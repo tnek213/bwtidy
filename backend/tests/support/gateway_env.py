@@ -40,6 +40,11 @@ signal.signal(signal.SIGTERM, lambda *args: sys.exit(0))
 
 
 class Handler(BaseHTTPRequestHandler):
+    ## buffered, so an answer's head and body leave in one write: the gateway's health check
+    ## hangs up once it has the head, and a body written after that fails with a broken pipe
+    ## whose traceback lands in worker.log (uvicorn, the real worker, drops it silently)
+    wbufsize = -1
+
     def seen(self):
         if self.path != "/api/health":
             with open("{SEEN}", "a") as file:

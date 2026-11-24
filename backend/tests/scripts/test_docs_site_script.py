@@ -137,4 +137,4 @@ def test_a_failure_while_putting_the_site_in_place_restores_the_old_one(
         docs_site.build(target)
     assert (target / "index.html").read_text() == "old"
     assert (target / "sitemap.xml").read_text() == "old"
-    assert [p.name for p in tmp_path.iterdir()] == ["out", "repo"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["out", "repo"]
