@@ -1,0 +1,891 @@
+[
+  {
+    "name": "@babel/code-frame",
+    "version": "7.29.7",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@babel/generator",
+    "version": "7.29.8",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@babel/helper-globals",
+    "version": "7.29.7",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@babel/helper-module-imports",
+    "version": "7.29.7",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@babel/helper-string-parser",
+    "version": "7.29.11",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@babel/helper-validator-identifier",
+    "version": "7.29.7",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@babel/parser",
+    "version": "7.29.11",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@babel/runtime",
+    "version": "7.29.10",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@babel/template",
+    "version": "7.29.7",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@babel/traverse",
+    "version": "7.29.10",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@babel/types",
+    "version": "7.29.11",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@base-ui/utils",
+    "version": "0.5.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/babel-plugin",
+    "version": "11.13.5",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/cache",
+    "version": "11.14.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/hash",
+    "version": "0.9.2",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/is-prop-valid",
+    "version": "1.4.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/memoize",
+    "version": "0.9.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/react",
+    "version": "11.14.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "@emotion/serialize",
+    "version": "1.3.3",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/sheet",
+    "version": "1.4.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/styled",
+    "version": "11.14.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "@emotion/unitless",
+    "version": "0.10.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/use-insertion-effect-with-fallbacks",
+    "version": "1.2.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/utils",
+    "version": "1.4.2",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@emotion/weak-memoize",
+    "version": "0.4.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@floating-ui/utils",
+    "version": "0.2.12",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@jridgewell/gen-mapping",
+    "version": "0.3.13",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@jridgewell/resolve-uri",
+    "version": "3.1.2",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@jridgewell/sourcemap-codec",
+    "version": "1.6.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@jridgewell/trace-mapping",
+    "version": "0.3.31",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@mui/core-downloads-tracker",
+    "version": "9.5.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@mui/material",
+    "version": "9.5.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "@mui/private-theming",
+    "version": "9.5.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@mui/styled-engine",
+    "version": "9.5.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@mui/system",
+    "version": "9.5.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@mui/types",
+    "version": "9.5.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@mui/utils",
+    "version": "9.5.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@mui/x-date-pickers",
+    "version": "9.18.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "@mui/x-internals",
+    "version": "9.18.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@popperjs/core",
+    "version": "2.11.8",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@tanstack/query-core",
+    "version": "5.105.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@tanstack/react-query",
+    "version": "5.105.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "@types/parse-json",
+    "version": "4.0.2",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@types/prop-types",
+    "version": "15.7.15",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@types/react",
+    "version": "19.3.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "@types/react-transition-group",
+    "version": "4.4.12",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "ag-charts-types",
+    "version": "14.2.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "ag-grid-community",
+    "version": "36.2.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "ag-grid-react",
+    "version": "36.2.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "ag-stack",
+    "version": "36.2.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "annotated-doc",
+    "version": "0.0.5",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "annotated-types",
+    "version": "0.8.0",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "anyio",
+    "version": "4.15.1",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "attrs",
+    "version": "26.1.0",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "babel-plugin-macros",
+    "version": "3.1.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "callsites",
+    "version": "3.1.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "cffi",
+    "version": "2.1.1",
+    "ecosystem": "PyPI",
+    "license": "MIT-0",
+    "direct": false
+  },
+  {
+    "name": "click",
+    "version": "8.5.0",
+    "ecosystem": "PyPI",
+    "license": "BSD-3-Clause",
+    "direct": false
+  },
+  {
+    "name": "clsx",
+    "version": "2.1.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "convert-source-map",
+    "version": "1.9.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "cosmiconfig",
+    "version": "7.1.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "cryptography",
+    "version": "50.0.2",
+    "ecosystem": "PyPI",
+    "license": "Apache-2.0 OR BSD-3-Clause",
+    "direct": true
+  },
+  {
+    "name": "csstype",
+    "version": "3.2.3",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "date-fns",
+    "version": "4.4.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "debug",
+    "version": "4.4.3",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "dom-helpers",
+    "version": "5.2.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "error-ex",
+    "version": "1.3.4",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "es-errors",
+    "version": "1.3.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "escape-string-regexp",
+    "version": "4.0.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "fastapi",
+    "version": "0.162.0",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "find-root",
+    "version": "1.1.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "function-bind",
+    "version": "1.1.2",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "h11",
+    "version": "0.16.0",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "hasown",
+    "version": "2.0.4",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "hoist-non-react-statics",
+    "version": "3.3.2",
+    "ecosystem": "npm",
+    "license": "BSD-3-Clause",
+    "direct": false
+  },
+  {
+    "name": "httpcore2",
+    "version": "2.16.0",
+    "ecosystem": "PyPI",
+    "license": "BSD-3-Clause",
+    "direct": false
+  },
+  {
+    "name": "httpx2",
+    "version": "2.16.0",
+    "ecosystem": "PyPI",
+    "license": "BSD-3-Clause",
+    "direct": true
+  },
+  {
+    "name": "idna",
+    "version": "3.20",
+    "ecosystem": "PyPI",
+    "license": "BSD-3-Clause",
+    "direct": false
+  },
+  {
+    "name": "import-fresh",
+    "version": "3.3.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "is-arrayish",
+    "version": "0.2.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "is-core-module",
+    "version": "2.17.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "js-tokens",
+    "version": "4.0.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "jsesc",
+    "version": "3.1.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "json-parse-even-better-errors",
+    "version": "2.3.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "jsonschema",
+    "version": "4.26.0",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "jsonschema-specifications",
+    "version": "2025.9.1",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "lines-and-columns",
+    "version": "1.2.4",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "loose-envify",
+    "version": "1.4.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "mcp",
+    "version": "2.3.0",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "mcp-types",
+    "version": "2.3.0",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "ms",
+    "version": "2.1.3",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "object-assign",
+    "version": "4.1.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "opentelemetry-api",
+    "version": "1.45.1",
+    "ecosystem": "PyPI",
+    "license": "Apache-2.0",
+    "direct": false
+  },
+  {
+    "name": "parent-module",
+    "version": "1.0.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "parse-json",
+    "version": "5.2.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "path-parse",
+    "version": "1.0.7",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "path-type",
+    "version": "4.0.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "picocolors",
+    "version": "1.1.1",
+    "ecosystem": "npm",
+    "license": "ISC",
+    "direct": false
+  },
+  {
+    "name": "prop-types",
+    "version": "15.8.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "pycparser",
+    "version": "3.12",
+    "ecosystem": "PyPI",
+    "license": "BSD-3-Clause",
+    "direct": false
+  },
+  {
+    "name": "pydantic",
+    "version": "2.14.1",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "pydantic-core",
+    "version": "2.50.1",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "pyjwt",
+    "version": "2.15.1",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "pyrage",
+    "version": "1.4.0",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "python-multipart",
+    "version": "0.0.32",
+    "ecosystem": "PyPI",
+    "license": "Apache-2.0",
+    "direct": false
+  },
+  {
+    "name": "react",
+    "version": "19.3.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "react-dom",
+    "version": "19.3.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": true
+  },
+  {
+    "name": "react-is",
+    "version": "16.13.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "react-is",
+    "version": "19.3.1",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "react-transition-group",
+    "version": "4.4.5",
+    "ecosystem": "npm",
+    "license": "BSD-3-Clause",
+    "direct": false
+  },
+  {
+    "name": "referencing",
+    "version": "0.37.0",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "reselect",
+    "version": "5.3.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "resolve",
+    "version": "1.22.13",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "resolve-from",
+    "version": "4.0.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "rpds-py",
+    "version": "2026.9.1",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "scheduler",
+    "version": "0.28.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "source-map",
+    "version": "0.5.7",
+    "ecosystem": "npm",
+    "license": "BSD-3-Clause",
+    "direct": false
+  },
+  {
+    "name": "sse-starlette",
+    "version": "3.6.0",
+    "ecosystem": "PyPI",
+    "license": "BSD-3-Clause",
+    "direct": false
+  },
+  {
+    "name": "starlette",
+    "version": "1.10.0",
+    "ecosystem": "PyPI",
+    "license": "BSD-3-Clause",
+    "direct": false
+  },
+  {
+    "name": "stylis",
+    "version": "4.2.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "supports-preserve-symlinks-flag",
+    "version": "1.0.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "truststore",
+    "version": "0.10.5",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "typing-extensions",
+    "version": "4.16.0",
+    "ecosystem": "PyPI",
+    "license": "PSF-2.0",
+    "direct": false
+  },
+  {
+    "name": "typing-inspection",
+    "version": "0.4.4",
+    "ecosystem": "PyPI",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "use-sync-external-store",
+    "version": "1.7.0",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "uvicorn",
+    "version": "0.54.0",
+    "ecosystem": "PyPI",
+    "license": "BSD-3-Clause",
+    "direct": true
+  },
+  {
+    "name": "yaml",
+    "version": "1.10.3",
+    "ecosystem": "npm",
+    "license": "ISC",
+    "direct": false
+  }
+]

@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""e2e: run backend/tests/e2e, Playwright on the host against the app in this worktree's dev stack.
+
+  scripts/e2e [--no-reset] [--stacks N] [PYTEST ARGS]
+  scripts/e2e -h | --help   print this and start nothing
+
+A test path (tests/... or backend/tests/..., a file, a directory or a node id) runs only those
+tests: scripts/e2e tests/e2e/test_x.py runs one file, -k NAME one test.
+
+The whole suite runs on several dev stacks of this worktree at once (default_stacks in
+scripts/devlib/stacks.py, by the RAM available), with pytest-xdist: -n N --dist loadfile, so
+every file runs in its order on one stack. A test path or -k runs on one stack (BWTIDY_STACK,
+1 by default). --stacks N sets the number either way.
+
+Runs scripts/dev-vault reset of each stack first, so every run starts from the seeded vault
+(the tests write to it) and without any bwtidy account. --no-reset only runs up, and setup
+when the stack was not up. Then starts a gateway as root in each stack's app container (it
+starts one worker per account, each as its own uid), its output appended to the stack's
+backend.log (.dev-vault/ for stack 1, .dev-vault-K/ for stack K), runs pytest on the host with
+BWTIDY_E2E_URL (one stack) or BWTIDY_E2E_URLS (several, conftest.py gives each xdist worker
+its own) and stops every gateway (SIGTERM, a clean stop of it and its workers), also after a
+failure or Ctrl+C. The stacks stay up, scripts/dev-vault down removes them all. Exits with
+pytest's code.
+"""
+
+import os
+import subprocess
+import sys
+import threading
+import time
+from datetime import datetime
+from pathlib import Path
+
+from devlib import gateway, health, stacks, suites
+from devlib.paths import ROOT
+
+BACKEND_DIR = ROOT / "backend"
+## several stacks' URLs, comma separated: xdist worker gwK takes stack K+1 (e2e/conftest.py)
+URLS_VAR = "BWTIDY_E2E_URLS"
+URL_VAR = "BWTIDY_E2E_URL"
+## short tracebacks, so a failure never prints an item (and its secrets) as a fixture value.
+## -rxX names the expected failures and why.
+PYTEST = ["uv", "run", "--quiet", "pytest", "--tb=short", "-rxX"]
+SUITE = "tests/e2e"
+## the script's options without a value, --stacks takes one
+OPTIONS = ["--no-reset"]
+
+
+def log_path(stack: int) -> Path:
+    return stacks.tls_dir(ROOT, stack) / "backend.log"
+
+
+def stop_label(stack: int) -> str:
+    return f"e2e: the backend of stack {stack}"
+
+
+def start_backend(stack: int) -> subprocess.Popen:
+    log_file = log_path(stack)
+    log_file.parent.mkdir(exist_ok=True)
+    with log_file.open("a") as log:
+        log.write(f"\n=== {datetime.now().astimezone():%Y-%m-%d %H:%M:%S %z} scripts/e2e\n")
+        log.flush()
+        return gateway.start_backend(stack, log)
+
+
+def stop_backends(backends: dict[int, subprocess.Popen]) -> None:
+    """Stop every gateway at once, each clean stop can wait for a backup."""
+    threads = [
+        threading.Thread(
+            target=gateway.stop_backend,
+            args=(stack, backend, stop_label(stack)),
+        )
+        for stack, backend in backends.items()
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+
+def prepare(reset: bool, numbers: list[int]) -> None:
+    if reset:
+        stacks.run_stacks([["reset"]], numbers)
+        return
+    fresh = [stack for stack in numbers if not stacks.stack_up(stack)]
+    if fresh:
+        stacks.run_stacks([["up"], ["setup"]], fresh)
+    running = [stack for stack in numbers if stack not in fresh]
+    if running:
+        stacks.run_stacks([["up"]], running)
+
+
+def stack_count(value: str | None, pytest: list[str]) -> int:
+    """--stacks N, else one stack for a test path or -k, else what the RAM allows."""
+    count = suites.stacks_option(value, "e2e")
+    if count is not None:
+        return count
+    if pytest[:1] != [SUITE] or any(arg.startswith("-k") for arg in pytest):
+        return 1
+    return stacks.default_stacks()
+
+
+def pytest_args(args: list[str]) -> list[str]:
+    return suites.pytest_args(args, "e2e", SUITE, OPTIONS)
+
+
+def stacks_for(count: int) -> list[int]:
+    """One stack is the one of BWTIDY_STACK, several are 1 to count."""
+    return [stacks.stack_number()] if count == 1 else list(range(1, count + 1))
+
+
+def pytest_env(urls: list[str]) -> dict[str, str]:
+    env = {k: v for k, v in os.environ.items() if k not in (URL_VAR, URLS_VAR)}
+    if len(urls) == 1:
+        env[URL_VAR] = urls[0]
+    else:
+        env[URLS_VAR] = ",".join(urls)
+    return env
+
+
+def xdist_args(count: int) -> list[str]:
+    ## loadfile keeps a file on one worker, so on one stack and in its order. xdist hands out
+    ## the files with the most tests first, --no-loadscope-reorder keeps them in the order of
+    ## one stack: a file that changes the vault (test_normalize.py moves a field of Media PC)
+    ## then never runs before a file that comes earlier on one stack (test_near_miss.py needs
+    ## that field). A worker started in place of a crashed one would have no stack
+    ## (conftest.py, pick_stack).
+    if count == 1:
+        return []
+    return [
+        "-n",
+        str(count),
+        "--dist",
+        "loadfile",
+        "--no-loadscope-reorder",
+        "--max-worker-restart",
+        "0",
+    ]
+
+
+def main(args: list[str]) -> int:
+    if suites.wants_help(args):
+        print(__doc__)
+        return 0
+    options, _ = suites.split_options(args, OPTIONS)
+    reset = "--no-reset" not in options
+    pytest = pytest_args(args)
+    count = stack_count(options.get("--stacks"), pytest)
+    numbers = stacks_for(count)
+    started = time.monotonic()
+    if count > 1:
+        print(f"e2e: running on {count} stacks", flush=True)
+    prepare(reset, numbers)
+    urls = [f"http://127.0.0.1:{stacks.app_port(stack, 'e2e')}" for stack in numbers]
+    for url in urls:
+        if health.healthy(url):
+            raise SystemExit(
+                f"e2e: a backend already runs on {url}, stop it first (scripts/dev-app)"
+            )
+    backends: dict[int, subprocess.Popen] = {}
+    try:
+        for stack in numbers:
+            gateway.sync_venv(stack)
+            log = log_path(stack).relative_to(ROOT)
+            print(f"e2e: starting the gateway, its log goes to {log}", flush=True)
+            backends[stack] = start_backend(stack)
+        for stack, url in zip(numbers, urls, strict=True):
+            health.wait_healthy(
+                stack, url, backends[stack], "e2e", log_path(stack), stop_label(stack)
+            )
+        command = [*PYTEST, *xdist_args(count), *pytest]
+        code = subprocess.run(command, cwd=BACKEND_DIR, env=pytest_env(urls)).returncode
+    finally:
+        stop_backends(backends)
+    still = "the stack is" if count == 1 else "the stacks are"
+    print(f"e2e: done in {time.monotonic() - started:.0f} s, {still} still up")
+    return code
+
+
+if __name__ == "__main__":
+    if not suites.wants_help(sys.argv[1:]):
+        suites.reexec_inhibited("e2e", __file__)
+    os.chdir(ROOT)
+    sys.exit(main(sys.argv[1:]))

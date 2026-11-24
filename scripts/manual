@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""manual: reset, build and run the very latest main to test it by hand.
+
+  scripts/manual [--keep-vault]
+
+Run it from the repo's main checkout. Refuses when the checkout is not on main or has
+uncommitted changes. Then fetches origin, fast-forwards main to origin/main (refuses when
+that is not a fast-forward or main is ahead of origin) and prints the version it is about
+to test (the package version and the commit, like 0.1.0-alpha.1 (261111 7db8830)). Resets the dev
+vault unless --keep-vault, then runs scripts/dev-app. Once the backend answers, /api/health's
+version must equal the expected one, otherwise the backend is stopped and this fails.
+Dev credentials only, see dev/README.md.
+"""
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+from devlib import gateway, git, health
+from devlib.paths import DEV_VAULT, ROOT
+
+NAME = "manual"
+## the stack of the worktree that has .dev-vault.env
+STACK = 1
+BRANCH = "main"
+REMOTE_BRANCH = "origin/main"
+USAGE = "usage: manual [--keep-vault]"
+
+
+def check_checkout(repo: Path) -> None:
+    """Refuse unless the checkout is on main and clean, naming each uncommitted file."""
+    git.check_checkout(NAME, repo, branch=BRANCH, list_changes=True)
+
+
+def update(repo: Path) -> None:
+    """Fetch origin and fast-forward main to origin/main, refuse anything else."""
+    fetch = git.git("fetch", "origin", repo=repo, check=False)
+    if fetch.returncode != 0:
+        raise SystemExit(f"manual: git fetch origin failed:\n{fetch.stderr.strip()}")
+    merge = git.git("merge", "--ff-only", REMOTE_BRANCH, repo=repo, check=False)
+    if merge.returncode != 0:
+        raise SystemExit(
+            f"manual: {BRANCH} cannot fast-forward to {REMOTE_BRANCH}, "
+            f"it has commits origin does not:\n{merge.stderr.strip() or merge.stdout.strip()}"
+        )
+    head = git.output("rev-parse", "HEAD", name=NAME, repo=repo)
+    if head != git.output("rev-parse", REMOTE_BRANCH, name=NAME, repo=repo):
+        raise SystemExit(
+            f"manual: {BRANCH} has commits that are not on {REMOTE_BRANCH}, "
+            "push or drop them so the tested version is the one on origin"
+        )
+
+
+def verify_version(expected: str, url: str) -> None:
+    """Print the version the backend runs, or fail when it is not the expected one."""
+    try:
+        actual = health.health_version(url)
+    except (OSError, ValueError, KeyError) as error:
+        raise SystemExit(
+            f"manual: could not read the version from {url}/api/health: {error}"
+        ) from error
+    if actual != expected:
+        raise SystemExit(
+            f"manual: the backend runs version {actual!r} but {expected!r} was expected, "
+            "stopping it"
+        )
+    banner = f"  Testing {actual}  "
+    line = "=" * len(banner)
+    print(f"\n{line}\n{banner}\n{line}\n", flush=True)
+
+
+def main(args: list[str]) -> int:
+    if args not in ([], ["--keep-vault"]):
+        print(USAGE, file=sys.stderr)
+        return 2
+    check_checkout(ROOT)
+    update(ROOT)
+    expected = health.health_text(git.commit(NAME))
+    print(f"manual: about to test {expected}", flush=True)
+    if not args:
+        subprocess.run([str(DEV_VAULT), "reset"], check=True)
+    return gateway.run_backend(STACK, lambda url: verify_version(expected, url))
+
+
+if __name__ == "__main__":
+    os.chdir(ROOT)
+    sys.exit(main(sys.argv[1:]))

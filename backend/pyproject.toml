@@ -1,0 +1,138 @@
+[project]
+name = "bwtidy"
+version = "0.1.0a1"
+description = "Local web UI and MCP server for keeping a Bitwarden vault consistent"
+authors = [
+    { name = "Kent Larsson", email = "kent.larsson@gmail.com" }
+]
+license = "AGPL-3.0-only"
+requires-python = ">=3.13"
+dependencies = [
+    "cryptography>=50.0.2",
+    "fastapi>=0.120",
+    "httpx2>=2.16",
+    "mcp>=2.3.0",
+    "pyrage>=1.4.0",
+    "uvicorn>=0.38",
+]
+
+[project.scripts]
+bwtidy = "bwtidy.main:run"
+bwtidy-gateway = "bwtidy.gateway.app:run"
+
+[build-system]
+requires = ["uv_build>=0.11.14,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "import-linter>=2.17",
+    "playwright>=1.64.1",
+    "pytest>=9.0",
+    "pytest-testmon>=2.3.0",
+    "pytest-xdist>=3.8.0",
+    "ruff>=0.15",
+    "ty>=0.0.1",
+]
+docs = [
+    "zensical==0.1.1",
+]
+
+[tool.ty.environment]
+## stubs for packages that ship none (see typings/pyrage), and scripts/ with devlib and the
+## scripts that the scripts and the tests import
+extra-paths = ["typings", "../scripts"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+markers = [
+    "integration: needs the dev vault stack, run with scripts/integration",
+    "e2e: drives the app in a browser against the dev vault stack, run with scripts/e2e",
+    "bw_cli: runs a fake bw executable of its own, so conftest leaves the CLI calls alone",
+    "real_scrypt: uses the real scrypt of pyrage, no stand-in",
+]
+
+[tool.importlinter]
+root_package = "bwtidy"
+
+[[tool.importlinter.contracts]]
+name = "Layers of the worker"
+type = "layers"
+layers = [
+    "bwtidy.main",
+    "bwtidy.api",
+    "bwtidy.mcp",
+    "bwtidy.queue",
+    "bwtidy.writes",
+    "bwtidy.worker",
+    "bwtidy.session",
+    "bwtidy.backups",
+    "bwtidy.vault",
+    "bwtidy.operations",
+    "bwtidy.sections",
+    "bwtidy.items",
+    "bwtidy.bw",
+    "bwtidy.config | bwtidy.login_state",
+    "bwtidy.version | bwtidy.protocol | bwtidy.logs | bwtidy.timing | bwtidy.validation | bwtidy.passphrase | bwtidy.mcp_token | bwtidy.db",
+]
+
+[[tool.importlinter.contracts]]
+name = "The gateway takes only basics from the worker"
+type = "forbidden"
+source_modules = ["bwtidy.gateway"]
+forbidden_modules = [
+    "bwtidy.main",
+    "bwtidy.api",
+    "bwtidy.mcp",
+    "bwtidy.queue",
+    "bwtidy.writes",
+    "bwtidy.session",
+    "bwtidy.worker",
+    "bwtidy.backups",
+    "bwtidy.vault",
+    "bwtidy.operations",
+    "bwtidy.sections",
+    "bwtidy.items",
+    "bwtidy.bw",
+    "bwtidy.db",
+]
+
+[[tool.importlinter.contracts]]
+name = "Route modules are independent"
+type = "independence"
+modules = [
+    "bwtidy.api.account",
+    "bwtidy.api.backups",
+    "bwtidy.api.bwlogin",
+    "bwtidy.api.datatypes",
+    "bwtidy.api.generator",
+    "bwtidy.api.grid",
+    "bwtidy.api.mcp",
+    "bwtidy.api.operations",
+    "bwtidy.api.queue",
+    "bwtidy.api.session",
+    "bwtidy.api.settings",
+    "bwtidy.api.statistics",
+    "bwtidy.api.templates",
+]
+
+[[tool.importlinter.contracts]]
+name = "bw knows no vocabulary"
+type = "forbidden"
+source_modules = ["bwtidy.bw"]
+forbidden_modules = ["bwtidy.items", "bwtidy.sections", "bwtidy.vault"]
+
+[[tool.importlinter.contracts]]
+name = "The vocabulary knows no state and no bw"
+type = "forbidden"
+source_modules = ["bwtidy.operations", "bwtidy.sections", "bwtidy.items"]
+forbidden_modules = ["bwtidy.vault", "bwtidy.writes", "bwtidy.queue", "bwtidy.bw"]

@@ -1,0 +1,60 @@
+## The test stack of scripts/dev-vault (Vaultwarden and the app container of the tests).
+## It is not a way to run bwtidy: that is compose.yaml.
+## Ports, the project name and the stack's directory (BWTIDY_TLS_DIR) come from .dev-vault.env,
+## the certificate from that directory (.dev-vault/ for stack 1, .dev-vault-K/ for stack K).
+## Both are written by scripts/dev-vault up.
+## Vaultwarden speaks HTTPS because bw 2026.10.0 and the web vault refuse plain HTTP servers.
+services:
+  vaultwarden:
+    ## scripts/dev-vault up sets BWTIDY_VW_IMAGE to the seeded snapshot image when it has one
+    image: ${BWTIDY_VW_IMAGE:-vaultwarden/server:1.37.4}
+    environment:
+      SIGNUPS_ALLOWED: "true"
+      ## the name the app container uses: Vaultwarden puts it in attachment links and token issuers
+      DOMAIN: https://vaultwarden
+      ## the default (a burst of 10, then one per minute) answers 429 to tests that log in many times
+      LOGIN_RATELIMIT_MAX_BURST: "1000"
+      ROCKET_PORT: "443"
+      ROCKET_TLS: '{certs="/tls/cert.pem",key="/tls/key.pem"}'
+    volumes:
+      - vw-data:/data
+      - ./${BWTIDY_TLS_DIR:-.dev-vault}/cert.pem:/tls/cert.pem:ro
+      - ./${BWTIDY_TLS_DIR:-.dev-vault}/key.pem:/tls/key.pem:ro
+    ports:
+      - "127.0.0.1:${BWTIDY_VW_PORT:?run scripts/dev-vault up}:443"
+
+  app:
+    build:
+      context: .
+      target: dev
+    environment:
+      BWTIDY_DATA_DIR: /data/app
+      NODE_EXTRA_CA_CERTS: /tls/cert.pem
+      ## backend/tests/integration skips without it, so bw never runs there against the host's state
+      BWTIDY_DEV_STACK: "1"
+    volumes:
+      - app-data:/data/app
+      - bw-data:/data/bw
+      ## the gateway's accounts (scripts/e2e and scripts/dev-app), app-data and bw-data are
+      ## the single-user backend's of the integration tests
+      - accounts-data:/data/accounts
+      - ./backend:/src/backend
+      ## docs/restore.md for every backup's RESTORE.md, as the worktree has it now (a mount of
+      ## the file alone would keep the old one once an editor replaces the file)
+      - ./docs:/app/docs:ro
+      - ./${BWTIDY_TLS_DIR:-.dev-vault}/cert.pem:/tls/cert.pem:ro
+    ports:
+      - "127.0.0.1:${BWTIDY_APP_PORT:?run scripts/dev-vault up}:8000"
+    depends_on:
+      - vaultwarden
+    ## the same as compose.yaml for the record: docker's SIGTERM reaches only PID 1, never a
+    ## gateway the scripts started with exec. As PID 1 sleep would ignore it, under init it
+    ## exits at once, so a down does not wait the whole grace period.
+    stop_grace_period: 150s
+    init: true
+
+volumes:
+  vw-data:
+  app-data:
+  bw-data:
+  accounts-data:

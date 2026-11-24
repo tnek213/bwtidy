@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+"""ci: lint, format check, type check, then test, backend first. Stops at the first failure.
+
+  scripts/ci                    check everything
+  scripts/ci --fix              let ruff fix what it can first, then check
+  scripts/ci install-githooks [--force]
+                                run `scripts/ci` on every commit. A pre-commit hook that is not
+                                ours is printed and kept, --force overwrites it
+
+First it checks that frontend/package.json has the version of backend/pyproject.toml (Python's
+0.1.0a1 is 0.1.0-alpha.1 as semver.org spells it, b is beta, rc is rc), the only version that is
+written by hand, and that frontend/src/about/thirdParty.json lists the packages of the lock files
+(scripts/third-party), then the docs (scripts/docs-lint): every image a markdown file links exists
+and every image in docs/images is linked, every link between pages resolves (a #anchor too), and
+the prose has no semicolon, em dash or ` -- ` (AGENTS.md), then that docs/reference/mcp-tools.md
+is what scripts/mcp-reference writes from the MCP server's tools, then a strict build of the
+documentation site (scripts/docs-site build: every page is in the nav, every nav entry, page link
+and anchor resolves in the site). bwtidy follows Semantic Versioning 2.0.0 (https://semver.org).
+Backend (backend/, via uv): ruff lint, ruff format, ty, lint-imports (the import contracts of
+[tool.importlinter] in backend/pyproject.toml), pytest (tests/unit, tests/scripts and tests/repo,
+not tests/integration, that is scripts/integration, nor tests/e2e, that is scripts/e2e).
+Frontend (frontend/, via npm): oxlint, dependency-cruiser (what imports what, cycles), knip (unused
+files, exports and types), tsc + vite build, vitest.
+Only ruff can fix anything. The rest needs a human (or an agent).
+
+pytest runs in parallel (pytest-xdist, --dist worksteal) with one worker per core, half the
+cores when the machine is already busy. PYTEST_WORKERS set by the caller wins. Every test runs,
+never only those testmon picks.
+"""
+
+import os
+import subprocess
+import sys
+from collections.abc import Callable
+from pathlib import Path
+from typing import NamedTuple
+
+from devlib import versions
+from devlib.paths import ROOT, SCRIPTS
+
+BACKEND = ROOT / "backend"
+FRONTEND = ROOT / "frontend"
+
+## scripts carry no .py, so ruff and ty skip them unless they are named outright
+SCRIPT_FILES = [str(p) for p in sorted(SCRIPTS.iterdir()) if p.is_file()]
+PACKAGE_FILES = [str(p) for p in sorted((SCRIPTS / "devlib").glob("*.py"))]
+SCRIPTS_CHECKED = [*SCRIPT_FILES, *PACKAGE_FILES]
+## a step in process: it answers why it failed, None when it passed
+Inline = Callable[[], str | None]
+
+
+class Check(NamedTuple):
+    """One step of ci: what it prints, where it runs, what it runs and its environment.
+
+    env is called when the step starts, None keeps ci's own. hint follows the label after FAILED,
+    fixable adds that scripts/ci --fix may help (unless it ran with --fix).
+    """
+
+    label: str
+    cwd: Path
+    argv: list[str] | Inline
+    env: Callable[[], dict[str, str]] | None = None
+    hint: str = ""
+    fixable: bool = False
+
+
+def uv(*cmd: str) -> list[str]:
+    return ["uv", "run", "--quiet", *cmd]
+
+
+def npm(script: str) -> list[str]:
+    return ["npm", "run", "--silent", script]
+
+
+def busy(cores: int) -> bool:
+    return os.getloadavg()[0] > cores / 2
+
+
+def pytest_workers() -> str:
+    """The number of pytest-xdist workers: all cores, half of them when the machine is busy.
+
+    PYTEST_WORKERS set by the caller wins.
+    """
+    if "PYTEST_WORKERS" in os.environ:
+        return os.environ["PYTEST_WORKERS"]
+    cores = os.cpu_count() or 1
+    return str(max(1, cores // 2) if busy(cores) else cores)
+
+
+def vitest_env() -> dict[str, str]:
+    """Environment for vitest: half the cores as workers when the machine is already busy.
+
+    Vitest takes all cores but one by default. Two runs side by side then oversubscribe the CPU
+    and the memory and tests time out, while fewer workers per run are as fast in total.
+    VITEST_MAX_WORKERS set by the caller wins.
+    """
+    env = dict(os.environ)
+    cores = os.cpu_count() or 1
+    if "VITEST_MAX_WORKERS" not in env and busy(cores):
+        env["VITEST_MAX_WORKERS"] = str(max(1, cores // 2))
+    return env
+
+
+## in their order, ci stops at the first that fails. The steps in backend/ and frontend/ need
+## their dependencies, ci installs them (and with --fix runs FIXES) before the first of them.
+CHECKS = [
+    Check("versions", ROOT, versions.version_mismatch),
+    Check(
+        "third-party",
+        ROOT,
+        [str(SCRIPTS / "third-party"), "--check"],
+        hint="(run scripts/third-party)",
+    ),
+    Check("docs-lint", ROOT, [str(SCRIPTS / "docs-lint")]),
+    Check(
+        "mcp-reference",
+        ROOT,
+        [str(SCRIPTS / "mcp-reference"), "--check"],
+        hint="(run scripts/mcp-reference)",
+    ),
+    Check(
+        "docs-site", ROOT, [str(SCRIPTS / "docs-site"), "build"], hint="(scripts/docs-site build)"
+    ),
+    Check("ruff check", BACKEND, uv("ruff", "check", ".", *SCRIPTS_CHECKED), fixable=True),
+    Check(
+        "ruff format", BACKEND, uv("ruff", "format", "--check", ".", *SCRIPTS_CHECKED), fixable=True
+    ),
+    Check(
+        "ty check", BACKEND, uv("ty", "check", ".", str(SCRIPTS / "third-party"), *PACKAGE_FILES)
+    ),
+    ## its cache keeps a module whose file went back to an older mtime, and a full run is as fast
+    Check("lint-imports", BACKEND, uv("lint-imports", "--no-cache")),
+    Check(
+        "pytest",
+        BACKEND,
+        uv(
+            "pytest",
+            "tests/unit",
+            "tests/scripts",
+            "tests/repo",
+            "-n",
+            pytest_workers(),
+            "--dist",
+            "worksteal",
+        ),
+    ),
+    Check("npm lint", FRONTEND, npm("lint")),
+    Check("npm lint:deps", FRONTEND, npm("lint:deps")),
+    Check("npm lint:exports", FRONTEND, npm("lint:exports")),
+    Check("npm build", FRONTEND, npm("build")),
+    Check("npm test", FRONTEND, npm("test"), env=vitest_env),
+]
+
+FIXES = [
+    Check("ruff check", BACKEND, uv("ruff", "check", "--fix", ".", *SCRIPTS_CHECKED)),
+    Check("ruff format", BACKEND, uv("ruff", "format", ".", *SCRIPTS_CHECKED)),
+]
+
+HOOK = '#!/bin/sh\nexec "$(git rev-parse --show-toplevel)/scripts/ci"\n'
+
+
+def run(check: Check, fix: bool) -> str | None:
+    """Run the check: None when it passes, else the line after FAILED."""
+    print(f"--> {check.label}", flush=True)
+    if callable(check.argv):
+        why = check.argv()
+        return None if why is None else f"{check.label}: {why}"
+    env = check.env() if check.env else None
+    if subprocess.run(check.argv, cwd=check.cwd, env=env).returncode == 0:
+        return None
+    hint = "(try scripts/ci --fix)" if check.fixable and not fix else check.hint
+    return f"{check.label} {hint}".rstrip()
+
+
+def ensure_deps() -> None:
+    ## a fresh worktree has neither .venv nor node_modules
+    subprocess.run(["uv", "sync", "--quiet"], cwd=BACKEND, check=True)
+    if not (FRONTEND / "node_modules").exists():
+        subprocess.run(["npm", "ci", "--no-fund", "--no-audit"], cwd=FRONTEND, check=True)
+
+
+def install_githooks(force: bool) -> int:
+    hooks = subprocess.run(
+        ["git", "rev-parse", "--git-path", "hooks"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    path = ROOT / hooks / "pre-commit"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and not force:
+        existing = path.read_text(errors="replace")
+        if existing != HOOK:
+            print(existing, end="" if existing.endswith("\n") else "\n")
+            print(
+                f"ci: {path} is a pre-commit hook that is not ours, kept. "
+                "Run scripts/ci install-githooks --force to overwrite it.",
+                file=sys.stderr,
+            )
+            return 1
+    path.write_text(HOOK)
+    path.chmod(0o755)
+    print(f"installed {path}")
+    return 0
+
+
+def main(args: list[str]) -> int:
+    if args in (["install-githooks"], ["install-githooks", "--force"]):
+        return install_githooks(force="--force" in args)
+    if args not in ([], ["--fix"]):
+        print("usage: ci [--fix | install-githooks [--force]]", file=sys.stderr)
+        return 2
+
+    fix = args == ["--fix"]
+    prepared = False
+    for check in CHECKS:
+        if check.cwd != ROOT and not prepared:
+            ensure_deps()
+            if fix:
+                ## a fix that fails still leaves the checks below to report what remains
+                for step in FIXES:
+                    run(step, fix)
+            prepared = True
+        failure = run(check, fix)
+        if failure is not None:
+            print(f"FAILED: {failure}", file=sys.stderr)
+            return 1
+    print("ci: all green")
+    return 0
+
+
+if __name__ == "__main__":
+    os.chdir(ROOT)
+    sys.exit(main(sys.argv[1:]))

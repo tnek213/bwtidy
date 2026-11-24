@@ -1,0 +1,41 @@
+# Publishes the documentation site on GitHub Pages (https://tnek213.github.io/bwtidy/).
+# Both jobs skip while the repo is private, as GitHub's free plan serves Pages only from public repos.
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # setup-uv publishes no major version tag, only full versions
+      - uses: astral-sh/setup-uv@v10.3.3
+      - run: scripts/docs-site build _site
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    if: ${{ !github.event.repository.private }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

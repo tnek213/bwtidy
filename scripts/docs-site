@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""docs-site: the documentation site that the gateway serves at /docs/, built with Zensical.
+
+  scripts/docs-site build [DIR]   build the site strictly into DIR (default a temp directory,
+                                  deleted after), fail on any warning. DIR is replaced only
+                                  after the build passed, and only when it is missing, empty
+                                  or a previous build (it holds index.html and sitemap.xml),
+                                  else the command refuses
+  scripts/docs-site serve [ARGS]  preview it with `zensical serve`, rebuilt on every change
+                                  (ARGS go to zensical, such as --dev-addr localhost:8001)
+
+The site is zensical.toml at the repo root over the pages in docs/, with the theme overrides in
+overrides/ (its main.html puts the alpha disclaimer as a banner above every page). Zensical
+comes from the backend's dependency group `docs` (backend/pyproject.toml, pinned in
+backend/uv.lock), run through `uv run --only-group docs`, so neither bwtidy nor its dependencies
+are needed. The Dockerfile's docs stage and the Pages workflow (.github/workflows/docs.yml) run
+`build` too.
+
+`build` fails on a broken nav entry or a link to a page or anchor that is not in the site, so a
+link out of docs/ (like one to dev/README.md) fails as well. It also fails, before Zensical runs,
+on a page of docs/ that the nav leaves out, as Zensical builds it without a way to reach it, and,
+after Zensical, on a built HTML page without the banner's marker (the attribute data-disclaimer),
+naming each such page. Zensical writes its output and its cache inside the project, so `build`
+copies zensical.toml, docs/ and overrides/ into a temp directory and builds there: nothing in the
+checkout changes and two builds never meet. `serve` runs in the checkout and leaves site/ and
+.cache/ there, both git-ignored.
+"""
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+
+## the Dockerfile's docs stage copies this script alone, so it stays free of scripts/devlib
+ROOT = Path(__file__).resolve().parent.parent
+BACKEND = ROOT / "backend"
+CONFIG = "zensical.toml"
+DOCS = "docs"
+OVERRIDES = "overrides"
+BANNER_MARKER = "data-disclaimer"
+## what Zensical writes at the top of every site, so a directory that holds both is a build
+BUILD_MARKERS = ("index.html", "sitemap.xml")
+ZENSICAL = [
+    "uv",
+    "run",
+    "--quiet",
+    "--frozen",
+    "--project",
+    str(BACKEND),
+    "--only-group",
+    "docs",
+    "zensical",
+]
+
+
+def nav_pages(entries: Any) -> Iterator[str]:
+    """Every page path of a nav: a list of paths and of {title: path or list} tables."""
+    if isinstance(entries, str):
+        yield entries
+    elif isinstance(entries, list):
+        for entry in entries:
+            yield from nav_pages(entry)
+    elif isinstance(entries, dict):
+        for value in entries.values():
+            yield from nav_pages(value)
+
+
+def left_out() -> list[str]:
+    """The pages of docs/ that the nav of zensical.toml does not list."""
+    with (ROOT / CONFIG).open("rb") as file:
+        nav = set(nav_pages(tomllib.load(file)["project"]["nav"]))
+    pages = (path.relative_to(ROOT / DOCS).as_posix() for path in (ROOT / DOCS).rglob("*.md"))
+    return sorted(page for page in pages if page not in nav)
+
+
+def without_banner(site: Path) -> list[str]:
+    """The HTML pages of a built site that lack the disclaimer banner's marker."""
+    pages = sorted(site.rglob("*.html"))
+    return [
+        page.relative_to(site).as_posix()
+        for page in pages
+        if BANNER_MARKER not in page.read_text(encoding="utf-8")
+    ]
+
+
+def refusal(target: Path) -> str | None:
+    """Why build must not replace the target: it is neither missing, empty nor a build."""
+    if not target.exists():
+        return None
+    if not target.is_dir():
+        return f"{target} is not a directory"
+    if not any(target.iterdir()) or all((target / name).is_file() for name in BUILD_MARKERS):
+        return None
+    return f"{target} is not empty and not a previous build (it lacks {' or '.join(BUILD_MARKERS)})"
+
+
+def replace(target: Path, site: Path) -> None:
+    """Put a copy of the built site at target, the old one stays until the copy is in place."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{target.name}-", dir=target.parent))
+    old = target.with_name(f".old-{target.name}")
+    try:
+        shutil.copytree(site, staging / "site")
+        if old.exists():
+            shutil.rmtree(old)
+        moved = target.exists()
+        if moved:
+            os.replace(target, old)
+        try:
+            os.replace(staging / "site", target)
+        except BaseException:
+            if moved:
+                os.replace(old, target)
+            raise
+        shutil.rmtree(old, ignore_errors=True)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+
+def build(target: Path | None) -> int:
+    if target is not None and (why := refusal(target)):
+        print(f"docs-site: {why}, nothing was built", file=sys.stderr)
+        return 1
+    missing = left_out()
+    for page in missing:
+        print(f"docs-site: docs/{page} is not in the nav of {CONFIG}", file=sys.stderr)
+    if missing:
+        return 1
+    with tempfile.TemporaryDirectory(prefix="bwtidy-docs-site-") as temp:
+        project = Path(temp)
+        shutil.copy2(ROOT / CONFIG, project / CONFIG)
+        shutil.copytree(ROOT / DOCS, project / DOCS)
+        shutil.copytree(ROOT / OVERRIDES, project / OVERRIDES)
+        built = subprocess.run([*ZENSICAL, "build", "--strict"], cwd=project)
+        if built.returncode != 0:
+            return 1
+        bare = without_banner(project / "site")
+        for page in bare:
+            print(f"docs-site: {page} has no disclaimer banner ({BANNER_MARKER})", file=sys.stderr)
+        if bare:
+            return 1
+        if target is not None:
+            replace(target, project / "site")
+            print(f"docs-site: built into {target}")
+    return 0
+
+
+def serve(args: list[str]) -> int:
+    return subprocess.run([*ZENSICAL, "serve", *args], cwd=ROOT).returncode
+
+
+def main(args: list[str]) -> int:
+    if args[:1] == ["build"] and len(args) <= 2:
+        return build(Path(args[1]).absolute() if len(args) == 2 else None)
+    if args[:1] == ["serve"]:
+        return serve(args[1:])
+    print(__doc__, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

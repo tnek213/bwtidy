@@ -1,0 +1,404 @@
+#!/usr/bin/env python3
+"""integration: run backend/tests/integration in the app container of this worktree's dev stack.
+
+  scripts/integration [--root] [--stacks N] [PYTEST ARGS]
+  scripts/integration -h | --help   print this and start nothing
+
+A test path (tests/... or backend/tests/..., a file, a directory or a node id) runs only those
+tests: scripts/integration tests/integration/test_x.py runs one file, -k NAME one test.
+
+The whole suite runs on several dev stacks of this worktree at once (default_stacks in
+scripts/devlib/stacks.py, by the RAM available): a scheduler hands out one file per stack at a
+time, the longest first (DURATIONS), and runs the --root run of test_gateway.py on a stack
+that has had a plain run. On one stack the whole suite is one pytest and then the --root run of
+test_gateway.py. Each run's output goes to .integration-logs/FILE.log (FILE-root.log for the
+root run, integration.log for the whole suite in one pytest), the end prints each failed run's
+short traceback and one summary line of every run in pytest's form. --stacks N sets the number
+of stacks, also for a list of files. A test path, -k or --root runs one pytest on one stack
+(BWTIDY_STACK, 1 by default), as does a list of files on one stack.
+
+When a stack is not up, it runs scripts/dev-vault up and setup first. The stacks stay
+up afterwards, scripts/dev-vault down stops them all. scripts/ci never runs these tests.
+
+--root runs pytest as root in the container, for the tests that switch uids
+(test_gateway.py, which skips otherwise):
+scripts/integration --root tests/integration/test_gateway.py.
+"""
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from dataclasses import dataclass
+from datetime import timedelta
+from pathlib import Path
+
+from devlib import stacks, suites
+from devlib.paths import DEV_VAULT, ROOT
+
+## each run's output when the scheduler runs the suite, emptied at the start of such a run
+LOG_DIR = ROOT / ".integration-logs"
+
+SUITE = "tests/integration"
+## the script's options without a value, --stacks takes one
+OPTIONS = ["--root"]
+## short tracebacks, so a failure never prints an item (and its secrets) as a fixture value
+PYTEST = 'cd /src/backend && {env}exec uv run --frozen --quiet {sync}pytest --tb=short {cache}"$@"'
+## the root run must leave nothing root-owned in the mounted worktree: no bytecode, no cache
+AS_ROOT = {
+    "env": "export PYTHONDONTWRITEBYTECODE=1 && ",
+    "sync": "--no-sync ",
+    "cache": "-p no:cacheprovider ",
+}
+PLAIN = {"env": "", "sync": "", "cache": ""}
+## the file that also runs as root, after a plain run on its stack created the venv as uid 1000
+ROOT_FILE = "test_gateway.py"
+## pytest seconds of each run on the dev stack, the scheduler starts the longest first and a
+## file missing here last. They are the times of a run on three stacks with bw exiting at once,
+## update them when a file grows a lot.
+DURATIONS = {
+    "test_restore.py": 903,
+    "test_backup_import.py": 266,
+    "test_rename_attachment.py": 248,
+    "test_create.py": 236,
+    "test_templates.py": 208,
+    "test_backup.py": 203,
+    "test_writes.py": 193,
+    "test_ssh_key.py": 149,
+    "test_queue_ui.py": 92,
+    "test_reencrypt.py": 85,
+    "test_normalize.py": 81,
+    "test_to_fill.py": 78,
+    "test_set_uris.py": 75,
+    "test_gateway.py --root": 220,
+    "test_mcp.py": 53,
+    "test_queued_edits.py": 50,
+    "test_worker_mode.py": 48,
+    "test_bw_login.py": 35,
+    "test_session.py": 35,
+    "test_generator.py": 33,
+    "test_seed.py": 31,
+    "test_grid.py": 19,
+    "test_gateway.py": 1,
+}
+## the order of pytest's own summary line
+KINDS = ["failed", "passed", "skipped", "deselected", "xfailed", "xpassed", "warning", "error"]
+## pytest's last line: "=== 3 passed, 1 skipped in 12.34s ===", -q drops the equals signs
+SUMMARY = re.compile(r"^=*\s*((?:\d+ \w+)(?:, \d+ \w+)*|no tests ran) in ([\d.]+)s\b.*$")
+
+
+def pytest_args(args: list[str]) -> list[str]:
+    return suites.pytest_args(args, "integration", SUITE, OPTIONS)
+
+
+@dataclass(frozen=True)
+class Job:
+    """One scripts/integration run of the scheduler: a file, plain or as root, or SUITE plain."""
+
+    file: str
+    root: bool = False
+
+    @property
+    def key(self) -> str:
+        return f"{self.file} --root" if self.root else self.file
+
+    @property
+    def log_name(self) -> str:
+        return f"{Path(self.file).name.removesuffix('.py')}{'-root' if self.root else ''}.log"
+
+    def args(self) -> list[str]:
+        if self.file == SUITE:
+            ## each file by name, so the run is one pytest and not a schedule of its own
+            paths = [f"{SUITE}/{name}" for name in suite_files()]
+        else:
+            paths = [f"{SUITE}/{self.file}"]
+        return [*(["--root"] if self.root else []), *paths]
+
+
+@dataclass
+class Result:
+    job: Job
+    stack: int
+    ## None when the run raised instead of ending, failure then says how
+    code: int | None
+    counts: dict[str, int]
+    seconds: float | None
+    failure: str | None = None
+
+    @property
+    def failed(self) -> bool:
+        return self.code != 0
+
+
+def suite_files() -> list[str]:
+    return sorted(p.name for p in (ROOT / "backend" / SUITE).glob("test_*.py"))
+
+
+def jobs(files: list[str]) -> list[Job]:
+    """A plain run of every file and the root run of ROOT_FILE, longest first, unknown ones last."""
+    result = [Job(name) for name in files]
+    if ROOT_FILE in files:
+        result.append(Job(ROOT_FILE, root=True))
+    known = sorted((j for j in result if j.key in DURATIONS), key=lambda j: -DURATIONS[j.key])
+    return known + sorted((j for j in result if j.key not in DURATIONS), key=lambda j: j.key)
+
+
+def plan(files: list[str], count: int, whole: bool) -> list[Job] | None:
+    """The scheduler's runs on count stacks, None for one plain pytest run.
+
+    On several stacks the jobs of the files. On one stack a run of the whole suite is one pytest
+    of SUITE and then the root run of ROOT_FILE, a list of files is one pytest.
+    """
+    if count > 1:
+        return jobs(files)
+    if not whole:
+        return None
+    return [Job(SUITE), *([Job(ROOT_FILE, root=True)] if ROOT_FILE in files else [])]
+
+
+def next_job(pending: list[Job], had_plain_run: bool) -> Job | None:
+    """The first pending job a stack may take: a root run only after a plain run there.
+
+    After a reset a root run as the stack's first one fails and leaves a root-owned venv.
+    """
+    return next((job for job in pending if had_plain_run or not job.root), None)
+
+
+def schedule(
+    pending: list[Job], numbers: list[int], run_job, stop: threading.Event, results: list[Result]
+) -> None:
+    """Run the jobs on the stacks, each stack one at a time, until none is left or stop is set.
+
+    Every stack's first job is a plain one, so the root run always finds a stack that may take it.
+    Each result goes to results as its run ends, so an interrupted schedule keeps what ran. A
+    run that raises becomes a failed result, so no job ends without one.
+    """
+    pending = list(pending)
+    lock = threading.Lock()
+
+    def one(stack: int) -> None:
+        had_plain_run = False
+        while not stop.is_set():
+            with lock:
+                job = next_job(pending, had_plain_run)
+                if job is None:
+                    return
+                pending.remove(job)
+            try:
+                result = run_job(stack, job)
+            except Exception as error:
+                failure = f"{type(error).__name__}: {error}"
+                result = Result(job, stack, None, {}, None, failure)
+            with lock:
+                results.append(result)
+            had_plain_run = had_plain_run or not job.root
+
+    threads = [threading.Thread(target=one, args=(stack,), daemon=True) for stack in numbers]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+
+def parse_summary(text: str) -> tuple[dict[str, int], float] | None:
+    """The counts and the seconds of pytest's summary line, the last one in the text."""
+    for line in reversed(text.splitlines()):
+        match = SUMMARY.match(line.strip())
+        if not match:
+            continue
+        counts: dict[str, int] = {}
+        if match[1] != "no tests ran":
+            for part in match[1].split(", "):
+                number, kind = part.split(" ", 1)
+                ## pytest says 1 error, 2 errors and 1 warning, 2 warnings
+                kind = {"errors": "error", "warnings": "warning"}.get(kind, kind)
+                counts[kind] = counts.get(kind, 0) + int(number)
+        return counts, float(match[2])
+    return None
+
+
+def summary_line(counts: dict[str, int], seconds: float) -> str:
+    """pytest's form: 160 passed, 2 skipped, 1 error in 1234.56s (0:20:34)."""
+    parts = []
+    for kind in [*KINDS, *sorted(set(counts) - set(KINDS))]:
+        number = counts.get(kind, 0)
+        if number:
+            plural = "s" if kind in ("warning", "error") and number != 1 else ""
+            parts.append(f"{number} {kind}{plural}")
+    text = ", ".join(parts) or "no tests ran"
+    duration = f"{seconds:.2f}s"
+    if seconds >= 60:
+        duration += f" ({timedelta(seconds=int(seconds))})"
+    return f"{text} in {duration}"
+
+
+def total(results: list[Result]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for result in results:
+        for kind, number in result.counts.items():
+            counts[kind] = counts.get(kind, 0) + number
+        ## a run that failed without a summary (a crash, a stack that went away) counts as an error
+        if result.failed and not result.counts.get("failed") and not result.counts.get("error"):
+            counts["error"] = counts.get("error", 0) + 1
+    return counts
+
+
+def short_traceback(text: str) -> str:
+    """From pytest's FAILURES or ERRORS section to the end, else the last 30 lines."""
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if re.fullmatch(r"=+ (FAILURES|ERRORS) =+", line.strip()):
+            return "\n".join(lines[index:])
+    return "\n".join(lines[-30:])
+
+
+def run_job(stack: int, job: Job, extra: list[str], print_lock: threading.Lock) -> Result:
+    """One scripts/integration run of the job's file on the stack, its output in its log."""
+    log = LOG_DIR / job.log_name
+    ## the parent holds the sleep lock already, or could not get it
+    env = dict(stacks.stack_env(stack), **{suites.INHIBITED: "1"})
+    with print_lock:
+        print(f"integration: stack {stack} starts {job.key}", flush=True)
+    with log.open("w") as out:
+        code = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), *job.args(), *extra],
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=out,
+            stderr=subprocess.STDOUT,
+        ).returncode
+    parsed = parse_summary(log.read_text(errors="replace"))
+    counts, seconds = parsed if parsed else ({}, None)
+    result = Result(job, stack, code, counts, seconds)
+    outcome = "failed" if result.failed else "done"
+    line = summary_line(counts, seconds) if seconds is not None else f"exit code {code}"
+    with print_lock:
+        print(f"integration: stack {stack} {outcome} {job.key}: {line}", flush=True)
+    return result
+
+
+def counted(number: int, word: str) -> str:
+    return f"{number} {word}{'' if number == 1 else 's'}"
+
+
+def report(planned: list[Job], results: list[Result], numbers: list[int], seconds: float) -> int:
+    """Print the failed runs' tracebacks and the summary line, answer the exit code.
+
+    A planned job without a result fails the run, and a line names it.
+    """
+    failed = sorted((r for r in results if r.failed), key=lambda r: r.job.key)
+    for result in failed:
+        print(f"\n{' ' + result.job.key + ' on stack ' + str(result.stack) + ' ':_^78}")
+        if result.failure is not None:
+            print(result.failure)
+        else:
+            log = LOG_DIR / result.job.log_name
+            print(short_traceback(log.read_text(errors="replace")))
+    print()
+    for result in failed:
+        if result.failure is not None:
+            print(f"integration: FAILED {result.job.key} on stack {result.stack}, no run")
+            continue
+        log = (LOG_DIR / result.job.log_name).relative_to(ROOT)
+        print(f"integration: FAILED {result.job.key} on stack {result.stack}, log {log}")
+    ran = {result.job for result in results}
+    missing = [job for job in planned if job not in ran]
+    for job in missing:
+        print(f"integration: FAILED {job.key}, no result")
+    print(
+        f"integration: {counted(len(results), 'run')} on {counted(len(numbers), 'stack')}, "
+        f"each run's log in {LOG_DIR.relative_to(ROOT)}/"
+    )
+    print(f"{' ' + summary_line(total(results), seconds) + ' ':=^78}", flush=True)
+    return 1 if failed or missing else 0
+
+
+def whole_suite(args: list[str]) -> bool:
+    return [arg for arg in pytest_args(args) if arg.startswith("tests/")] == [SUITE]
+
+
+def scheduled_files(options: dict[str, str | None], args: list[str]) -> list[str] | None:
+    """The files the scheduler runs, None for one plain pytest run.
+
+    The whole suite, or with --stacks a list of the suite's files. Never with --root or -k.
+    """
+    if "--root" in options or any(arg.startswith("-k") for arg in args):
+        return None
+    if whole_suite(args):
+        return suite_files()
+    named = [arg for arg in pytest_args(args) if arg.startswith("tests/")]
+    if "--stacks" not in options:
+        return None
+    files = []
+    for path in named:
+        name = path.removeprefix(f"{SUITE}/")
+        if "/" in name or "::" in name or not (ROOT / "backend" / path).is_file():
+            return None
+        files.append(name)
+    return files
+
+
+def stack_count(value: str | None) -> int:
+    count = suites.stacks_option(value, "integration")
+    return stacks.default_stacks() if count is None else count
+
+
+def run_scheduled(todo: list[Job], numbers: list[int], extra: list[str]) -> int:
+    started = time.monotonic()
+    fresh = [stack for stack in numbers if not stacks.stack_up(stack)]
+    if fresh:
+        print(f"integration: stacks {fresh} are not up, starting them", flush=True)
+        stacks.run_stacks([["up"], ["setup"]], fresh)
+    shutil.rmtree(LOG_DIR, ignore_errors=True)
+    LOG_DIR.mkdir()
+    runs = f"{counted(len(todo), 'run')} on {counted(len(numbers), 'stack')}"
+    print(f"integration: {runs}, longest first", flush=True)
+    print_lock = threading.Lock()
+    stop = threading.Event()
+    results: list[Result] = []
+    try:
+        schedule(todo, numbers, lambda s, j: run_job(s, j, extra, print_lock), stop, results)
+    except KeyboardInterrupt:
+        stop.set()
+        print("integration: interrupted, no new runs start", file=sys.stderr, flush=True)
+        report(todo, results, numbers, time.monotonic() - started)
+        return 130
+    return report(todo, results, numbers, time.monotonic() - started)
+
+
+def main(args: list[str]) -> int:
+    if suites.wants_help(args):
+        print(__doc__)
+        return 0
+    options, _ = suites.split_options(args, OPTIONS)
+    files = scheduled_files(options, args)
+    if files is not None:
+        count = stack_count(options.get("--stacks"))
+        todo = plan(files, count, whole_suite(args))
+        if todo is not None:
+            extra = [arg for arg in pytest_args(args) if not arg.startswith("tests/")]
+            return run_scheduled(todo, list(range(1, count + 1)), extra)
+    pytest = pytest_args(args)
+    if not stacks.stack_up():
+        print("integration: the dev stack is not up, starting it", flush=True)
+        subprocess.run([str(DEV_VAULT), "up"], check=True)
+        subprocess.run([str(DEV_VAULT), "setup"], check=True)
+    exec_args = ["exec"]
+    command_options = PLAIN
+    if "--root" in options:
+        exec_args.append("--root")
+        command_options = AS_ROOT
+    command = PYTEST.format(**command_options)
+    return subprocess.run(
+        [str(DEV_VAULT), *exec_args, "sh", "-c", command, "sh", *pytest]
+    ).returncode
+
+
+if __name__ == "__main__":
+    if not suites.wants_help(sys.argv[1:]):
+        suites.reexec_inhibited("integration", __file__)
+    os.chdir(ROOT)
+    sys.exit(main(sys.argv[1:]))

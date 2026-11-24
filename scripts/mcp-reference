@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""mcp-reference: docs/reference/mcp-tools.md, written from the tools the MCP server registers.
+
+  scripts/mcp-reference           write docs/reference/mcp-tools.md
+  scripts/mcp-reference --check   write nothing, exit 1 when the file differs from what it writes
+
+It builds the server with create_mcp_server and reads its list_tools, the same tool objects an
+MCP client lists, so a new tool or a changed description reaches the page on the next run. Per
+tool: its name, its kind (read, propose or end, from its annotations), its parameters with their
+types, defaults and descriptions, and its description. It imports bwtidy, so it runs with the
+backend venv's python and starts itself through `uv run` when it is not. `scripts/ci` runs the
+check.
+"""
+
+import asyncio
+import json
+import re
+import sys
+from typing import Any
+
+from devlib import venv
+from devlib.paths import ROOT
+
+OUTPUT = ROOT / "docs" / "reference" / "mcp-tools.md"
+
+INTRO = """\
+# MCP tools
+
+<!-- Written by scripts/mcp-reference from the tools the MCP server registers. Do not edit it by
+hand, run the script. -->
+
+These are the tools bwtidy's MCP server offers an AI agent, as its client lists them. An agent
+reads your vault without the secret values and proposes changes into the queue. It never writes:
+a proposal waits on the Queue page until you approve or reject it. Why it works this way:
+[What an agent can do](../explanation/mcp.md). How to connect a client:
+[Connect an MCP client](../how-to/mcp.md).
+
+Each tool is one of three kinds:
+
+- read: reads the vault or the queue and changes nothing.
+- propose: adds one entry to the queue and changes nothing in the vault until you approve it.
+- end: ends the bwtidy session, like Log out in the web UI.
+
+The descriptions are the text the agent reads, so they speak to the agent. While MCP is off,
+every tool answers only that bwtidy MCP is disabled.
+"""
+
+SECTIONS = {
+    "read": "Read tools",
+    "propose": "Propose tools",
+    "end": "Tools that end the session",
+}
+
+## a markdown character escaped with a backslash wherever it shows in a description
+ESCAPED = re.compile(r"([\\`*\[\]|#~])")
+## an underscore that could start or end emphasis, one not between two letters or digits
+LOOSE_UNDERSCORE = re.compile(r"(?<![0-9A-Za-z])_|_(?![0-9A-Za-z])")
+
+
+def registered_tools() -> list[Any]:
+    """The tools the server lists, in their order, from a server with nothing behind it."""
+    from bwtidy.mcp.server import create_mcp_server
+
+    ## registering a tool only keeps the four, no tool runs here
+    nothing: Any = None
+    server = create_mcp_server(nothing, nothing, nothing, nothing)
+    return asyncio.run(server.list_tools())
+
+
+def kind(tool: Any) -> str:
+    """read, propose or end: the kind whose annotations the tool was registered with."""
+    from bwtidy.mcp.server import END, PROPOSE, READ_ONLY
+
+    for name, annotations in (("read", READ_ONLY), ("propose", PROPOSE), ("end", END)):
+        if tool.annotations == annotations:
+            return name
+    raise ValueError(f"{tool.name}: its annotations are none of READ_ONLY, PROPOSE and END")
+
+
+def text(value: str) -> str:
+    """Plain text as markdown that shows it as it is, on one line."""
+    value = " ".join(value.split())
+    value = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    value = ESCAPED.sub(r"\\\1", value)
+    return LOOSE_UNDERSCORE.sub(r"\\_", value)
+
+
+def or_list(parts: list[str]) -> str:
+    return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} or {parts[-1]}"
+
+
+def type_parts(schema: dict[str, Any], defs: dict[str, Any]) -> list[str]:
+    """The alternatives of a JSON schema type, each in a few words: `string`, `list of string`."""
+    if "$ref" in schema:
+        name = schema["$ref"].rsplit("/", 1)[-1]
+        target = defs[name]
+        return [f"`{name}`"] if "properties" in target else type_parts(target, defs)
+    if "anyOf" in schema:
+        return [part for choice in schema["anyOf"] for part in type_parts(choice, defs)]
+    if "enum" in schema:
+        return [f"`{json.dumps(value)}`" for value in schema["enum"]]
+    match schema.get("type"):
+        case "array":
+            return [f"list of {inner_text(schema.get('items', {}), defs)}"]
+        case "object" if isinstance(schema.get("additionalProperties"), dict):
+            return [f"object of {inner_text(schema['additionalProperties'], defs)}"]
+        case str(name):
+            return [name]
+    return ["any"]
+
+
+def type_text(schema: dict[str, Any], defs: dict[str, Any]) -> str:
+    return or_list(type_parts(schema, defs))
+
+
+def inner_text(schema: dict[str, Any], defs: dict[str, Any]) -> str:
+    """The type of a list's or an object's values, in parentheses when it has alternatives."""
+    parts = type_parts(schema, defs)
+    return or_list(parts) if len(parts) == 1 else f"({or_list(parts)})"
+
+
+def parameter_rows(schema: dict[str, Any], defs: dict[str, Any]) -> list[str]:
+    required = set(schema.get("required", []))
+    rows = []
+    for name, field in schema.get("properties", {}).items():
+        default = "required" if name in required else f"`{json.dumps(field.get('default'))}`"
+        description = text(field.get("description", ""))
+        rows.append(f"| `{name}` | {type_text(field, defs)} | {default} | {description} |")
+    return rows
+
+
+def table(schema: dict[str, Any], defs: dict[str, Any]) -> list[str]:
+    return [
+        "| Parameter | Type | Default | Description |",
+        "| --- | --- | --- | --- |",
+        *parameter_rows(schema, defs),
+    ]
+
+
+def tool_section(tool: Any) -> list[str]:
+    schema = tool.input_schema
+    defs = schema.get("$defs", {})
+    lines = [f"### {tool.name}", "", f"Kind: {kind(tool)}.", "", text(tool.description or ""), ""]
+    if not schema.get("properties"):
+        return [*lines, "No parameters.", ""]
+    lines += [*table(schema, defs), ""]
+    for name, target in defs.items():
+        if "properties" in target:
+            lines += [f"Each `{name}`:", "", *table(target, defs), ""]
+    return lines
+
+
+def rendered(tools: list[Any]) -> str:
+    lines = [INTRO]
+    for kind_name, heading in SECTIONS.items():
+        lines += [f"## {heading}", ""]
+        for tool in tools:
+            if kind(tool) == kind_name:
+                lines += tool_section(tool)
+    return "\n".join(lines).rstrip("\n") + "\n"
+
+
+def main(args: list[str]) -> int:
+    if args not in ([], ["--check"]):
+        print("usage: mcp-reference [--check]", file=sys.stderr)
+        return 2
+    venv.run_in_backend_venv("mcp-reference", __file__, args)
+    tools = registered_tools()
+    page = rendered(tools)
+    shown = OUTPUT.relative_to(ROOT)
+    if args == ["--check"]:
+        if not OUTPUT.exists() or OUTPUT.read_text() != page:
+            print(f"mcp-reference: {shown} is stale, run scripts/mcp-reference", file=sys.stderr)
+            return 1
+        return 0
+    OUTPUT.write_text(page)
+    print(f"mcp-reference: wrote {len(tools)} tools to {shown}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

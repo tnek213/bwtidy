@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest a change or an addition to bwtidy.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste vault contents, secrets, tokens or backups into this issue.** Describe them instead, for example "an item with three custom fields".
+
+        bwtidy is alpha software and nobody promises a response time or that a request is built.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you want to do and what stops you.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What bwtidy could do about it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you thought of
+    validations:
+      required: false

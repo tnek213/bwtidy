@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>bwtidy</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      var match = document.cookie.match(/(?:^|;\s*)bwtidy_color_mode=(light|dark)(?:;|$)/)
+      if (match) {
+        document.documentElement.style.colorScheme = match[1]
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
