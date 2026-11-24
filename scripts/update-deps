@@ -1,0 +1,481 @@
+#!/usr/bin/env python3
+"""update-deps: update every dependency within its declared range, never past it.
+
+  scripts/update-deps             update the lock files, the image digests and the action SHAs
+  scripts/update-deps --dry-run   show what would change and write nothing
+
+Backend: uv lock --upgrade, within the ranges of backend/pyproject.toml. Frontend: npm update
+within the ranges of frontend/package.json (an exact pin stays), then npm ci so node_modules
+match. The image's Bitwarden CLI (docker/bitwarden-cli): npm update --package-lock-only, as only
+the image installs it. The Dockerfile: each image keeps the tag it names and gets the digest that
+tag points to now. The workflows: each action moves to the newest release tag of its major
+version, with its commit SHA and that tag in the comment above it. Then it runs
+scripts/third-party and the version check, and prints what changed (package, old version, new
+version) per ecosystem. Last it lists the updates outside the ranges (new major versions, newer
+image tags, newer action majors) without applying them, for a human to decide on. It never
+commits and never changes bwtidy's own version.
+"""
+
+import json
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
+
+from devlib import versions
+from devlib.paths import ROOT, SCRIPTS
+
+BACKEND = ROOT / "backend"
+FRONTEND = ROOT / "frontend"
+CLI = ROOT / "docker" / "bitwarden-cli"
+DOCKERFILE = ROOT / "Dockerfile"
+WORKFLOWS = ROOT / ".github" / "workflows"
+## seconds for one network command or request, a registry with many tags pages through several
+TIMEOUT = 120
+INDEX_TYPES = ", ".join(
+    [
+        "application/vnd.oci.image.index.v1+json",
+        "application/vnd.docker.distribution.manifest.list.v2+json",
+        "application/vnd.oci.image.manifest.v1+json",
+        "application/vnd.docker.distribution.manifest.v2+json",
+    ]
+)
+
+## a package that is new or gone has None on that side
+Change = tuple[str, str | None, str | None]
+
+
+@dataclass(frozen=True)
+class ImageRef:
+    """An image of the Dockerfile that names a tag: its line, image, tag and pinned digest."""
+
+    line: int
+    image: str
+    tag: str
+    digest: str | None
+
+
+@dataclass(frozen=True)
+class ActionPin:
+    """An action of a workflow pinned to a commit SHA, with its tag in the comment above."""
+
+    line: int
+    action: str
+    tag: str
+    sha: str
+
+
+## --- versions and tags
+
+
+def numbers(tag: str) -> tuple[tuple[int, ...], str] | None:
+    """The leading numbers of a tag and the rest: 24-bookworm-slim is ((24,), "-bookworm-slim")."""
+    match = re.fullmatch(r"v?(\d+(?:\.\d+)*)(.*)", tag)
+    if match is None:
+        return None
+    return tuple(int(n) for n in match[1].split(".")), match[2]
+
+
+def newer_tags(tag: str, tags: list[str]) -> list[str]:
+    """The tags of the same form as TAG (as many numbers, the same rest) with a higher version.
+
+    That is what a human decides on: python 3.13-slim-bookworm finds 3.14-slim-bookworm, node 24
+    finds 26, never a variant such as 3.14-alpine. Oldest first.
+    """
+    own = numbers(tag)
+    if own is None:
+        return []
+    found = []
+    for other in tags:
+        parsed = numbers(other)
+        if parsed and parsed[1] == own[1] and len(parsed[0]) == len(own[0]) and parsed[0] > own[0]:
+            found.append((parsed[0], other))
+    return [name for _, name in sorted(found)]
+
+
+def release_version(tag: str) -> tuple[int, ...] | None:
+    """The version of a release tag such as v7 or v10.3.3, None for any other tag."""
+    parsed = numbers(tag)
+    return parsed[0] if parsed and parsed[1] == "" else None
+
+
+def newest_in_major(tag: str, tags: list[str]) -> str:
+    """The newest release tag of TAG's major version, a full version before a bare v7."""
+    own = release_version(tag)
+    if own is None:
+        return tag
+    best = tag
+    best_key = (*own, *([0] * (3 - len(own))), len(own))
+    for other in tags:
+        version = release_version(other)
+        if version is None or version[0] != own[0]:
+            continue
+        key = (*version, *([0] * (3 - len(version))), len(version))
+        if key > best_key:
+            best, best_key = other, key
+    return best
+
+
+def newer_majors(tag: str, tags: list[str]) -> list[str]:
+    """The release tags of a higher major version than TAG's, the newest of each, oldest first."""
+    own = release_version(tag)
+    if own is None:
+        return []
+    majors = sorted({v[0] for t in tags if (v := release_version(t)) and v[0] > own[0]})
+    return [newest_in_major(f"v{major}", tags) for major in majors]
+
+
+## --- the Dockerfile
+
+
+def image_refs(text: str) -> list[ImageRef]:
+    """Every image with a tag in the Dockerfile: the syntax line and the FROM lines.
+
+    A FROM of an earlier stage (FROM node AS frontend) names no tag and is left out.
+    """
+    refs = []
+    for index, line in enumerate(text.splitlines()):
+        match = re.match(r"(?:# syntax=|FROM\s+(?:--platform=\S+\s+)?)(\S+)", line)
+        if match is None:
+            continue
+        name, _, digest = match[1].partition("@")
+        image, colon, tag = name.rpartition(":")
+        if not colon or "/" in tag:
+            continue
+        refs.append(ImageRef(index, image, tag, digest or None))
+    return refs
+
+
+def with_digest(text: str, ref: ImageRef, digest: str) -> str:
+    """TEXT with the image of REF pinned to DIGEST, its tag as it was."""
+    lines = text.split("\n")
+    old = f"{ref.image}:{ref.tag}" + (f"@{ref.digest}" if ref.digest else "")
+    lines[ref.line] = lines[ref.line].replace(old, f"{ref.image}:{ref.tag}@{digest}", 1)
+    return "\n".join(lines)
+
+
+def registry_of(image: str) -> tuple[str, str]:
+    """The registry host and the repository of an image name: node is library/node on Docker Hub."""
+    first, _, rest = image.partition("/")
+    if rest and ("." in first or ":" in first or first == "localhost"):
+        host, repository = first, rest
+    else:
+        host, repository = "docker.io", image
+    if host == "docker.io":
+        host = "registry-1.docker.io"
+        if "/" not in repository:
+            repository = f"library/{repository}"
+    return host, repository
+
+
+class Registry:
+    """The OCI distribution API of one repository, with an anonymous pull token."""
+
+    def __init__(self, image: str) -> None:
+        self.host, self.repository = registry_of(image)
+        self.token: str | None = None
+
+    def _open(
+        self, url: str, accept: str = "", method: str = "GET"
+    ) -> tuple[bytes, dict[str, str]]:
+        headers = {"Accept": accept} if accept else {}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        request = urllib.request.Request(url, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(request, timeout=TIMEOUT) as answer:
+                return answer.read(), dict(answer.headers)
+        except urllib.error.HTTPError as error:
+            challenge = error.headers.get("WWW-Authenticate", "")
+            if error.code != 401 or self.token or not challenge.startswith("Bearer "):
+                raise
+        self.token = self._fetch_token(challenge)
+        return self._open(url, accept, method)
+
+    def _fetch_token(self, challenge: str) -> str:
+        fields = dict(re.findall(r'(\w+)="([^"]*)"', challenge))
+        query = f"service={fields.get('service', '')}&scope=repository:{self.repository}:pull"
+        with urllib.request.urlopen(f"{fields['realm']}?{query}", timeout=TIMEOUT) as answer:
+            body = json.loads(answer.read())
+        return body.get("token") or body["access_token"]
+
+    def digest(self, tag: str) -> str:
+        """The digest TAG points to now: the index of every platform when there is one."""
+        url = f"https://{self.host}/v2/{self.repository}/manifests/{tag}"
+        ## HEAD, since Docker Hub counts a GET of a manifest as a pull
+        _, headers = self._open(url, INDEX_TYPES, "HEAD")
+        lowered = {k.lower(): v for k, v in headers.items()}
+        return lowered["docker-content-digest"]
+
+    def tags(self) -> list[str]:
+        found: list[str] = []
+        url: str | None = f"https://{self.host}/v2/{self.repository}/tags/list?n=10000"
+        while url:
+            body, headers = self._open(url)
+            found += json.loads(body).get("tags") or []
+            link = {k.lower(): v for k, v in headers.items()}.get("link", "")
+            url = f"https://{self.host}{link.split(';')[0].strip('<> ')}" if link else None
+        return found
+
+
+## --- the workflows
+
+
+def action_pins(text: str) -> list[ActionPin]:
+    """Every action pinned to a commit SHA whose line above is a comment with its tag."""
+    lines = text.split("\n")
+    pins = []
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"\s*(?:- )?uses: ([\w.-]+/[\w./-]+)@([0-9a-f]{40})\s*", line)
+        if match is None or index == 0:
+            continue
+        comment = re.fullmatch(r"\s*# (v?\d+(?:\.\d+)*)\s*", lines[index - 1])
+        if comment is not None:
+            pins.append(ActionPin(index, match[1], comment[1], match[2]))
+    return pins
+
+
+def with_action(text: str, pin: ActionPin, tag: str, sha: str) -> str:
+    """TEXT with the action of PIN at SHA and TAG in the comment above it."""
+    lines = text.split("\n")
+    lines[pin.line] = lines[pin.line].replace(f"@{pin.sha}", f"@{sha}", 1)
+    lines[pin.line - 1] = lines[pin.line - 1].replace(f"# {pin.tag}", f"# {tag}", 1)
+    return "\n".join(lines)
+
+
+def remote_tags(action: str) -> dict[str, str]:
+    """The tags of an action's repository and the commit each names (an annotated tag peeled)."""
+    owner_repo = "/".join(action.split("/")[:2])
+    listing = run(["git", "ls-remote", "--tags", f"https://github.com/{owner_repo}"], ROOT)
+    tags: dict[str, str] = {}
+    for line in listing.splitlines():
+        sha, _, ref = line.partition("\t")
+        name = ref.removeprefix("refs/tags/")
+        if name.endswith("^{}"):
+            tags[name.removesuffix("^{}")] = sha
+        else:
+            tags.setdefault(name, sha)
+    return tags
+
+
+## --- the lock files
+
+
+def uv_versions(text: str) -> dict[str, str]:
+    """Every package of a uv.lock and its version, the project itself left out."""
+    lock = tomllib.loads(text)
+    return {
+        p["name"]: p["version"]
+        for p in lock.get("package", [])
+        if "version" in p and p.get("source", {}).get("editable") != "."
+    }
+
+
+def npm_versions(text: str) -> dict[str, str]:
+    """Every package of a package-lock.json and its version, by its path below node_modules."""
+    packages = json.loads(text).get("packages", {})
+    return {
+        path.removeprefix("node_modules/"): entry["version"]
+        for path, entry in packages.items()
+        if path and "version" in entry and not entry.get("link")
+    }
+
+
+def changes(before: dict[str, str], after: dict[str, str]) -> list[Change]:
+    """What differs between two listings of packages, by name."""
+    names = sorted(set(before) | set(after))
+    return [(n, before.get(n), after.get(n)) for n in names if before.get(n) != after.get(n)]
+
+
+def uv_dry_run_changes(output: str) -> list[Change]:
+    """The changes `uv lock --upgrade --dry-run` prints: Update, Add and Remove lines."""
+    found: list[Change] = []
+    for line in output.splitlines():
+        if match := re.fullmatch(r"Update (\S+) v(\S+) -> v(\S+)", line.strip()):
+            found.append((match[1], match[2], match[3]))
+        elif match := re.fullmatch(r"Add (\S+) v(\S+)", line.strip()):
+            found.append((match[1], None, match[2]))
+        elif match := re.fullmatch(r"Remove (\S+) v(\S+)", line.strip()):
+            found.append((match[1], match[2], None))
+    return sorted(found)
+
+
+def uv_outdated(output: str) -> list[tuple[str, str, str]]:
+    """The direct dependencies `uv tree --outdated --depth 1` marks: (name, locked, latest)."""
+    found = []
+    for line in output.splitlines():
+        match = re.search(r"(\S+) v(\S+)(?: \(.*?\))*? \(latest: v(\S+)\)", line)
+        if match:
+            found.append((match[1], match[2], match[3]))
+    return found
+
+
+def npm_outside(outdated: dict) -> list[tuple[str, str, str]]:
+    """The packages of `npm outdated --json` whose latest version is outside the range."""
+    return sorted(
+        (name, entry.get("wanted", "?"), entry["latest"])
+        for name, entry in outdated.items()
+        if entry.get("latest") and entry.get("latest") != entry.get("wanted")
+    )
+
+
+## --- running it
+
+
+def run(command: list[str], cwd: Path, check: bool = True) -> str:
+    """COMMAND's output, with a time limit, since most of them reach the network."""
+    result = subprocess.run(
+        command, cwd=cwd, capture_output=True, text=True, timeout=TIMEOUT * 5, check=False
+    )
+    if check and result.returncode != 0:
+        raise SystemExit(f"update-deps: {' '.join(command)} failed:\n{result.stderr.strip()}")
+    return result.stdout + result.stderr
+
+
+def update_backend(dry_run: bool) -> list[Change]:
+    lock = BACKEND / "uv.lock"
+    if dry_run:
+        return uv_dry_run_changes(run(["uv", "lock", "--upgrade", "--dry-run"], BACKEND))
+    before = uv_versions(lock.read_text())
+    run(["uv", "lock", "--upgrade"], BACKEND)
+    return changes(before, uv_versions(lock.read_text()))
+
+
+def update_npm(project: Path, dry_run: bool, install: bool) -> list[Change]:
+    """npm update within the ranges, in a copy for a dry run, and npm ci when INSTALL."""
+    lock = project / "package-lock.json"
+    before = npm_versions(lock.read_text())
+    with tempfile.TemporaryDirectory(prefix="update-deps-") as tmp:
+        where = Path(tmp) if dry_run else project
+        if dry_run:
+            for name in ("package.json", "package-lock.json"):
+                shutil.copy(project / name, where / name)
+        flags = ["--no-fund", "--no-audit"]
+        if dry_run or not install:
+            flags += ["--package-lock-only", "--ignore-scripts"]
+        run(["npm", "update", *flags], where)
+        after = npm_versions((where / "package-lock.json").read_text())
+    if install and not dry_run:
+        run(["npm", "ci", "--no-fund", "--no-audit"], project)
+    return changes(before, after)
+
+
+def update_images(dry_run: bool, outside: list[str], errors: list[str]) -> list[Change]:
+    text = DOCKERFILE.read_text()
+    found: list[Change] = []
+    for ref in image_refs(text):
+        name = f"{ref.image}:{ref.tag}"
+        try:
+            registry = Registry(ref.image)
+            digest = registry.digest(ref.tag)
+            newer = newer_tags(ref.tag, registry.tags())
+        except (OSError, KeyError, ValueError) as error:
+            errors.append(f"{name}: {error}")
+            continue
+        if digest != ref.digest:
+            found.append((name, ref.digest, digest))
+            text = with_digest(text, ref, digest)
+        if newer:
+            outside.append(f"image {name}: newer tag {ref.image}:{newer[-1]}")
+    if not dry_run:
+        DOCKERFILE.write_text(text)
+    return found
+
+
+def update_actions(dry_run: bool, outside: list[str], errors: list[str]) -> list[Change]:
+    found: list[Change] = []
+    known: dict[str, dict[str, str]] = {}
+    for workflow in sorted(WORKFLOWS.glob("*.yml")):
+        text = workflow.read_text()
+        for pin in action_pins(text):
+            try:
+                tags = known.get(pin.action) or remote_tags(pin.action)
+            except (SystemExit, subprocess.TimeoutExpired) as error:
+                errors.append(f"{pin.action}: {error}")
+                continue
+            known[pin.action] = tags
+            tag = newest_in_major(pin.tag, list(tags))
+            if tags.get(tag, pin.sha) != pin.sha or tag != pin.tag:
+                change = (pin.action, f"{pin.tag} {pin.sha[:7]}", f"{tag} {tags[tag][:7]}")
+                if change not in found:
+                    found.append(change)
+                text = with_action(text, pin, tag, tags[tag])
+            newer = newer_majors(pin.tag, list(tags))
+            note = f"action {pin.action} {pin.tag}: newer major {newer[-1]}" if newer else ""
+            if note and note not in outside:
+                outside.append(note)
+        if not dry_run:
+            workflow.write_text(text)
+    return found
+
+
+def outside_packages(outside: list[str], backend_changes: list[Change]) -> None:
+    """Add the packages whose latest version lies outside the ranges, after the update."""
+    ## in a dry run the lock is not upgraded yet, so a latest version the upgrade reaches is not
+    ## outside its range
+    reached = {name: new for name, _, new in backend_changes}
+    tree = run(["uv", "tree", "--outdated", "--depth", "1", "--frozen"], BACKEND, check=False)
+    for name, locked, latest in uv_outdated(tree):
+        if reached.get(name) != latest:
+            outside.append(f"backend {name} {reached.get(name, locked)}: latest {latest}")
+    for label, project in (("frontend", FRONTEND), ("bitwarden-cli", CLI)):
+        answer = run(["npm", "outdated", "--json"], project, check=False)
+        start = answer.find("{")
+        outdated = json.loads(answer[start:]) if start >= 0 else {}
+        for name, wanted, latest in npm_outside(outdated):
+            outside.append(f"{label} {name} {wanted}: latest {latest}")
+
+
+def print_changes(label: str, found: list[Change]) -> None:
+    if not found:
+        print(f"{label}: no change")
+        return
+    print(f"{label}:")
+    for name, old, new in found:
+        print(f"  {name} {old or '(new)'} -> {new or '(removed)'}")
+
+
+def main(args: list[str]) -> int:
+    if args and args[0] in ("-h", "--help"):
+        print(__doc__)
+        return 0
+    if args not in ([], ["--dry-run"]):
+        print(__doc__, file=sys.stderr)
+        return 2
+    dry_run = args == ["--dry-run"]
+    outside: list[str] = []
+    errors: list[str] = []
+    found = {
+        "backend (backend/uv.lock)": update_backend(dry_run),
+        "frontend (frontend/package-lock.json)": update_npm(FRONTEND, dry_run, install=True),
+        "Bitwarden CLI (docker/bitwarden-cli/package-lock.json)": update_npm(
+            CLI, dry_run, install=False
+        ),
+        "images (Dockerfile)": update_images(dry_run, outside, errors),
+        "actions (.github/workflows)": update_actions(dry_run, outside, errors),
+    }
+    outside_packages(outside, found["backend (backend/uv.lock)"])
+    if not dry_run:
+        run([str(SCRIPTS / "third-party")], ROOT)
+        mismatch = versions.version_mismatch()
+        if mismatch:
+            errors.append(mismatch)
+    print("Would change:" if dry_run else "Changed:")
+    for label, changed in found.items():
+        print_changes(label, changed)
+    print("Outside the ranges, for a human to decide (not applied):")
+    for line in outside or ["nothing"]:
+        print(f"  {line}")
+    for error in errors:
+        print(f"update-deps: {error}", file=sys.stderr)
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

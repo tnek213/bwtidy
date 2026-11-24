@@ -1,0 +1,228 @@
+// The projects the About page thanks by name (docs/spec.md, About). Language is the main language of the
+// project's repository, license its SPDX id, as thirdParty.json has it for a project bwtidy installs.
+export interface Credit {
+  name: string
+  url: string
+  language: string
+  license: string
+  usedFor: string
+  // The names in thirdParty.json this project ships as, so every direct dependency has a credit.
+  packages?: string[]
+}
+
+export const RUNTIME_CREDITS: Credit[] = [
+  {
+    name: 'Bitwarden CLI',
+    url: 'https://github.com/bitwarden/clients/tree/main/apps/cli',
+    language: 'TypeScript',
+    license: 'GPL-3.0',
+    usedFor: 'every read and write of the vault',
+  },
+  {
+    name: 'Python',
+    url: 'https://github.com/python/cpython',
+    language: 'Python and C',
+    license: 'PSF-2.0',
+    usedFor: 'the language the backend is written in',
+  },
+  {
+    name: 'FastAPI',
+    url: 'https://github.com/fastapi/fastapi',
+    language: 'Python',
+    license: 'MIT',
+    usedFor: 'the web API of the gateway and the workers',
+    packages: ['fastapi'],
+  },
+  {
+    name: 'Starlette',
+    url: 'https://github.com/Kludex/starlette',
+    language: 'Python',
+    license: 'BSD-3-Clause',
+    usedFor: 'the web framework FastAPI and the MCP server build on',
+    packages: ['starlette'],
+  },
+  {
+    name: 'Pydantic',
+    url: 'https://github.com/pydantic/pydantic',
+    language: 'Python',
+    license: 'MIT',
+    usedFor: 'checking every request and operation against its model',
+    packages: ['pydantic'],
+  },
+  {
+    name: 'Uvicorn',
+    url: 'https://github.com/Kludex/uvicorn',
+    language: 'Python',
+    license: 'BSD-3-Clause',
+    usedFor: 'the web server of the gateway and the workers',
+    packages: ['uvicorn'],
+  },
+  {
+    name: 'HTTPX2',
+    url: 'https://github.com/pydantic/httpx2',
+    language: 'Python',
+    license: 'BSD-3-Clause',
+    usedFor: 'the calls to bw serve and from the gateway to the workers',
+    packages: ['httpx2'],
+  },
+  {
+    name: 'MCP Python SDK',
+    url: 'https://github.com/modelcontextprotocol/python-sdk',
+    language: 'Python',
+    license: 'MIT',
+    usedFor: 'the MCP server an AI agent connects to',
+    packages: ['mcp'],
+  },
+  {
+    name: 'pyrage',
+    url: 'https://github.com/woodruffw/pyrage',
+    language: 'Rust and Python',
+    license: 'MIT',
+    usedFor: 'the age encryption of the backups',
+    packages: ['pyrage'],
+  },
+  {
+    name: 'cryptography',
+    url: 'https://github.com/pyca/cryptography',
+    language: 'Python and Rust',
+    license: 'Apache-2.0 OR BSD-3-Clause',
+    usedFor: 'reading an SSH private key to fill in its public key and fingerprint',
+    packages: ['cryptography'],
+  },
+  {
+    name: 'React',
+    url: 'https://github.com/react/react',
+    language: 'JavaScript',
+    license: 'MIT',
+    usedFor: 'the web page',
+    packages: ['react', 'react-dom'],
+  },
+  {
+    name: 'MUI',
+    url: 'https://github.com/mui/material-ui',
+    language: 'JavaScript',
+    license: 'MIT',
+    usedFor: 'the buttons, menus, dialogs and forms',
+    packages: ['@mui/material'],
+  },
+  {
+    name: 'MUI X Date Pickers',
+    url: 'https://github.com/mui/mui-x',
+    language: 'TypeScript',
+    license: 'MIT',
+    usedFor: 'the date fields and their calendar',
+    packages: ['@mui/x-date-pickers'],
+  },
+  {
+    name: 'date-fns',
+    url: 'https://github.com/date-fns/date-fns',
+    language: 'TypeScript',
+    license: 'MIT',
+    usedFor: 'reading and writing the days of the date fields',
+    packages: ['date-fns'],
+  },
+  {
+    name: 'Emotion',
+    url: 'https://github.com/emotion-js/emotion',
+    language: 'JavaScript',
+    license: 'MIT',
+    usedFor: 'the styles of the page, under MUI',
+    packages: ['@emotion/react', '@emotion/styled'],
+  },
+  {
+    name: 'AG Grid Community',
+    url: 'https://github.com/ag-grid/ag-grid',
+    language: 'TypeScript',
+    license: 'MIT',
+    usedFor: 'the grid of the vault',
+    packages: ['ag-grid-community', 'ag-grid-react'],
+  },
+  {
+    name: 'TanStack Query',
+    url: 'https://github.com/TanStack/query',
+    language: 'TypeScript',
+    license: 'MIT',
+    usedFor: 'loading and refreshing what the page shows',
+    packages: ['@tanstack/react-query'],
+  },
+]
+
+export const TOOL_CREDITS: Credit[] = [
+  {
+    name: 'Node.js',
+    url: 'https://github.com/nodejs/node',
+    language: 'JavaScript',
+    license: 'MIT',
+    usedFor: 'building and testing the web page',
+  },
+  {
+    name: 'TypeScript',
+    url: 'https://github.com/microsoft/TypeScript',
+    language: 'Go and TypeScript',
+    license: 'Apache-2.0',
+    usedFor: 'the language the web page is written in, and its type check',
+  },
+  {
+    name: 'Vite',
+    url: 'https://github.com/vitejs/vite',
+    language: 'TypeScript',
+    license: 'MIT',
+    usedFor: 'building the web page',
+  },
+  {
+    name: 'Vitest',
+    url: 'https://github.com/vitest-dev/vitest',
+    language: 'TypeScript',
+    license: 'MIT',
+    usedFor: 'the tests of the web page',
+  },
+  {
+    name: 'oxlint',
+    url: 'https://github.com/oxc-project/oxc',
+    language: 'Rust',
+    license: 'MIT',
+    usedFor: 'the lint of the web page',
+  },
+  {
+    name: 'uv',
+    url: 'https://github.com/astral-sh/uv',
+    language: 'Rust',
+    license: 'Apache-2.0 OR MIT',
+    usedFor: 'the Python packages and the environment of the backend',
+  },
+  {
+    name: 'Ruff',
+    url: 'https://github.com/astral-sh/ruff',
+    language: 'Rust',
+    license: 'MIT',
+    usedFor: 'the lint and the format of the Python code',
+  },
+  {
+    name: 'ty',
+    url: 'https://github.com/astral-sh/ty',
+    language: 'Rust',
+    license: 'MIT',
+    usedFor: 'the type check of the Python code',
+  },
+  {
+    name: 'pytest',
+    url: 'https://github.com/pytest-dev/pytest',
+    language: 'Python',
+    license: 'MIT',
+    usedFor: 'the tests of the backend',
+  },
+  {
+    name: 'Playwright',
+    url: 'https://github.com/microsoft/playwright',
+    language: 'TypeScript',
+    license: 'Apache-2.0',
+    usedFor: 'the end-to-end tests, which drive the app in a browser',
+  },
+  {
+    name: 'Vaultwarden',
+    url: 'https://github.com/dani-garcia/vaultwarden',
+    language: 'Rust',
+    license: 'AGPL-3.0',
+    usedFor: 'the Bitwarden server the development and the tests run against',
+  },
+]

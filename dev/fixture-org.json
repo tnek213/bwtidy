@@ -1,0 +1,271 @@
+{
+  "encrypted": false,
+  "collections": [
+    {
+      "id": "1988dbf4-9330-5fd0-a554-f60656a0806b",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "name": "Shared",
+      "externalId": null
+    },
+    {
+      "id": "8a8ce008-1f20-5763-ae2a-b2ca5d18ea66",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "name": "Youth",
+      "externalId": null
+    }
+  ],
+  "items": [
+    {
+      "id": "c025fa41-81f4-51b2-b0b9-7f471e751e39",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Family streaming",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": [
+        "1988dbf4-9330-5fd0-a554-f60656a0806b"
+      ],
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://stream.example.test"
+          }
+        ],
+        "username": "family@home.example.test",
+        "password": "pw-a96dbc46a43254b8",
+        "totp": null
+      }
+    },
+    {
+      "id": "b5c71ccd-dcca-57e0-8620-19b9ea8ab677",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Family grocery account",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": [
+        "1988dbf4-9330-5fd0-a554-f60656a0806b"
+      ],
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://food.example.test"
+          }
+        ],
+        "username": "family@home.example.test",
+        "password": "pw-08bafd715ca05a3f",
+        "totp": null
+      }
+    },
+    {
+      "id": "b600abef-6dea-52c5-ab71-50c3b419a72d",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Electricity contract",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": [
+        "1988dbf4-9330-5fd0-a554-f60656a0806b"
+      ],
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://grid.example.test"
+          }
+        ],
+        "username": "family@home.example.test",
+        "password": "pw-3a3c9e54b7155f6c",
+        "totp": null
+      }
+    },
+    {
+      "id": "889337c5-dc29-5d4b-9a1f-fad322544389",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Kids school app",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": [
+        "1988dbf4-9330-5fd0-a554-f60656a0806b"
+      ],
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://school.example.test"
+          }
+        ],
+        "username": "parent@home.example.test",
+        "password": "pw-0ae5097cf664598d",
+        "totp": null
+      }
+    },
+    {
+      "id": "20e31c5d-eb0e-5eb6-b3aa-54ceaaa4d892",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Home wifi",
+      "notes": "SSID homenet",
+      "favorite": false,
+      "fields": [
+        {
+          "name": "Password",
+          "value": "homenet-made-up",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": [
+        "1988dbf4-9330-5fd0-a554-f60656a0806b"
+      ],
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "7ff25259-d306-5d08-ae5a-88acf51abc31",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Home insurance",
+      "notes": "Policy 123-456\nExample Insurance, call 0000-00 00 00",
+      "favorite": false,
+      "fields": [],
+      "collectionIds": [
+        "1988dbf4-9330-5fd0-a554-f60656a0806b"
+      ],
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "d9d2564a-991c-50ac-8476-a620207107cf",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Youth mail",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": [
+        "8a8ce008-1f20-5763-ae2a-b2ca5d18ea66"
+      ],
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://mail.example.test"
+          }
+        ],
+        "username": "youth@home.example.test",
+        "password": "pw-942f2b07a8605eb3",
+        "totp": null
+      }
+    },
+    {
+      "id": "e6dc978f-2dfd-513a-9e26-788c2daf623c",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Youth bank",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": [
+        "8a8ce008-1f20-5763-ae2a-b2ca5d18ea66"
+      ],
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://bank.example.test"
+          }
+        ],
+        "username": "19820202-0000",
+        "password": "pw-cd63494c742455c4",
+        "totp": null
+      }
+    },
+    {
+      "id": "ba7008bc-40cd-5cf0-8236-dec9bcb0a476",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Youth laptop",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "User",
+          "value": "youth",
+          "type": 0,
+          "linkedId": null
+        },
+        {
+          "name": "password",
+          "value": "youth-laptop-made-up",
+          "type": 1,
+          "linkedId": null
+        },
+        {
+          "name": "Bitlocker recovery key",
+          "value": "999999-888888-777777-666666-555555-444444-333333-222222",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": [
+        "8a8ce008-1f20-5763-ae2a-b2ca5d18ea66"
+      ],
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "44223779-a561-55e5-8e05-374049b98074",
+      "organizationId": "00000000-0000-4000-8000-000000000000",
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Youth gym",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": [
+        "8a8ce008-1f20-5763-ae2a-b2ca5d18ea66"
+      ],
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://gym.example.test"
+          }
+        ],
+        "username": "youth",
+        "password": "pw-0733e574de215a4d",
+        "totp": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+## Builds the image from this checkout instead of pulling it. Everything else comes from
+## compose.yaml, so run both files.
+## How to run it: docs/how-to/run.md
+services:
+  bwtidy:
+    ## the local build's name, instead of BWTIDY_IMAGE
+    image: bwtidy:local
+    build:
+      context: .
+      target: app
+      args:
+        BWTIDY_COMMIT: ${BWTIDY_COMMIT:-}

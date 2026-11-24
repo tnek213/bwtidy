@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+dist/
+*.local
+.env
+.dev-vault.env
+.dev-vault/
+.testmondata*
+.dev-vault-*.env
+.dev-vault-*/
+.integration-logs/
+/site/
+/.cache/
+/_site/

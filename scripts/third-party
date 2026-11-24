@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""third-party: the list of every third-party package bwtidy ships, with its license.
+
+  scripts/third-party           write frontend/src/about/thirdParty.json
+  scripts/third-party --check   write nothing, exit 1 naming the packages that differ
+
+Run it after a change to the dependencies (frontend/package-lock.json, backend/uv.lock). The About
+page shows the list (docs/spec.md, About). npm: every package of the package-lock that is not a dev
+package, the project itself left out. PyPI: what `uv export --no-dev` names, with the license from
+the installed metadata (License-Expression, else a License classifier), so it runs with the backend
+venv's python and starts itself through `uv run --locked` when it is not. A package whose license
+is not known is an error naming it: add it to OVERRIDES once its own repo says which. `direct`
+marks the dependencies frontend/package.json and backend/pyproject.toml name.
+"""
+
+import json
+import re
+import subprocess
+import sys
+import tomllib
+from collections.abc import Callable
+from importlib import metadata
+from typing import Any
+
+from devlib import venv
+from devlib.paths import ROOT
+
+BACKEND = ROOT / "backend"
+FRONTEND = ROOT / "frontend"
+OUTPUT = FRONTEND / "src" / "about" / "thirdParty.json"
+
+## PyPI packages whose metadata names no license, from their own repository
+OVERRIDES = {
+    ## neither License-Expression nor a classifier in 1.4.0, its dist-info LICENSE file and
+    ## https://github.com/woodruffw/pyrage are MIT
+    "pyrage": "MIT",
+}
+
+## the License classifiers that name one license only
+CLASSIFIERS = {
+    "License :: OSI Approved :: MIT License": "MIT",
+    "License :: OSI Approved :: Apache Software License": "Apache-2.0",
+    "License :: OSI Approved :: ISC License (ISCL)": "ISC",
+    "License :: OSI Approved :: Python Software Foundation License": "PSF-2.0",
+}
+
+Package = dict[str, Any]
+## a package's metadata by name, as importlib.metadata.metadata gives it
+MetadataReader = Callable[[str], Any]
+
+
+def normalized(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def npm_packages(lock: dict[str, Any], direct: set[str]) -> list[Package]:
+    found = []
+    for path, entry in lock["packages"].items():
+        ## the root is the project itself, a link points at a package listed on its own
+        if path == "" or entry.get("dev") or entry.get("link"):
+            continue
+        name = entry.get("name") or path.rsplit("node_modules/", 1)[-1]
+        found.append(
+            {
+                "name": name,
+                "version": entry["version"],
+                "ecosystem": "npm",
+                "license": known(name, entry.get("license")),
+                "direct": name in direct,
+            }
+        )
+    return found
+
+
+def known(name: str, license: str | None) -> str:
+    if not license or license.upper() == "UNKNOWN":
+        raise ValueError(f"no license known for {name}, add it to OVERRIDES in scripts/third-party")
+    return license
+
+
+def pypi_license(name: str, read: MetadataReader) -> str:
+    if name in OVERRIDES:
+        return OVERRIDES[name]
+    meta = read(name)
+    expression = meta.get("License-Expression")
+    if expression:
+        return expression
+    licenses = {
+        CLASSIFIERS.get(c) for c in meta.get_all("Classifier") or [] if c.startswith("License ::")
+    }
+    if len(licenses) == 1:
+        return known(name, licenses.pop())
+    return known(name, None)
+
+
+def exported(text: str) -> list[tuple[str, str, bool]]:
+    """(name, version, has a marker) of each requirement `uv export` prints."""
+    found = []
+    for line in text.splitlines():
+        match = re.match(r"([A-Za-z0-9._-]+)==([^\s;]+)\s*(;.*)?$", line)
+        if match:
+            found.append((normalized(match[1]), match[2], match[3] is not None))
+    return found
+
+
+def pypi_packages(export: str, direct: set[str], read: MetadataReader) -> list[Package]:
+    found = []
+    for name, version, marker in exported(export):
+        try:
+            license = pypi_license(name, read)
+        except metadata.PackageNotFoundError:
+            ## a package for another platform (win32, emscripten) is not installed here
+            if marker:
+                continue
+            raise
+        found.append(
+            {
+                "name": name,
+                "version": version,
+                "ecosystem": "PyPI",
+                "license": license,
+                "direct": name in direct,
+            }
+        )
+    return found
+
+
+def deduplicated(packages: list[Package]) -> list[Package]:
+    unique = {json.dumps(p, sort_keys=True): p for p in packages}
+    return sorted(unique.values(), key=lambda p: (p["name"].lower(), p["ecosystem"], p["version"]))
+
+
+def npm_direct() -> set[str]:
+    return set(json.loads((FRONTEND / "package.json").read_text())["dependencies"])
+
+
+def pypi_direct() -> set[str]:
+    pyproject = tomllib.loads((BACKEND / "pyproject.toml").read_text())
+    return {
+        normalized(re.split(r"[\s<>=!~;\[]", spec, maxsplit=1)[0])
+        for spec in pyproject["project"]["dependencies"]
+    }
+
+
+def uv_export() -> str:
+    return subprocess.run(
+        ["uv", "export", "--locked", "--no-dev", "--no-hashes", "--no-emit-project"],
+        cwd=BACKEND,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+
+def collect(read: MetadataReader = metadata.metadata) -> list[Package]:
+    lock = json.loads((FRONTEND / "package-lock.json").read_text())
+    return deduplicated(
+        npm_packages(lock, npm_direct()) + pypi_packages(uv_export(), pypi_direct(), read)
+    )
+
+
+def rendered(packages: list[Package]) -> str:
+    return json.dumps(packages, indent=2) + "\n"
+
+
+def stale_names(committed: list[Package], current: list[Package]) -> list[str]:
+    """The names of the packages that are in only one of the two lists, or differ between them."""
+    keys = {json.dumps(p, sort_keys=True) for p in committed} ^ {
+        json.dumps(p, sort_keys=True) for p in current
+    }
+    return sorted({json.loads(key)["name"] for key in keys}, key=str.lower)
+
+
+def main(args: list[str]) -> int:
+    if args not in ([], ["--check"]):
+        print("usage: third-party [--check]", file=sys.stderr)
+        return 2
+    venv.run_in_backend_venv("third-party", __file__, args)
+    try:
+        current = collect()
+    except ValueError as error:
+        print(f"third-party: {error}", file=sys.stderr)
+        return 1
+    if args == ["--check"]:
+        committed = json.loads(OUTPUT.read_text()) if OUTPUT.exists() else []
+        names = stale_names(committed, current)
+        if names:
+            print(f"third-party: {OUTPUT.relative_to(ROOT)} is stale for: {', '.join(names)}")
+            return 1
+        return 0
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT.write_text(rendered(current))
+    print(f"third-party: wrote {len(current)} packages to {OUTPUT.relative_to(ROOT)}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

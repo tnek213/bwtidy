@@ -1,0 +1,83 @@
+name: bwtidy
+
+## The compose file that runs bwtidy, with the settings of .env (made from example.env).
+## How to run it: docs/how-to/run.md
+services:
+  bwtidy:
+    ## the image comes from .env, the tag defaults to latest
+    image: ${BWTIDY_IMAGE:?set BWTIDY_IMAGE in .env (copy example.env)}:${BWTIDY_VERSION:-latest}
+    ## the docs use this name in docker logs and docker exec
+    container_name: bwtidy
+    restart: unless-stopped
+    ## a stop reaches the gateway as PID 1, init reaps the bw and worker processes it leaves
+    init: true
+    ## bound to the host's loopback: a reverse proxy (Caddy, nginx, Traefik) on the host
+    ## terminates TLS and forwards to this port, then set BWTIDY_SECURE_COOKIES=1 and
+    ## BWTIDY_MCP_HOSTS in .env
+    ports:
+      - "127.0.0.1:${BWTIDY_HOST_PORT:-8765}:8000"
+    ## empty values leave the gateway's own defaults (docs/spec.md, Gateway)
+    environment:
+      BWTIDY_MCP_HOSTS: ${BWTIDY_MCP_HOSTS:-}
+      BWTIDY_SECURE_COOKIES: ${BWTIDY_SECURE_COOKIES:-}
+      BWTIDY_MAX_PENDING: ${BWTIDY_MAX_PENDING:-}
+      BWTIDY_MAX_WORKERS: ${BWTIDY_MAX_WORKERS:-}
+      BWTIDY_UID_BASE: ${BWTIDY_UID_BASE:-}
+      BWTIDY_ALLOWED_SERVERS: ${BWTIDY_ALLOWED_SERVERS:-}
+      BWTIDY_HEARTBEAT_TIMEOUT: ${BWTIDY_HEARTBEAT_TIMEOUT:-}
+      BWTIDY_SESSION_IDLE_TIMEOUT: ${BWTIDY_SESSION_IDLE_TIMEOUT:-}
+      BWTIDY_BACKUP_KEEP_NEWEST: ${BWTIDY_BACKUP_KEEP_NEWEST:-}
+      BWTIDY_BACKUP_KEEP_DAYS: ${BWTIDY_BACKUP_KEEP_DAYS:-}
+      BWTIDY_BACKUP_KEEP_ALWAYS: ${BWTIDY_BACKUP_KEEP_ALWAYS:-}
+      BWTIDY_FAILED_KEEP_HOURS: ${BWTIDY_FAILED_KEEP_HOURS:-}
+      ## each account's backups go to /backups/HOST/EMAIL instead of its directory in the accounts
+      BWTIDY_BACKUPS_ROOT: /backups
+    volumes:
+      ## the accounts, their Bitwarden CLI logins and databases, owned by the account uids
+      - bwtidy-accounts:/data/accounts
+      ## the encrypted backups. /backups can be any mount: BWTIDY_BACKUPS in .env names a host
+      ## directory instead of the volume (another disk, a network share, a directory a backup
+      ## tool reads). The gateway makes a directory per account in it, owned by the account's
+      ## uid, so the file system must let root chown.
+      - ${BWTIDY_BACKUPS:-bwtidy-backups}:/backups
+    ## the image has no curl or wget, and the endpoint needs no login
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "__import__('urllib.request').request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    ## nothing writes outside the volumes and /tmp (tried with login, edits, commits and backups)
+    read_only: true
+    tmpfs:
+      - /tmp
+    ## the gateway runs as root and starts one worker per account as that account's own uid
+    ## (docs/spec.md, Gateway). These capabilities are all it needs for that.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+      - KILL
+    security_opt:
+      - no-new-privileges:true
+    ## a stop lets every worker commit and stop bw cleanly: above the gateway's 10 s for requests
+    ## in flight, its 120 s for the workers and bw serve's 5 s (docs/spec.md, Gateway)
+    stop_grace_period: 150s
+    ## the logs of a long running container never fill the disk
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  bwtidy-accounts:
+  bwtidy-backups:

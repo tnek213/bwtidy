@@ -1,0 +1,30 @@
+{#- The alpha disclaimer as a banner above every page, without a button to close it. -#}
+{% extends "base.html" %}
+
+{% block extrahead %}
+  <style>
+    .md-banner {
+      color: #1a1a1a;
+      background-color: #ffc400;
+    }
+    [data-md-color-scheme="slate"] .md-banner {
+      background-color: #f0b400;
+    }
+    .md-banner .md-banner__inner {
+      font-size: .75rem;
+      font-weight: 700;
+    }
+    .md-banner .md-banner__inner a,
+    .md-banner .md-banner__inner a:hover {
+      color: inherit;
+      text-decoration: underline;
+    }
+  </style>
+{% endblock %}
+
+{% block announce %}
+  <p data-disclaimer>
+    bwtidy is alpha software that changes your password vault.
+    <a href="{{ base_url | trim("/") }}/#alpha-software">Read the disclaimer before you use it.</a>
+  </p>
+{% endblock %}

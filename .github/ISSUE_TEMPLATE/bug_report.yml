@@ -1,0 +1,62 @@
+name: Bug report
+description: Something in bwtidy does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste vault contents, secrets, tokens or backups into this issue.** Describe them instead, for example "an item with three custom fields".
+
+        bwtidy is alpha software and nobody promises a response time. A security issue does not belong here: see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: As the About page shows it (About bwtidy in the More actions menu of the app bar).
+      placeholder: Version 0.1.0-alpha.1 (261117 4d7de55)
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: The steps, in order.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      placeholder: Firefox 130 on Linux
+    validations:
+      required: false
+  - type: dropdown
+    id: run
+    attributes:
+      label: How you run bwtidy
+      options:
+        - The image
+        - A build from source
+        - Other
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Remove every secret first, such as passwords, tokens, vault contents and your server address if it is private.
+      render: text
+    validations:
+      required: false

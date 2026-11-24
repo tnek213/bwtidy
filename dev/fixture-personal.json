@@ -1,0 +1,1680 @@
+{
+  "encrypted": false,
+  "folders": [
+    {
+      "id": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "name": "Work"
+    },
+    {
+      "id": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "name": "Home"
+    },
+    {
+      "id": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "name": "Infra"
+    }
+  ],
+  "items": [
+    {
+      "id": "29b6c982-b192-54c4-88af-bf34e0f213d7",
+      "organizationId": null,
+      "folderId": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Example Mail",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://mail.example.test"
+          }
+        ],
+        "username": "dev@mail.example.test",
+        "password": "pw-e0e73848bd0e5953",
+        "totp": "otpauth://totp/ExampleMail:dev?secret=KRSXG5CTMVRXEZLU&issuer=ExampleMail"
+      },
+      "passwordHistory": [
+        {
+          "lastUsedDate": "2025-11-02T10:15:00.000Z",
+          "password": "old-mail-pass-1"
+        },
+        {
+          "lastUsedDate": "2026-02-20T08:00:00.000Z",
+          "password": "old-mail-pass-2"
+        }
+      ]
+    },
+    {
+      "id": "3241b1bf-1206-541b-8b87-e44ec2190e18",
+      "organizationId": null,
+      "folderId": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Example Chat",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://chat.example.test"
+          }
+        ],
+        "username": "dev",
+        "password": "pw-07d00bbc49c85180",
+        "totp": null
+      }
+    },
+    {
+      "id": "d7fc7a24-9b34-5cb0-b9e3-e58bd086879b",
+      "organizationId": null,
+      "folderId": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Timesheet",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://time.example.test/login"
+          }
+        ],
+        "username": "dev.user",
+        "password": "pw-aef76880043450bf",
+        "totp": null
+      }
+    },
+    {
+      "id": "678a0336-c2ca-586c-87b9-35514a3ea6ae",
+      "organizationId": null,
+      "folderId": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Expense portal",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://expense.example.test"
+          }
+        ],
+        "username": "dev.user",
+        "password": "pw-f9684f7b872a5fbd",
+        "totp": null
+      }
+    },
+    {
+      "id": "262eeb7e-6573-57b9-b232-4d3f309a1f8f",
+      "organizationId": null,
+      "folderId": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Wiki",
+      "notes": null,
+      "favorite": true,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://wiki.example.test"
+          },
+          {
+            "match": null,
+            "uri": "https://docs.example.test"
+          }
+        ],
+        "username": "dev",
+        "password": "pw-54fcf5e23a7b567b",
+        "totp": null
+      }
+    },
+    {
+      "id": "ac428621-dfd6-55b7-b50d-e412669a469d",
+      "organizationId": null,
+      "folderId": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Issue tracker",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://issues.example.test"
+          }
+        ],
+        "username": "dev@example.test",
+        "password": "pw-59d37455f204538d",
+        "totp": "JBSWY3DPEHPK3PXP"
+      }
+    },
+    {
+      "id": "bd4243b2-fada-54a4-8b44-f71893c1350a",
+      "organizationId": null,
+      "folderId": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "type": 1,
+      "reprompt": 0,
+      "name": "VPN",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://vpn.example.test"
+          }
+        ],
+        "username": "dev",
+        "password": "pw-bfad9801c6c6522c",
+        "totp": "otpauth://totp/ExampleVPN:dev?secret=KRSXG5CTMVRXEZLU&issuer=ExampleVPN"
+      }
+    },
+    {
+      "id": "ac75918b-a07e-5101-bb2e-417309b7a6d0",
+      "organizationId": null,
+      "folderId": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Payroll",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://payroll.example.test"
+          }
+        ],
+        "username": "19800101-0000",
+        "password": "pw-cf98b2d293ed56ab",
+        "totp": null
+      }
+    },
+    {
+      "id": "7b8460a1-d66b-5a0e-9494-d904d69c3df3",
+      "organizationId": null,
+      "folderId": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Conference room booking",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://rooms.example.test"
+          }
+        ],
+        "username": "dev",
+        "password": "pw-ebbf3d37ea5b50ea",
+        "totp": null
+      }
+    },
+    {
+      "id": "af16defc-e60c-5922-bfdd-2b0e3a349018",
+      "organizationId": null,
+      "folderId": "3ef4d5d2-9258-5f9e-893c-9203106805ad",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Customer CRM",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://crm.example.test"
+          }
+        ],
+        "username": "dev@example.test",
+        "password": "pw-95da94e8079b5e45",
+        "totp": null
+      }
+    },
+    {
+      "id": "8ed0224f-cc89-53e2-9fa8-f7075ac3a6a1",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Electricity company",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://power.example.test"
+          }
+        ],
+        "username": "dev@home.example.test",
+        "password": "pw-4fcc7842855e592c",
+        "totp": null
+      }
+    },
+    {
+      "id": "5eb0a533-90ac-581b-94a1-ab5bc05ece55",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Water and waste",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://water.example.test"
+          }
+        ],
+        "username": "dev@home.example.test",
+        "password": "pw-951491e89f8959c8",
+        "totp": null
+      }
+    },
+    {
+      "id": "da7021a4-76e0-5d29-93c8-0bd90c47a621",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Grocery delivery",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://groceries.example.test"
+          }
+        ],
+        "username": "dev@home.example.test",
+        "password": "pw-ae506b784fcf57f4",
+        "totp": null
+      }
+    },
+    {
+      "id": "e32b5336-c383-590a-b069-3a9d41cfafa0",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Library",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://library.example.test"
+          }
+        ],
+        "username": "123456789",
+        "password": "pw-bc9c1eeb2dd65ca0",
+        "totp": null
+      }
+    },
+    {
+      "id": "ec4bfce9-9a19-5380-b502-3eb048a99f02",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Streaming video",
+      "notes": null,
+      "favorite": true,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://video.example.test"
+          }
+        ],
+        "username": "dev@home.example.test",
+        "password": "pw-9d65e9292df95f59",
+        "totp": null
+      }
+    },
+    {
+      "id": "ba6a16ad-598c-5c00-b3ff-782c5ec9eb8e",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Music service",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://music.example.test"
+          }
+        ],
+        "username": "dev@home.example.test",
+        "password": "pw-9b266db99a8c5163",
+        "totp": null
+      }
+    },
+    {
+      "id": "931b707a-c758-5c1d-beff-4e95e66b2ea2",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Pharmacy",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://pharmacy.example.test"
+          }
+        ],
+        "username": "dev@home.example.test",
+        "password": "pw-048fda10690e583b",
+        "totp": null
+      }
+    },
+    {
+      "id": "a39d1b47-adf9-5e23-b2aa-b0e6860430a2",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Car insurance",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://insure.example.test"
+          }
+        ],
+        "username": "dev@home.example.test",
+        "password": "pw-89e467d56f6856a0",
+        "totp": null
+      }
+    },
+    {
+      "id": "b2382dba-7f35-51ea-ab4a-713cc63240a7",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Hardware store",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://hardware.example.test"
+          }
+        ],
+        "username": "dev@home.example.test",
+        "password": "pw-b72889b18b235794",
+        "totp": null
+      }
+    },
+    {
+      "id": "b4b2d68a-3195-57f9-a744-984058558fd9",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Train tickets",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://trains.example.test"
+          },
+          {
+            "match": null,
+            "uri": "androidapp://test.example.trains"
+          }
+        ],
+        "username": "dev@home.example.test",
+        "password": "pw-42bebcfe2212502f",
+        "totp": null
+      }
+    },
+    {
+      "id": "561f4eb9-3cac-5958-a613-7e4de36e73c4",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Proxmox",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://pve.lab.example.test:8006"
+          }
+        ],
+        "username": "root@pam",
+        "password": "pw-dd9750c1317955ab",
+        "totp": null
+      },
+      "passwordHistory": [
+        {
+          "lastUsedDate": "2025-09-30T21:45:00.000Z",
+          "password": "old-pve-pass"
+        }
+      ]
+    },
+    {
+      "id": "6ed144f2-b3a2-5e70-94b3-42311e4d15c2",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Dashboards",
+      "notes": null,
+      "favorite": true,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://dashboards.lab.example.test"
+          }
+        ],
+        "username": "admin",
+        "password": "pw-511c473def205191",
+        "totp": null
+      }
+    },
+    {
+      "id": "6b17142d-8735-53e8-83a7-3c26883059ed",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Code forge",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://git.lab.example.test"
+          }
+        ],
+        "username": "dev",
+        "password": "pw-fbfa1458177d559c",
+        "totp": "otpauth://totp/Code%20forge:dev?secret=KRSXG5CTMVRXEZLU&issuer=Code%20forge"
+      }
+    },
+    {
+      "id": "1e4d5fb1-f87f-55c7-a33d-76d723dfd1c7",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Task board",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://todo.lab.example.test"
+          }
+        ],
+        "username": "dev",
+        "password": "pw-48d942a8512f5de7",
+        "totp": null
+      }
+    },
+    {
+      "id": "d4be4560-2d65-5395-b758-f2b0394b5168",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Home Assistant",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://ha.lab.example.test"
+          }
+        ],
+        "username": "dev",
+        "password": "pw-6e0be437ecd05208",
+        "totp": null
+      }
+    },
+    {
+      "id": "1275616f-6935-511f-b2d3-4f0a819c0d44",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Router web UI",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://192.0.2.1"
+          }
+        ],
+        "username": "admin",
+        "password": "pw-a2804811a5005f9f",
+        "totp": null
+      }
+    },
+    {
+      "id": "068ae26d-95d8-5649-90cc-52d28619e172",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "NAS",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://nas.lab.example.test:5001"
+          }
+        ],
+        "username": "admin",
+        "password": "pw-257b033d0fe85040",
+        "totp": "JBSWY3DPEHPK3PXP"
+      }
+    },
+    {
+      "id": "1b882476-6565-5d3e-8949-0fd861c80c75",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "DNS registrar",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://registrar.example.test"
+          }
+        ],
+        "username": "dev@example.test",
+        "password": "pw-8deeed1b2652521c",
+        "totp": "otpauth://totp/Registrar:dev?secret=KRSXG5CTMVRXEZLU&issuer=Registrar"
+      }
+    },
+    {
+      "id": "f753c8fb-1de0-5f8e-a06f-b081a1506698",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Cloud object storage",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://s3.example.test"
+          }
+        ],
+        "username": "dev-access-key",
+        "password": "pw-2fd354c5e4b15abb",
+        "totp": null
+      }
+    },
+    {
+      "id": "39e62323-6dd9-5562-a3f4-97ba60944ca8",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Mail relay",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "smtp://relay.example.test:587"
+          }
+        ],
+        "username": "relay@example.test",
+        "password": "pw-6a5d2ec76d1a5b01",
+        "totp": null
+      }
+    },
+    {
+      "id": "f2b480ea-221f-5733-a41a-07eb22c9bc6d",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Example Forge",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://forge.example.test"
+          }
+        ],
+        "username": "dev",
+        "password": "pw-9c81a0ec687855bb",
+        "totp": "otpauth://totp/Forge:dev?secret=KRSXG5CTMVRXEZLU&issuer=Forge",
+        "fido2Credentials": [
+          {
+            "credentialId": "1903342c-06b1-5451-8eef-00dd86061133",
+            "keyType": "public-key",
+            "keyAlgorithm": "ECDSA",
+            "keyCurve": "P-256",
+            "keyValue": "MHcCAQEEIKH57E-EGIO7Ts4c6GvP1PqGpXkt4mJWYzMYQkQbs7m2oAoGCCqGSM49AwEHoUQDQgAES0b2S6yz1zIH2-kgFglAXwB62dFFnAkF7HBROGjm6sQraMccH_y10TzQN1zKJvK4UzkOEiADjpqrOu3hmRnN2A",
+            "rpId": "forge.example.test",
+            "userHandle": "Ztt56oJcWqCWr8yEU_AlkA",
+            "userName": "dev",
+            "counter": "0",
+            "rpName": "Example Forge",
+            "userDisplayName": "Dev",
+            "discoverable": "true",
+            "creationDate": "2026-03-14T09:26:53.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "389d5b85-18ca-51cf-9a2b-f4c16899e09c",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Online bank",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://bank.example.test"
+          }
+        ],
+        "username": "19800101-0000",
+        "password": "pw-62ecac34ace05e51",
+        "totp": null
+      },
+      "passwordHistory": [
+        {
+          "lastUsedDate": "2026-01-05T12:00:00.000Z",
+          "password": "old-bank-pass"
+        }
+      ]
+    },
+    {
+      "id": "208ff196-78f0-532e-af48-84e2b4ef1c58",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Tax agency",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://tax.example.test"
+          }
+        ],
+        "username": "19800101-0000",
+        "password": "pw-7a001e2d5fb857b3",
+        "totp": null
+      }
+    },
+    {
+      "id": "0a9ebfcc-77ea-50a5-8ba0-55c5738c6c14",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Health portal",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://health.example.test"
+          }
+        ],
+        "username": "19800101-0000",
+        "password": "pw-334fc6a6717553c3",
+        "totp": null
+      }
+    },
+    {
+      "id": "38cfac26-23e0-51e9-85d5-879477dfd651",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Shoe shop",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://shoes.example.test"
+          }
+        ],
+        "username": "dev@home.example.test",
+        "password": "pw-b1b3b80c656b5843",
+        "totp": null
+      }
+    },
+    {
+      "id": "f38580ca-f622-5bb1-9a16-19b5621d3f34",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Photo sharing",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://photos.example.test"
+          }
+        ],
+        "username": "dev",
+        "password": "pw-d8c6c50c85435736",
+        "totp": null
+      }
+    },
+    {
+      "id": "5b440ecb-654d-5b70-b7c5-c3f61249dc22",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Old forum account",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://forum.example.test"
+          }
+        ],
+        "username": "devuser42",
+        "password": "pw-9d74e60f7aa85ba4",
+        "totp": null
+      }
+    },
+    {
+      "id": "f38dab51-244f-554e-8529-af289c986f7b",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Airline",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://airline.example.test"
+          }
+        ],
+        "username": "SK123456789",
+        "password": "pw-0b76785a8c645e61",
+        "totp": null
+      }
+    },
+    {
+      "id": "2ca21a76-a54c-53c0-beb2-ded415129aa4",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Bike club",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [],
+        "username": "dev",
+        "password": "pw-2f143a55b31553ed",
+        "totp": null
+      }
+    },
+    {
+      "id": "bfd99274-490a-5be3-b60c-6d87fa25ec15",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Game launcher",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://games.example.test"
+          }
+        ],
+        "username": "dev_gamer",
+        "password": "pw-b47a54badc2d5e9b",
+        "totp": "otpauth://totp/Games:dev?secret=KRSXG5CTMVRXEZLU&issuer=Games"
+      }
+    },
+    {
+      "id": "e8da1a35-c2b9-5c18-964a-11c3ae32a2fb",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 1,
+      "reprompt": 0,
+      "name": "ThinkPad X1",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "MSDM Windows Key",
+          "value": "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE",
+          "type": 0,
+          "linkedId": null
+        },
+        {
+          "name": "BIOS Password",
+          "value": "bios-x1-made-up",
+          "type": 1,
+          "linkedId": null
+        },
+        {
+          "name": "LUKS",
+          "value": "luks-x1-made-up passphrase",
+          "type": 1,
+          "linkedId": null
+        },
+        {
+          "name": "User",
+          "value": "dev",
+          "type": 0,
+          "linkedId": null
+        },
+        {
+          "name": "User password",
+          "value": "x1-user-made-up",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "login": {
+        "uris": [],
+        "username": null,
+        "password": null,
+        "totp": null
+      }
+    },
+    {
+      "id": "ffca48b8-a026-5777-bae7-81ca67f68e14",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Gaming desktop",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "LUKS/dm-crypt and Bitlocker",
+          "value": "desktop-disk-made-up",
+          "type": 1,
+          "linkedId": null
+        },
+        {
+          "name": "Bitlocker RecoveryPassword",
+          "value": "111111-222222-333333-444444-555555-666666-777777-888888",
+          "type": 1,
+          "linkedId": null
+        },
+        {
+          "name": "UEFI Administrator Password",
+          "value": "uefi-desktop-made-up",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "login": {
+        "uris": [],
+        "username": "dev",
+        "password": "pw-767298dbc83c5cc6",
+        "totp": null
+      }
+    },
+    {
+      "id": "315f39ce-56d4-524b-bb45-1c7c014838c7",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 2,
+      "reprompt": 0,
+      "name": "Media PC",
+      "notes": "Living room box under the TV.",
+      "favorite": false,
+      "fields": [
+        {
+          "name": "user",
+          "value": "media",
+          "type": 0,
+          "linkedId": null
+        },
+        {
+          "name": "user password",
+          "value": "media-user-made-up",
+          "type": 1,
+          "linkedId": null
+        },
+        {
+          "name": "dm-crypt password",
+          "value": "media-disk-made-up",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "4d582184-1b88-5f37-9f93-545001eb7b0e",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Old webshop",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "username",
+          "value": "dev",
+          "type": 0,
+          "linkedId": null
+        },
+        {
+          "name": "Password",
+          "value": "pw-a074c93d475b5144",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "c35c5d5a-84d6-5b2d-a029-e91e02b94aee",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Printer admin",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "username",
+          "value": "dev",
+          "type": 0,
+          "linkedId": null
+        },
+        {
+          "name": "Password",
+          "value": "pw-aa38446c0d645c2c",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "9a533c88-6fb6-51df-b4d4-18c60d4fa73b",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "School portal",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "username",
+          "value": "dev",
+          "type": 0,
+          "linkedId": null
+        },
+        {
+          "name": "Password",
+          "value": "pw-bfa256a07cfd504d",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "8a511c8a-5ec4-56a7-aa2e-265e2a760f5e",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Camera NVR",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "username",
+          "value": "dev",
+          "type": 0,
+          "linkedId": null
+        },
+        {
+          "name": "Password",
+          "value": "pw-56e4a6a35292557b",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "8c17072d-726c-5f6e-bb71-310bcadf821a",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 2,
+      "reprompt": 0,
+      "name": "Switch admin",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "username",
+          "value": "admin",
+          "type": 0,
+          "linkedId": null
+        },
+        {
+          "name": "password",
+          "value": "pw-be23854541425078",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "f28c11be-a752-58dd-9bdc-700332c0d379",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 2,
+      "reprompt": 0,
+      "name": "Alarm system",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "username",
+          "value": "dev",
+          "type": 0,
+          "linkedId": null
+        },
+        {
+          "name": "code",
+          "value": "4711",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "76d758dd-d091-50a0-a617-b419e1222cc2",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Windows license key",
+      "notes": "Windows 11 Pro\nKey: AAAAA-11111-BBBBB-22222-CCCCC",
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "5beeb77a-c7a3-5e9c-bca8-6d1cb83ac41f",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Office license key",
+      "notes": "Office 2021\nKey: ZZZZZ-99999-YYYYY-88888-XXXXX",
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "471e9753-aee8-56f4-8ba3-3f2affb40ad7",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "SIM PIN",
+      "notes": "PIN 0000\nPUK 12345678",
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "a1aa21d9-d955-587b-868b-fe3b72cbe377",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Example Mail recovery codes",
+      "notes": "1111-2222\n3333-4444\n5555-6666\n7777-8888",
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "df7884e5-2ee1-5f0e-b4ed-26cf7ed580c6",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Bank account",
+      "notes": "Example Bank\nClearing 9999\nAccount 1234 567 890",
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "9725c4b6-6b7f-5dae-b166-361ad0348062",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Proton recovery phrase",
+      "notes": "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima",
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "c3ddfcbc-4d2e-5e37-ba9f-3cc18fc50f2c",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Door code",
+      "notes": "Front door 1234#",
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "2f3e31ed-10a2-548a-80fe-ab88f34d89eb",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Expired license key",
+      "notes": "Old editor license, expired 2024\nKey: OLD-KEY-0000",
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "ebf1f358-ab7c-532d-bbe6-211eaf8226ab",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 2,
+      "reprompt": 0,
+      "name": "Internal CA",
+      "notes": "Root CA for lab.example.test",
+      "favorite": false,
+      "fields": [
+        {
+          "name": "ca key passphrase",
+          "value": "ca-made-up-passphrase",
+          "type": 1,
+          "linkedId": null
+        },
+        {
+          "name": "Public Key",
+          "value": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMadeUpMadeUpMadeUpMadeUpMadeUpMadeUp dev@lab",
+          "type": 0,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "71037321-47fe-5721-bd55-68e95cc728da",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 2,
+      "reprompt": 0,
+      "name": "Code forge API",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "token",
+          "value": "tok-made-up-0123456789",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "6cc6b1ff-bc83-5b76-9907-2d0f56a071e0",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 2,
+      "reprompt": 0,
+      "name": "Ansible vault",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "vault_pass_ai",
+          "value": "ansible-made-up",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "787f520f-8a0c-59fa-b203-a825e186130f",
+      "organizationId": null,
+      "folderId": "85c31d85-c632-5a2f-964f-f9aefcd4de57",
+      "type": 2,
+      "reprompt": 0,
+      "name": "Server sudo",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "sudo",
+          "value": "sudo-made-up",
+          "type": 1,
+          "linkedId": null
+        },
+        {
+          "name": "infra",
+          "value": "host-a, host-b",
+          "type": 0,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "b69af118-cc40-5bd3-bdb4-6dd111cbb38b",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Backup disk",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "Encryption passphrase ",
+          "value": "backup-disk-made-up",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "e8831bc4-8fa7-5b63-8ea6-6232995272f6",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Example Forge recovery",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "Recovery code",
+          "value": "abcd-efgh-ijkl",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "5b54b897-6bf4-51f7-ac1d-c00a9fc77c24",
+      "organizationId": null,
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Phone backup",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "Recovery key",
+          "value": "RK-made-up-0000-1111",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "secureNote": {
+        "type": 0
+      }
+    },
+    {
+      "id": "1f391da9-614a-58ca-9d9e-6eb1b010614e",
+      "organizationId": null,
+      "folderId": "a8b6f1cc-3a21-5fcb-a7f3-c98a9dbe7337",
+      "type": 1,
+      "reprompt": 0,
+      "name": "Home router",
+      "notes": null,
+      "favorite": false,
+      "fields": [
+        {
+          "name": "WPA key",
+          "value": "wpa-main-made-up",
+          "type": 1,
+          "linkedId": null
+        },
+        {
+          "name": "WPA key",
+          "value": "wpa-guest-made-up",
+          "type": 1,
+          "linkedId": null
+        }
+      ],
+      "collectionIds": null,
+      "login": {
+        "uris": [
+          {
+            "match": null,
+            "uri": "https://192.0.2.254"
+          }
+        ],
+        "username": "admin",
+        "password": "pw-909753314a995c7a",
+        "totp": null
+      }
+    },
+    {
+      "id": "9b7bb13e-b905-5ee7-9a79-87693b53a31c",
+      "organizationId": null,
+      "folderId": null,
+      "type": 3,
+      "reprompt": 0,
+      "name": "Visa debit",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "card": {
+        "cardholderName": "Dev User",
+        "brand": "Visa",
+        "number": "4111111111111111",
+        "expMonth": "12",
+        "expYear": "2029",
+        "code": "123"
+      }
+    },
+    {
+      "id": "ec832216-0b36-5a8e-bfaa-6d42849c0963",
+      "organizationId": null,
+      "folderId": null,
+      "type": 3,
+      "reprompt": 0,
+      "name": "Mastercard credit",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "card": {
+        "cardholderName": "Dev User",
+        "brand": "Mastercard",
+        "number": "5555555555554444",
+        "expMonth": "07",
+        "expYear": "2028",
+        "code": "456"
+      }
+    },
+    {
+      "id": "783efcee-9ed0-5e9b-b2f0-51dff1701160",
+      "organizationId": null,
+      "folderId": null,
+      "type": 4,
+      "reprompt": 0,
+      "name": "Dev Identity",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "identity": {
+        "title": "Mx",
+        "firstName": "Dana",
+        "middleName": null,
+        "lastName": "Example",
+        "address1": "Testgatan 12",
+        "address2": null,
+        "address3": null,
+        "city": "Exampleby",
+        "state": null,
+        "postalCode": "123 45",
+        "country": "SE",
+        "company": null,
+        "email": "dana@mail.example.test",
+        "phone": "+46 70 000 00 00",
+        "ssn": null,
+        "username": "dana.example",
+        "passportNumber": null,
+        "licenseNumber": null
+      }
+    },
+    {
+      "id": "19a3980f-b699-5aca-a2ca-8d4315c8b006",
+      "organizationId": null,
+      "folderId": null,
+      "type": 5,
+      "reprompt": 0,
+      "name": "Build server key",
+      "notes": null,
+      "favorite": false,
+      "fields": [],
+      "collectionIds": null,
+      "sshKey": {
+        "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACBZDAogXxb8udiHjI5GXAus9TbajSZ/nFPNa9v4LVpLHAAAAJjtFbn+7RW5\n/gAAAAtzc2gtZWQyNTUxOQAAACBZDAogXxb8udiHjI5GXAus9TbajSZ/nFPNa9v4LVpLHA\nAAAEBl9t5aUXWHeK7MDe5wpxkHS5jC4fS9qHbUFWrpUTSYQ1kMCiBfFvy52IeMjkZcC6z1\nNtqNJn+cU81r2/gtWkscAAAAFWJ1aWxkQGNpLmV4YW1wbGUudGVzdA==\n-----END OPENSSH PRIVATE KEY-----\n",
+        "publicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFkMCiBfFvy52IeMjkZcC6z1NtqNJn+cU81r2/gtWksc build@ci.example.test",
+        "keyFingerprint": "SHA256:nNldmWttheP20S4JprjDuBxbInzNowDzMEi6/tD0KMA"
+      }
+    }
+  ]
+}
