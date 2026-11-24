@@ -1,7 +1,7 @@
 [project]
 name = "bwtidy"
 version = "0.1.0a1"
-description = "Local web UI and MCP server for keeping a Bitwarden vault consistent"
+description = "Self-hosted web UI and MCP server for keeping a Bitwarden vault consistent"
 authors = [
     { name = "Kent Larsson", email = "kent.larsson@gmail.com" }
 ]

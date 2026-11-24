@@ -1,6 +1,6 @@
 # bwtidy specification
 
-bwtidy is a local web UI and MCP server for keeping a Bitwarden
+bwtidy is a self-hosted web UI and MCP server for keeping a Bitwarden
 vault consistent. It shows the whole vault as a wide grid, normalizes field
 names across items, applies templates, and lets an AI agent propose
 reorganizations without ever seeing secret values.
