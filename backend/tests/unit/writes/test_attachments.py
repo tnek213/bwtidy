@@ -17,7 +17,7 @@ from tests.support.quiet import assert_absent
 from tests.support.writes_helpers import plain_decrypt
 
 ## 21 bytes, which the fake lists as 81 like the a1 of the sample vault
-CONTENTS = b"attachment-bytes-1545"
+CONTENTS = b"attachment-bytes-test"
 
 
 @pytest.fixture

@@ -368,8 +368,8 @@ function pendingEntry(id: number, summary: string, diff: DiffRow[]): QueueEntry 
 }
 
 const pending: QueueEntry[] = [
-  pendingEntry(4, 'Rename "Code forge" to "Gitea"', [
-    { itemId: 'item-1', itemName: 'Code forge', column: 'name', before: 'Code forge', after: 'Gitea' },
+  pendingEntry(4, 'Rename "Code forge" to "Codeharbor"', [
+    { itemId: 'item-1', itemName: 'Code forge', column: 'name', before: 'Code forge', after: 'Codeharbor' },
   ]),
   pendingEntry(5, 'Rename field BIOS Password to UEFI Password', [
     { itemId: 'item-2', itemName: 'Laptop', column: 'fields.BIOS Password', before: { masked: true }, after: null },
@@ -386,7 +386,7 @@ function renderWithQueue() {
 
 test('a queued value shows in its cell with a background and a tooltip, and the cell is read-only', async () => {
   renderWithQueue()
-  await screen.findByText('Gitea')
+  await screen.findByText('Codeharbor')
 
   const name = cell('item-1', 'name')
   expect(name).toHaveClass('bw-queued-cell')
@@ -402,7 +402,7 @@ test('a queued value shows in its cell with a background and a tooltip, and the 
   fireEvent.mouseOver(name)
   fireEvent.mouseEnter(name)
   fireEvent.mouseMove(name)
-  const tooltip = await screen.findByText('Queued in #4: Rename "Code forge" to "Gitea". Was: Code forge', {}, { timeout: 3000 })
+  const tooltip = await screen.findByText('Queued in #4: Rename "Code forge" to "Codeharbor". Was: Code forge', {}, { timeout: 3000 })
   expect(tooltip.closest('.ag-tooltip')).not.toBeNull()
   fireEvent.mouseOut(name)
   fireEvent.mouseLeave(name)
@@ -411,7 +411,7 @@ test('a queued value shows in its cell with a background and a tooltip, and the 
 
 test('a queued rename adds its new column, empties the old cell and fades a trashed row', async () => {
   renderWithQueue()
-  await screen.findByText('Gitea')
+  await screen.findByText('Codeharbor')
 
   await waitFor(() => expect(header('fields.UEFI Password')).toBeInTheDocument())
   const renamed = cell('item-2', 'fields.UEFI Password')
@@ -425,7 +425,7 @@ test('a queued rename adds its new column, empties the old cell and fades a tras
 
 test('the switch turns the queued changes off', async () => {
   renderWithQueue()
-  await screen.findByText('Gitea')
+  await screen.findByText('Codeharbor')
 
   fireEvent.click(screen.getByRole('switch', { name: 'Show queued changes' }))
 
@@ -437,14 +437,14 @@ test('the switch turns the queued changes off', async () => {
 
 test('search works on the vault values, not the queued ones', async () => {
   renderWithQueue()
-  await screen.findByText('Gitea')
+  await screen.findByText('Codeharbor')
 
   const search = screen.getByRole('searchbox', { name: 'Search' })
-  fireEvent.change(search, { target: { value: 'gitea' } })
+  fireEvent.change(search, { target: { value: 'codeharbor' } })
   await waitFor(() => expect(rowNames()).toEqual([]))
 
   fireEvent.change(search, { target: { value: 'code forge' } })
-  await waitFor(() => expect(rowNames()).toEqual(['Gitea']))
+  await waitFor(() => expect(rowNames()).toEqual(['Codeharbor']))
 })
 
 async function editText(itemId: string, columnId: string, value: string) {

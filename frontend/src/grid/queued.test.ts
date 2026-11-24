@@ -192,7 +192,7 @@ function uiEntry(id: number, summary: string, diff: DiffRow[], status: QueueEntr
 test('a UI edit stays editable and its tooltip says when it is saved, a proposal stays read-only', () => {
   const decorated = shown([
     uiEntry(7, 'Set login.username of "Code forge"', [diffRow('login.username', 'user', 'user.l')]),
-    entry(8, 'Rename "Code forge" to "Gitea"', [diffRow('name', 'Code forge', 'Gitea')]),
+    entry(8, 'Rename "Code forge" to "Codeharbor"', [diffRow('name', 'Code forge', 'Codeharbor')]),
   ])
 
   expect(shownValue(decorated, 'login.username')).toBe('user.l')
@@ -202,7 +202,7 @@ test('a UI edit stays editable and its tooltip says when it is saved, a proposal
     'Unsaved in #7: Set login.username of "Code forge". Was: user\nSaved automatically in 4 s.',
   )
   expect(queuedTooltip(decorated, 'name', 'Saved automatically in 4 s.')).toBe(
-    'Queued in #8: Rename "Code forge" to "Gitea". Was: Code forge',
+    'Queued in #8: Rename "Code forge" to "Codeharbor". Was: Code forge',
   )
 })
 

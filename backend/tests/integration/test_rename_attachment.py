@@ -19,7 +19,7 @@ from support.cli import BwCli
 
 pytestmark = pytest.mark.integration
 
-CONTENT = b"Made-up file of todo 1545, renamed by bwtidy.\n"
+CONTENT = b"Made-up file, renamed by bwtidy.\n"
 
 
 @pytest.fixture(scope="module")
