@@ -11,11 +11,19 @@
 > own Bitwarden export, made outside bwtidy, and expect bugs and breaking
 > changes between versions.
 
-bwtidy is a web UI and MCP server for keeping a Bitwarden vault tidy. It shows
-the whole vault as one wide grid, helps you normalize field names and apply
-templates, and lets an AI agent propose changes over MCP (the Model Context
-Protocol, how AI agents call tools) without seeing secret values. Nothing an
-agent proposes is written until you approve it.
+<!-- intro: the same text in README.md and docs/index.md -->
+
+A password vault gets messy over the years: `Password` in some items,
+`password` in others, addresses without `https://`. Bitwarden's apps show
+one item at a time, so this is hard to see and fix. bwtidy shows the whole
+vault in one grid. Tidy means items of one kind share field names and
+formats: a template says which fields, a datatype what a value looks like.
+An AI agent can propose fixes over MCP and never sees a secret value. You
+approve every change, and bwtidy backs up the vault before each write. It
+is for people who keep a large Bitwarden or Vaultwarden vault, often
+self-hosted.
+
+<!-- end of intro -->
 
 New to bwtidy? [Run it](how-to/run.md), then take [the tutorial](tutorial/first-cleanup.md).
 
