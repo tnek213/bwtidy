@@ -172,8 +172,10 @@ and fields.
 
 ### Alerts
 
-- bwtidy's note is named "NAME" now: bwtidy's own note was renamed in
-  another app. Rename it back gives it its name again.
+- bwtidy's note is named "NAME" now: bwtidy's own note has another name
+  than the one it should have (renamed in another app). Rename it back gives
+  it that name again, Keep this name keeps NAME, so the warning goes away
+  (see [The bwtidy note](../explanation/tool-note.md#renaming-the-note)).
 - Backups not re-encrypted (after a login with a new master password): the
   backups it names could not be opened with the stored password and are left
   as they were.

@@ -523,8 +523,15 @@ const withToolNote: GridData = {
   rows: [...grid.rows, { id: 'tool', revisionDate: '2026-10-28T10:00:00Z', cells: { name: 'bwtidyK', type: 'note' } }],
 }
 
-function templatesDoc(name: string) {
-  return { templates: [], revisionDate: '2026-10-28T10:00:00Z', toolNoteId: 'tool', toolNoteName: name }
+// Without expected the answer has no toolNoteExpectedName, which reads as bwtidy.
+function templatesDoc(name: string, expected?: string) {
+  return {
+    templates: [],
+    revisionDate: '2026-10-28T10:00:00Z',
+    toolNoteId: 'tool',
+    toolNoteName: name,
+    ...(expected === undefined ? {} : { toolNoteExpectedName: expected }),
+  }
 }
 
 test('the tool note row is grey and read-only', async () => {
@@ -568,12 +575,67 @@ test('a renamed tool note shows a warning, and Rename it back renames it', async
   })
 
   expect(await screen.findByText('bwtidy\'s note is named "bwtidyK" now.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Keep this name' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Rename it back' }))
 
+  expect(await screen.findByText('bwtidy\'s note is named "bwtidy" again. Backup: b.zip.age')).toBeInTheDocument()
   await waitFor(() => expect(screen.queryByText(/is named "bwtidyK" now/)).toBeNull())
   const calls = fetchMock.mock.calls.filter(([path]) => path === '/api/tool-note/rename-back')
   expect(calls).toHaveLength(1)
   expect(JSON.parse(String(calls[0][1]?.body))).toEqual({ revisionDate: '2026-10-28T10:00:00Z' })
+})
+
+test('Keep this name makes the name the note has now its expected name', async () => {
+  let expected = 'bwtidy'
+  const { fetchMock } = renderGrid(withToolNote, {
+    routes: {
+      'GET /api/templates': () => jsonResponse(200, templatesDoc('bwtidyK', expected)),
+      'POST /api/tool-note/keep-name': () => {
+        expected = 'bwtidyK'
+        const answer = { toolNoteName: 'bwtidyK', toolNoteExpectedName: 'bwtidyK', revisionDate: '2026-10-28T11:00:00Z' }
+        return jsonResponse(200, { ...answer, backup: 'b.zip.age' })
+      },
+    },
+  })
+
+  expect(await screen.findByText('bwtidy\'s note is named "bwtidyK" now.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Keep this name' }))
+
+  expect(await screen.findByText('bwtidy\'s note keeps the name "bwtidyK". Backup: b.zip.age')).toBeInTheDocument()
+  await waitFor(() => expect(screen.queryByText(/is named "bwtidyK" now/)).toBeNull())
+  const calls = fetchMock.mock.calls.filter(([path]) => path === '/api/tool-note/keep-name')
+  expect(calls).toHaveLength(1)
+  expect(JSON.parse(String(calls[0][1]?.body))).toEqual({ name: 'bwtidyK' })
+  expect(fetchMock.mock.calls.filter(([path]) => path === '/api/tool-note/rename-back')).toHaveLength(0)
+})
+
+test('no warning while the tool note has the name it kept', async () => {
+  renderGrid(withToolNote, { routes: { 'GET /api/templates': () => jsonResponse(200, templatesDoc('bwtidyK', 'bwtidyK')) } })
+  await screen.findByText('bwtidyK')
+
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Keep this name' })).toBeNull())
+  expect(screen.queryByRole('button', { name: 'Rename it back' })).toBeNull()
+  expect(screen.queryByText(/is named/)).toBeNull()
+})
+
+test('a note renamed away from the name it kept shows the warning, and Rename it back names it so again', async () => {
+  let name = 'Other'
+  renderGrid(withToolNote, {
+    routes: {
+      'GET /api/templates': () => jsonResponse(200, templatesDoc(name, 'bwtidyK')),
+      'POST /api/tool-note/rename-back': () => {
+        name = 'bwtidyK'
+        const answer = { toolNoteName: 'bwtidyK', toolNoteExpectedName: 'bwtidyK', revisionDate: '2026-10-28T11:00:00Z' }
+        return jsonResponse(200, { ...answer, backup: 'b.zip.age' })
+      },
+    },
+  })
+
+  expect(await screen.findByText('bwtidy\'s note is named "Other" now.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Rename it back' }))
+
+  expect(await screen.findByText('bwtidy\'s note is named "bwtidyK" again. Backup: b.zip.age')).toBeInTheDocument()
+  await waitFor(() => expect(screen.queryByText(/is named "Other" now/)).toBeNull())
 })
 
 test('no warning while the tool note is named bwtidy', async () => {

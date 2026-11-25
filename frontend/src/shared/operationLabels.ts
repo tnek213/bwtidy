@@ -92,7 +92,7 @@ export const OPERATION_LABELS: Record<string, OperationLabel> = {
   },
   setToolNoteSection: {
     label: "Save bwtidy's settings",
-    explanation: 'bwtidy saved a change to one section of its own note: the templates, the datatypes, the to-fill list or the generator settings.',
+    explanation: 'bwtidy saved a change to one section of its own note: the templates, the datatypes, the to-fill list, the generator settings or the name the note should have.',
   },
 }
 

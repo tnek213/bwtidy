@@ -31,6 +31,8 @@ export interface TemplatesDoc {
   revisionDate?: string
   // The tool note's name now, which is bwtidy unless someone renamed it.
   toolNoteName?: string
+  // The name the tool note should have: bwtidy, or a name the user kept with Keep this name.
+  toolNoteExpectedName?: string
   // The templates of a save the auto-commit has not written yet.
   saving?: boolean
   // Each coordinate whose datatype is unknown or broken, which counts as none.
@@ -110,7 +112,20 @@ export function saveTemplates(changes: TemplateChange[]): Promise<QueuedTemplate
   return apiFetch<QueuedTemplates>('/api/templates', { method: 'PUT', body: { changes } })
 }
 
-export function renameToolNoteBack(revisionDate: string): Promise<{ backup: string }> {
-  return apiFetch<{ backup: string }>('/api/tool-note/rename-back', { method: 'POST', body: { revisionDate } })
+// The answer of both writes of the tool note's name (docs/spec.md, The tool note).
+interface ToolNoteNameWrite {
+  toolNoteName: string
+  toolNoteExpectedName: string
+  revisionDate: string
+  backup: string
+}
+
+export function renameToolNoteBack(revisionDate: string): Promise<ToolNoteNameWrite> {
+  return apiFetch<ToolNoteNameWrite>('/api/tool-note/rename-back', { method: 'POST', body: { revisionDate } })
+}
+
+// name is the one the warning showed, so a note renamed again since is refused (409).
+export function keepToolNoteName(name: string): Promise<ToolNoteNameWrite> {
+  return apiFetch<ToolNoteNameWrite>('/api/tool-note/keep-name', { method: 'POST', body: { name } })
 }
 
