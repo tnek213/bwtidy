@@ -24,6 +24,7 @@ on:
       - .github/workflows/ci.yml
       - .github/workflows/docs.yml
       - .github/workflows/docker-readme.yml
+      - .github/workflows/image-scan.yml
   release:
     types: [published]
   workflow_dispatch:

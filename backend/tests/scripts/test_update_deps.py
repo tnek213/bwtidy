@@ -32,6 +32,10 @@ WORKFLOW = f"""jobs:
       - id: deployment
         # v5
         uses: actions/deploy-pages@{SHA}
+      # v1.30.0
+      - uses: docker/scout-action@{SHA}
+      # v4.39.5
+      - uses: github/codeql-action/upload-sarif@{SHA}
 """
 
 
@@ -103,7 +107,17 @@ def test_action_pins_need_a_sha_and_the_tag_in_the_comment_above(deps):
         ("actions/checkout", "v7", SHA),
         ("astral-sh/setup-uv", "v10.3.3", SHA),
         ("actions/deploy-pages", "v5", SHA),
+        ("docker/scout-action", "v1.30.0", SHA),
+        ("github/codeql-action/upload-sarif", "v4.39.5", SHA),
     ]
+
+
+def test_the_tags_of_an_action_in_a_subdirectory_come_from_its_repository(deps, monkeypatch):
+    asked = []
+    listing = f"{SHA}\trefs/tags/v4.39.5\n{SHA2}\trefs/tags/v4.39.5^{{}}\n"
+    monkeypatch.setattr(deps, "run", lambda command, cwd: asked.append(command) or listing)
+    assert deps.remote_tags("github/codeql-action/upload-sarif") == {"v4.39.5": SHA2}
+    assert asked[0][-1] == "https://github.com/github/codeql-action"
 
 
 def test_a_new_action_tag_rewrites_the_sha_and_the_comment_only(deps):

@@ -28,6 +28,13 @@ GitHub CLI:
 gh attestation verify oci://docker.io/tnek213/bwtidy:latest --owner tnek213
 ```
 
+## Scanning the image
+
+Docker Scout scans the published images (`latest` and `main`) every day, and
+each known vulnerability that an update fixes becomes a code scanning alert in
+this repository. It is the same data as the Scout view on Docker Hub, which also
+lists the vulnerabilities that have no fix yet.
+
 ## Reporting a vulnerability
 
 Report it privately through GitHub's private vulnerability reporting:

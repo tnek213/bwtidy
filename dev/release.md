@@ -122,6 +122,31 @@ gh attestation verify oci://docker.io/tnek213/bwtidy:latest --owner tnek213
 
 Check a change to the workflow with actionlint, as for the docs workflow above.
 
+## Scanning the published images
+
+The workflow "Image scan" (`.github/workflows/image-scan.yml`) scans
+`docker.io/tnek213/bwtidy:latest` and `:main` with Docker Scout every day at
+04:17 UTC, after every successful run of "Image" on main, on a pull request that
+changes the workflow and by hand ("Run workflow"). It uploads the results as
+SARIF to code scanning, so the alerts show under the repository's Security tab,
+"Code scanning", one category per tag (`image-latest` and `image-main`). It
+reports only the vulnerabilities that a newer version of the package fixes
+(`only-fixed`): those are the ones a rebuild or an update can act on, and an
+alert closes when a scan no longer finds it. The data is the same as the Scout
+view on Docker Hub, which also lists the unfixed ones. The job skips while the
+repository is private.
+
+Scout needs a Docker Hub login even for a public image, so the workflow has a
+secret of its own that can only read. Set it up once: make a Docker Hub personal
+access token with the description `bwtidy-scout-read` and the scope Public Repo
+Read-only, and store it with
+`gh secret set DOCKERHUB_SCOUT_TOKEN --repo tnek213/bwtidy`. The workflow fails,
+saying why, when the secret is missing. A pull request from Dependabot or a fork
+gets no repository secrets, so its scan fails and the next scheduled run checks
+the change.
+
+Check a change to the workflow with actionlint, as for the docs workflow above.
+
 ## The Docker Hub overview
 
 The workflow "Docker Hub README" (`.github/workflows/docker-readme.yml`) copies
