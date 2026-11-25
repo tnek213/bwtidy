@@ -68,6 +68,22 @@ def test_markdown_in_a_description_shows_as_text(mcp_reference):
     assert mcp_reference.text("_x_") == "\\_x\\_"
 
 
+def test_a_code_span_stays_code(mcp_reference):
+    assert mcp_reference.text("`fields.<name>` or *x*") == "`fields.<name>` or \\*x\\*"
+    assert mcp_reference.text("a lone ` stays") == "a lone \\` stays"
+
+
+def test_a_description_keeps_its_paragraphs_and_lists(mcp_reference):
+    rendered = mcp_reference.description("Each has:\n\n- `id`: its id.\n- a *b*\n\nLast\nline.")
+    assert rendered == ["Each has:", "", "- `id`: its id.", "- a \\*b\\*", "", "Last line.", ""]
+
+
+def test_the_parameters_follow_their_label(page):
+    text = section(page, "list_items")
+    assert "\nParameters:\n\n| Parameter | Type | Default | Description |\n" in text
+    assert "\n- `secretColumns`: the secret columns that hold a value.\n" in text
+
+
 def test_check_fails_on_a_changed_file(tmp_path, monkeypatch, capsys, page, mcp_reference):
     output = tmp_path / "mcp-tools.md"
     monkeypatch.setattr(mcp_reference, "ROOT", tmp_path)

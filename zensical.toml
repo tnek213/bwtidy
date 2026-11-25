@@ -44,7 +44,8 @@ nav = [
 
 [project.theme]
 language = "en"
-# main.html there puts the alpha disclaimer as a banner above every page
+# main.html there puts the alpha disclaimer as a banner above every page, widens the content and
+# opens a picture larger on a click
 custom_dir = "overrides"
 # the system's fonts, so a page loads nothing from another host
 font = false

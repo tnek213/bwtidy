@@ -1,4 +1,6 @@
-{#- The alpha disclaimer as a banner above every page, without a button to close it. -#}
+{#- The alpha disclaimer as a banner above every page, without a button to close it. A wider content
+column than the theme's, and a picture that opens larger on a click. All of it inline, from no
+CDN, as a running bwtidy serves the site offline. -#}
 {% extends "base.html" %}
 
 {% block extrahead %}
@@ -19,6 +21,33 @@
       color: inherit;
       text-decoration: underline;
     }
+    /* the theme's 61rem leaves a narrow column between the two sidebars */
+    .md-grid {
+      max-width: 80rem;
+    }
+    /* the theme breaks code anywhere, which splits a variable name over lines in a table */
+    .md-typeset table:not([class]) td code {
+      word-break: normal;
+    }
+    .md-typeset img[data-zoom] {
+      cursor: zoom-in;
+    }
+    dialog[data-zoom] {
+      max-width: none;
+      max-height: none;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: zoom-out;
+    }
+    dialog[data-zoom]::backdrop {
+      background-color: rgba(0, 0, 0, .8);
+    }
+    dialog[data-zoom] img {
+      display: block;
+      max-width: calc(100vw - 2rem);
+      max-height: calc(100vh - 2rem);
+    }
   </style>
 {% endblock %}
 
@@ -27,4 +56,56 @@
     bwtidy is alpha software made with AI, with very few users so far.
     <a href="{{ base_url | trim("/") }}/#alpha-software">Read the disclaimer before you use it.</a>
   </p>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+    (() => {
+      // A picture shown smaller than it is opens at its full size (or the window's) in a dialog,
+      // on a click or on Enter or Space, and a click or Escape closes it.
+      const dialog = document.createElement("dialog");
+      dialog.dataset.zoom = "";
+      const large = document.createElement("img");
+      dialog.append(large);
+      document.body.append(dialog);
+      dialog.addEventListener("click", () => dialog.close());
+      const images = [...document.querySelectorAll("article.md-content__inner img")]
+        .filter((image) => !image.closest("a"));
+      const mark = (image) => {
+        const smaller = image.naturalWidth > image.clientWidth + 1;
+        image.toggleAttribute("data-zoom", smaller);
+        if (smaller) {
+          image.tabIndex = 0;
+          image.setAttribute("role", "button");
+          image.title = "Show larger";
+        } else {
+          image.removeAttribute("tabindex");
+          image.removeAttribute("role");
+          image.removeAttribute("title");
+        }
+      };
+      for (const image of images) {
+        if (image.complete) mark(image);
+        image.addEventListener("load", () => mark(image));
+      }
+      window.addEventListener("resize", () => images.forEach(mark));
+      const open = (image) => {
+        large.src = image.src;
+        large.alt = image.alt;
+        dialog.showModal();
+      };
+      document.addEventListener("click", (event) => {
+        const image = event.target.closest("img[data-zoom]");
+        if (image) open(image);
+      });
+      document.addEventListener("keydown", (event) => {
+        const image = event.target.closest?.("img[data-zoom]");
+        if (image && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          open(image);
+        }
+      });
+    })();
+  </script>
 {% endblock %}

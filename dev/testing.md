@@ -647,7 +647,10 @@ npm run lint:exports    # knip: no file, export or type that nothing uses (knip.
 lint) writes `docs/reference/mcp-tools.md` from the tools the MCP server
 registers, so after a change to a tool run it and commit the page. It imports
 bwtidy, so it starts itself again through `uv run --locked` in the backend venv when
-needed. Its intro is in the script (`INTRO`).
+needed. Its intro is in the script (`INTRO`). A tool's description is short
+paragraphs and lists split by blank lines (`paragraphs` and `bullets` in
+`backend/src/bwtidy/mcp/texts.py`), which the page keeps, its `code` spans as
+code, and its parameters follow in a table.
 
 `scripts/ci` then builds the documentation site strictly, see
 [Releasing](release.md#the-documentation-site).

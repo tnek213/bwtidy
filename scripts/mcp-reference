@@ -7,9 +7,10 @@
 It builds the server with create_mcp_server and reads its list_tools, the same tool objects an MCP
 client lists, so a new tool or a changed description reaches the page on the next run. Per tool:
 its name, its kind (read, propose or end, from its annotations), its parameters with their types,
-defaults and descriptions, and its description. It imports bwtidy, so it runs with the backend
-venv's python and starts itself through `uv run --locked` when it is not. `scripts/ci` runs the
-check.
+defaults and descriptions, and its description. A description is paragraphs and lists split by
+blank lines, a list's lines each starting with "- ", and its `code` spans stay code. It imports
+bwtidy, so it runs with the backend venv's python and starts itself through `uv run --locked`
+when it is not. `scripts/ci` runs the check.
 """
 
 import asyncio
@@ -55,6 +56,9 @@ SECTIONS = {
 ESCAPED = re.compile(r"([\\`*\[\]|#~])")
 ## an underscore that could start or end emphasis, one not between two letters or digits
 LOOSE_UNDERSCORE = re.compile(r"(?<![0-9A-Za-z])_|_(?![0-9A-Za-z])")
+## a code span, which markdown shows as it is, so nothing in it is escaped
+CODE = re.compile(r"(`[^`]+`)")
+BULLET = "- "
 
 
 def registered_tools() -> list[Any]:
@@ -77,12 +81,31 @@ def kind(tool: Any) -> str:
     raise ValueError(f"{tool.name}: its annotations are none of READ_ONLY, PROPOSE and END")
 
 
-def text(value: str) -> str:
-    """Plain text as markdown that shows it as it is, on one line."""
-    value = " ".join(value.split())
+def plain(value: str) -> str:
+    """Text without code spans as markdown that shows it as it is."""
     value = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     value = ESCAPED.sub(r"\\\1", value)
     return LOOSE_UNDERSCORE.sub(r"\\_", value)
+
+
+def text(value: str) -> str:
+    """Text as markdown on one line that shows it as it is, its code spans as code."""
+    parts = CODE.split(" ".join(value.split()))
+    ## split with a group puts each code span at an odd index
+    return "".join(part if index % 2 else plain(part) for index, part in enumerate(parts))
+
+
+def description(value: str) -> list[str]:
+    """A tool's description as markdown: its paragraphs and lists, a blank line after each."""
+    lines = []
+    for block in value.strip().split("\n\n"):
+        entries = block.split("\n")
+        if all(entry.startswith(BULLET) for entry in entries):
+            lines += [BULLET + text(entry.removeprefix(BULLET)) for entry in entries]
+        else:
+            lines.append(text(block))
+        lines.append("")
+    return lines
 
 
 def or_list(parts: list[str]) -> str:
@@ -140,10 +163,16 @@ def table(schema: dict[str, Any], defs: dict[str, Any]) -> list[str]:
 def tool_section(tool: Any) -> list[str]:
     schema = tool.input_schema
     defs = schema.get("$defs", {})
-    lines = [f"### {tool.name}", "", f"Kind: {kind(tool)}.", "", text(tool.description or ""), ""]
+    lines = [
+        f"### {tool.name}",
+        "",
+        f"Kind: {kind(tool)}.",
+        "",
+        *description(tool.description or ""),
+    ]
     if not schema.get("properties"):
         return [*lines, "No parameters.", ""]
-    lines += [*table(schema, defs), ""]
+    lines += ["Parameters:", "", *table(schema, defs), ""]
     for name, target in defs.items():
         if "properties" in target:
             lines += [f"Each `{name}`:", "", *table(target, defs), ""]
