@@ -37,7 +37,8 @@ dependency-cruiser (`npm run lint:deps`), knip (`npm run lint:exports`),
 tsc + vite build, vitest. It must pass before every commit.
 `.github/workflows/ci.yml` runs it on GitHub for every push to main and every
 pull request.
-`scripts/ci --fix` lets ruff fix what it can.
+`scripts/ci --fix` lets ruff fix what it can. `scripts/ci --quick` leaves out
+pytest and vitest.
 
 Dependencies change only through the lock files: `uv add` or `uv lock` in
 `backend/`, `npm install` in `frontend/` or `docker/bitwarden-cli/` (the
@@ -65,7 +66,8 @@ A change that alters what a docs test in `backend/tests/e2e/docs` shows
 reruns those tests (`scripts/docs-shots -k NAME`) and commits the changed
 images in `docs/images` in the same commit. The pre-push hook
 (`scripts/install-hooks` installs it, once per clone) makes sure of it: it
-runs `scripts/ci` on what is pushed, and for a push that touches
+runs `scripts/ci` on what is pushed (`scripts/ci --quick` for a branch other
+than main, the pull request's CI runs the rest), and for a push that touches
 `frontend/src/` or `backend/tests/e2e/docs/` it takes every screenshot again,
 commits the changed images as "Take the docs screenshots again" and stops the
 push, which then goes through when pushed again (dev/testing.md, "The

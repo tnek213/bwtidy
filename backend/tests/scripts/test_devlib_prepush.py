@@ -55,6 +55,14 @@ def test_a_delete_and_a_new_ref_are_told_by_their_zeros():
     assert not created.deleted
 
 
+def test_main_and_a_tag_need_the_full_ci_and_another_branch_does_not():
+    tag = RefUpdate("refs/tags/v1", "a" * 40, "refs/tags/v1", ZERO)
+    assert prepush.full_ci(update("a", "b", "main"))
+    assert prepush.full_ci(tag)
+    assert not prepush.full_ci(update("a", "b", "feat/x"))
+    assert not prepush.full_ci(update("a", "b", "release/main"))
+
+
 def test_the_name_drops_the_ref_prefix():
     assert update("a", "b", "feat/x").name == "feat/x"
     assert RefUpdate("refs/tags/v1", "a", "refs/tags/v1", ZERO).name == "v1"

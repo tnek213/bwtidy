@@ -31,8 +31,9 @@ allows it.
   before a change goes in. The CI workflow (`.github/workflows/ci.yml`) runs
   it on every push to main and every pull request.
 - `scripts/install-hooks`: run it once after cloning. It installs a pre-push
-  hook that runs `scripts/ci` on what you push and, for a change to the UI,
-  takes the docs screenshots again and commits those that changed
+  hook that runs `scripts/ci` on what you push to main (to any other branch
+  only `scripts/ci --quick`, the pull request's CI runs the rest) and, for a
+  change to the UI, takes the docs screenshots again and commits those that changed
   ([dev/testing.md](dev/testing.md#the-pre-push-hook)).
 
 Work only against the dev stack, never against a real vault.

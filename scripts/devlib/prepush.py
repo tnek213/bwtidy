@@ -5,10 +5,11 @@ git runs the hook with the remote's name and URL as arguments and one line per r
 nothing, a new ref a remote sha of zeros. A ref whose commit the remote already has (a tag on a
 pushed commit, a branch rewound) brings no new commit and checks nothing either.
 
-A ref with new commits gets scripts/ci on its commit. It touches the UI when a file under
-UI_PATHS differs between its commit and the remote's (for a new ref: the merge base with the
-remote's main), and then the docs screenshots are taken again. passed and record keep the trees
-a step passed on, in the git directory that the worktrees share.
+A ref with new commits gets scripts/ci on its commit, in full for a push to main or a tag
+(full_ci), else scripts/ci --quick, the CI workflow running the rest on the pull request. It
+touches the UI when a file under UI_PATHS differs between its commit and the remote's (for a new
+ref: the merge base with the remote's main), and then the docs screenshots are taken again.
+passed and record keep the trees a step passed on, in the git directory that the worktrees share.
 """
 
 from collections.abc import Iterable
@@ -54,6 +55,11 @@ class RefUpdate(NamedTuple):
     def name(self) -> str:
         """The remote ref without refs/heads/ or refs/tags/, as a person names it."""
         return self.remote_ref.removeprefix("refs/heads/").removeprefix("refs/tags/")
+
+
+def full_ci(update: RefUpdate) -> bool:
+    """Whether the update needs the full scripts/ci: a push to main or a tag, not other branches."""
+    return update.remote_ref == f"refs/heads/{MAIN}" or update.remote_ref.startswith("refs/tags/")
 
 
 def parse_updates(text: str) -> list[RefUpdate]:
