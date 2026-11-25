@@ -71,6 +71,7 @@ Every script prints its usage with `--help`.
 | `scripts/third-party`   | writes the About page's list of packages ([Testing](testing.md#dependencies))           |
 | `scripts/update-deps`   | updates every dependency within its range, lists the rest ([Testing](testing.md#dependencies)) |
 | `scripts/docs-site`     | builds or serves the documentation site ([Releasing](release.md#the-documentation-site)) |
+| `scripts/prune-tags`    | deletes the old short-commit image tags on Docker Hub, a dry run by default ([Releasing](release.md#pruning-the-short-commit-tags)) |
 
 After ty, `scripts/ci` runs `uv run --locked lint-imports --no-cache` in `backend/`:
 import-linter checks the backend's imports against the contracts in

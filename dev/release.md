@@ -121,7 +121,7 @@ in the build stages.
 
 A push to main that changes only files the image never copies (the `paths-ignore` list in
 the workflow: `README.md`, the other top-level docs, the compose files, `dev/`, the tests,
-the other workflows) builds nothing. Keep that list in step with the Dockerfile's `COPY`
+the other workflows, `scripts/prune-tags`) builds nothing. Keep that list in step with the Dockerfile's `COPY`
 lines: a file the image copies must never be on it. A push to main never moves `latest`. The workflow fails, saying why, when the
 release tag is not `v` plus the version in `frontend/package.json`, when it is run
 by hand on another branch, or when the repository secret `DOCKERHUB_TOKEN` is
@@ -180,6 +180,46 @@ the change.
 
 Check a change to the workflow with actionlint, as for the docs workflow above.
 
+## Pruning the short-commit tags
+
+Every push to main that changes the image adds a short-commit tag, so the workflow
+"Prune image tags" (`.github/workflows/prune-tags.yml`) deletes the old ones with
+`scripts/prune-tags` every Sunday at 03:41 UTC. The script lists every tag of the
+repository through Docker Hub's API and keeps:
+
+- every tag that is not exactly 7 lowercase hex characters: the versions, `latest`,
+  `main` and any other name. The version tags are immutable on Docker Hub anyway (a
+  repository setting with the regex `^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$`).
+- the 10 newest short-commit tags by last push, so a recent build can still be run
+  or compared.
+- the short commit of every commit a git tag `v*` points to, as a server may run a
+  release by its commit tag. The workflow checks out the full history with its tags,
+  and the script stops without deleting anything when Docker Hub has a version tag
+  but the checkout has no tag `v*`.
+- every short-commit tag with the same digest as `main` or `latest`.
+
+It deletes the rest, prints why it keeps each tag it keeps, and stops with an error,
+deleting nothing, when the listing fails or finds no tags. A failed delete is
+reported, the others go on and the run fails.
+
+The workflow also runs by hand ("Run workflow"), as a dry run unless `dry_run` is
+unticked, and as a dry run on every pull request that changes the workflow or the
+script. A dry run prints what it would delete and deletes nothing. Run one by hand
+from a checkout with its tags (`git fetch --tags`):
+
+```sh
+scripts/prune-tags              # a dry run, anonymous as the repository is public
+scripts/prune-tags --delete     # deletes, needs the token in DOCKERHUB_PAT
+```
+
+With `DOCKERHUB_PAT` set, the dry run logs in too, which checks the token. Deleting
+a tag needs a personal access token with Read, Write, Delete, so the workflow uses
+the secret `DOCKERHUB_README_TOKEN` of the Docker Hub overview below. The script logs
+in at `/v2/auth/token` (`/v2/users/login` is deprecated) and never prints the token.
+A pull request from Dependabot or a fork gets no repository secrets, so its dry run
+fails and the next scheduled run checks the change. Check a change to the workflow
+with actionlint, as for the docs workflow above.
+
 ## The Docker Hub overview
 
 The workflow "Docker Hub README" (`.github/workflows/docker-readme.yml`) copies
@@ -190,6 +230,9 @@ links and images in the README become links into the GitHub repository. Docker H
 takes at most 25,000 bytes of README.
 
 The description API refuses a token with only Read and Write, so this workflow has a
-secret of its own: make a Docker Hub personal access token with Read, Write, Delete
-and store it with `gh secret set DOCKERHUB_README_TOKEN --repo tnek213/bwtidy`. The
-workflow fails, saying why, when the secret is missing.
+secret of its own, which it shares with the pruning of the short-commit tags
+([Pruning the short-commit tags](#pruning-the-short-commit-tags)), as deleting a tag
+needs the same scope: make a Docker Hub personal access token with Read, Write, Delete
+and store it with `gh secret set DOCKERHUB_README_TOKEN --repo tnek213/bwtidy`. Both
+workflows fail, saying why, when the secret is missing. `DOCKERHUB_TOKEN` (Read and
+Write) stays the one the image is pushed with.
