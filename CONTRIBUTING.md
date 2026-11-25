@@ -25,8 +25,10 @@ allows it.
   proposal: open an issue first.
 - [AGENTS.md](AGENTS.md): the rules every change follows, for people and
   agents alike.
-- [docs/spec.md](docs/spec.md): what bwtidy does and why. A change to what a
-  user sees updates it in the same commit.
+- [docs/spec.md](docs/spec.md): what bwtidy does and why. You are welcome to
+  update it with your change but do not have to: the maintainer keeps it in
+  step. A change to what a user sees does update the page under `docs/` that
+  covers it, in the same commit.
 - `scripts/ci`: runs the lint, type, build and unit checks. It must pass
   before a change goes in. The CI workflow (`.github/workflows/ci.yml`) runs
   it on every push to main and every pull request.
