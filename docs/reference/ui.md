@@ -22,6 +22,9 @@ items have a value in it.
 
 ### Toolbar
 
+![The toolbar above the grid: New item, Search, the filters, the switches, Columns and the number of items](../images/reference-toolbar.png)
+
+
 - New item: opens the New item dialog, see [New item](#new-item).
 - To fill in (N): shows only the items with a secret field on your To fill
   in list, the empty secret fields you still have to fill in (see
@@ -51,6 +54,9 @@ items have a value in it.
 - N items, or N of M items: how many rows the filters keep.
 
 ### Cells
+
+![The username, password, totp and uris cells of a login, the password masked and its eye outlined](../images/reference-cells.png)
+
 
 - Double click, Enter or typing: edits the cell. Text in place, `login.uris`
   and `collections` in a list dialog, `folder` as a pick of the folders or a
@@ -148,6 +154,9 @@ which value each of them keeps (Choose the values to keep).
 
 Below the grid while any row is ticked.
 
+![The selection bar with 2 selected, Move to trash and Clear](../images/reference-selection-bar.png)
+
+
 - N selected: how many items are ticked.
 - Move to trash: moves them all to the trash in one write, after one
   question that lists them.
@@ -158,6 +167,9 @@ Below the grid while any row is ticked.
 New item adds an item from a type (Login, Secure note, Card, Identity, SSH
 key) or a stored template (Start from), with its Name, Folder, Organization
 and fields.
+
+![The New item dialog started from Login, with Name, Folder, Organization, the login's fields and Generate a password](../images/reference-new-item.png)
+
 
 - Type the secret fields in the dialog, hidden until you tick Show what I
   type, or leave one of a raw type empty and it goes on your To fill in list.
@@ -195,7 +207,14 @@ it when it has the template's type and a value in every required coordinate.
   (Delete asks first). A warning above it names a template that duplicates an
   earlier one, or a datatype that is unknown or broken.
 
+
+![The Templates tab with the template Device admin, its two coordinates and its matching items](../images/reference-templates.png)
+
+
 The template editor:
+
+![The template editor of Device admin with its two coordinates](../images/reference-template-editor.png)
+
 
 - Name, Type and Description. Under Type: what the type is for and what it
   is not for.
@@ -220,6 +239,9 @@ well a value matches its format, never whether the value is right.
 
 The datatype editor:
 
+![The datatype editor of User name with its pattern, examples, counter-examples and a value to try](../images/reference-datatype-editor.png)
+
+
 - Name, Regular expression (the help icon after "Supports" lists the syntax
   it takes), Whole value (the pattern must match the whole value, else any
   part of it) and Ignore case. Under the pattern its states, largest repeat
@@ -235,6 +257,10 @@ The datatype editor:
 
 What waits to be written: your edits until the auto-commit, an agent's
 proposals until you decide. See [How edits are saved](../explanation/edits.md).
+
+
+![The Queue page with an agent's pending proposal to rename an item, its checkbox and the Approve selected button outlined](../images/explanation-queue-proposal.png)
+
 
 - Auto-commit: After seconds and Or at changes set when your edits are
   written, Save keeps them.
@@ -262,6 +288,10 @@ On Failed:
 Every write with the fields it changed and its backup, the vault as it was
 right before that write, newest first.
 
+
+![The Change log with the two written edits, their backup outlined and the backup's own row outlined below them](../images/tutorial-change-log.png)
+
+
 - From, To, Source, Operation, Field, Items and Result narrow the rows.
   Clear filters empties them all.
 - Diff report: lists every operation on every field of the shown rows, to
@@ -286,6 +316,10 @@ right before that write, newest first.
 Opens from More actions. Three sections: Display (the first three below),
 Password generator and Delete data.
 
+
+![The Display section of the Settings page with Date and time format, Layout and Hide bwtidy's own note](../images/reference-settings-display.png)
+
+
 - Date and time format: System (the browser's own), ISO 8601, Europe, Europe
   (dots) or USA. Every date and time follows it. Kept for the account, so
   every browser shows the same.
@@ -309,6 +343,10 @@ pending they ask whether to write them first or drop them.
 Opens from Pattern limits and statistics on the Datatypes tab. How close
 values and patterns come to the limits of the datatype checks, kept in
 memory for this session only.
+
+
+![The Limits table of the Statistics page](../images/reference-statistics-limits.png)
+
 
 - Limits: the longest pattern, the largest repeat count, the most states,
   the deepest nesting and the longest value bwtidy checks.
@@ -349,6 +387,10 @@ the form under it works as usual. After the first login of any account it
 never shows again. It comes back only when every account is deleted, as on a
 fresh start.
 
+
+![The account form with the server and email filled in and Continue outlined](../images/tutorial-account-form.png)
+
+
 ## App bar
 
 - bwtidy (the title): goes to the Vault.
@@ -370,6 +412,10 @@ fresh start.
   once), the MCP URL, both with a Copy button, and a link to how to connect
   your client.
 
+
+![The MCP token dialog with the token field, the MCP URL field and the link to how to connect your client, which is outlined](../images/mcp-token-dialog.png)
+
+
 How to use both: [Connect an MCP client](../how-to/mcp.md). What they give
 an agent: [What an agent can do](../explanation/mcp.md). What it can call:
 [MCP tools](mcp-tools.md).
@@ -388,6 +434,10 @@ CLI out too, and the next login runs the Bitwarden login again
 CLI out: when the session already ended, the page asks you to unlock first.
 Your unsaved changes are written first. See [Logging in](../explanation/login.md)
 for the session and its end.
+
+
+![The Log out dialog with Also log out of Bitwarden](../images/reference-log-out.png)
+
 
 ### More actions
 
