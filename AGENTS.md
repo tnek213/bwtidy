@@ -2,7 +2,9 @@
 
 What the product is and why: [docs/spec.md](docs/spec.md). Read it before
 changing behavior. When a feature changes what the spec says, update the spec
-in the same commit.
+in the same commit. This is for the maintainer's agents. Human contributors may
+leave the spec to the maintainer, so an agent reviewing a contributor's pull
+request does not ask for spec changes.
 
 ## Layout
 
