@@ -2,11 +2,13 @@
 
 The lock files carry generated copies: backend/uv.lock (the bwtidy package, Python's spelling)
 and frontend/package-lock.json (its top-level version and packages[""], semver's spelling).
+docs/releases.md has a heading for it in semver's spelling, its release notes.
 """
 
 import functools
 import importlib.util
 import json
+import re
 import tomllib
 from types import ModuleType
 
@@ -56,11 +58,34 @@ def package_lock_versions() -> tuple[str, str]:
     return str(lock["version"]), str(lock["packages"][""]["version"])
 
 
+RELEASE_NOTES = "docs/releases.md"
+
+
+def release_notes_problem(version: str) -> str | None:
+    """Why docs/releases.md has no notes for the version, else None.
+
+    The notes of a version are under a heading that starts with it, such as `## 0.1.0-alpha.1`.
+    """
+    try:
+        text = (ROOT / RELEASE_NOTES).read_text()
+    except OSError as error:
+        return f"cannot read {RELEASE_NOTES}: {error.strerror}"
+    heading = re.compile(rf"^#+[ \t]+{re.escape(version)}(?:[ \t]|$)", re.MULTILINE)
+    if heading.search(text):
+        return None
+    return (
+        f"{RELEASE_NOTES} has no heading for {version}, the version as frontend/package.json "
+        f"spells it: write its release notes under '## {version}' "
+        "(dev/release.md, The release notes)"
+    )
+
+
 def version_mismatch() -> str | None:
     """Why a copy of backend/pyproject.toml's version differs from it, else None.
 
     The copies are frontend/package.json and the lock files backend/uv.lock and
-    frontend/package-lock.json, one line for each copy that differs.
+    frontend/package-lock.json, one line for each copy that differs. A last line says when
+    docs/releases.md has no heading for the version (semver's spelling, as in package.json).
     """
     python = pyproject_version()
     try:
@@ -89,4 +114,7 @@ def version_mismatch() -> str | None:
         for where, actual, wanted, why in copies
         if actual != wanted
     ]
+    notes = release_notes_problem(expected)
+    if notes is not None:
+        problems.append(notes)
     return "\n".join(problems) or None

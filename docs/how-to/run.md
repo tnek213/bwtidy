@@ -1,12 +1,21 @@
 # Run bwtidy
 
 bwtidy runs as one Docker container with the official Bitwarden CLI inside.
-You need Docker with Compose. The image is published on Docker Hub as
-`docker.io/tnek213/bwtidy`, with these tags:
+You need Docker with Compose. The normal way is the ready-made image on Docker
+Hub, `docker.io/tnek213/bwtidy`: `compose.yaml` pulls it, so there is nothing
+to build. Its tags:
 
-- `latest` and the versions (like `0.1.0-alpha.1`) are releases.
+- `latest` and the versions (like `0.1.0-alpha.1`) are releases. What each
+  one brings is in the [Release notes](../releases.md).
 - `main` and the short commits follow every push to main that changes the
   image.
+
+GitHub Actions builds every image from this repository and signs a
+provenance attestation for it, which shows the commit it was built from.
+How to check it is in
+[SECURITY.md, Verifying the image](https://github.com/tnek213/bwtidy/blob/main/SECURITY.md#verifying-the-image).
+To build the image yourself instead, see
+[Build the image yourself](#build-the-image-yourself).
 
 ## Start it
 
@@ -66,18 +75,40 @@ are logged in to the web UI. Each of them invalidates the session key bwtidy
 uses for backups (see
 [How bwtidy uses the Bitwarden CLI](../explanation/bw-cli.md)).
 
-## Run unreleased code
+## Build the image yourself
 
-To run the code of a checkout, build the image from it instead of pulling. You
-need buildx 0.17 or later:
+To run unreleased code, or to run only what you built, build the image from a
+checkout instead of pulling it. `compose.build.yaml` adds the build to
+`compose.yaml`: it builds the `Dockerfile`'s target `app` from the checkout
+and names the image `bwtidy:local`, everything else comes from `compose.yaml`
+and `.env`. You need buildx 0.17 or later:
 
 ```sh
+git clone https://github.com/tnek213/bwtidy.git bwtidy && cd bwtidy
+cp example.env .env
 BWTIDY_COMMIT="$(git log -1 --format='%cd %h' --date=format:%y%m%d)" \
   docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
-With a buildx older than 0.17, run `docker build --target app -t bwtidy:local .`
-first and leave `--build` out. To update, `git pull` and run the command again.
+The version comes from `backend/pyproject.toml` in the checkout. The build
+has no `.git`, so the commit comes in as the build arg `BWTIDY_COMMIT`: the
+committer date (YYMMDD), a space and the short hash, the way the project's
+own image workflow sets it. The About page then shows both, like
+`0.1.0-alpha.1 (261111 7db8830)`. Without it, it shows the version alone. The
+published images also carry the OCI labels `version` and `revision`
+(`org.opencontainers.image.*`), which the workflow sets and a build of your
+own leaves out.
+
+With a buildx older than 0.17, build with plain Docker first and leave
+`--build` out:
+
+```sh
+docker build --target app -t bwtidy:local \
+  --build-arg BWTIDY_COMMIT="$(git log -1 --format='%cd %h' --date=format:%y%m%d)" .
+docker compose -f compose.yaml -f compose.build.yaml up -d
+```
+
+To update, `git pull` and run the same commands again.
 
 ## Behind a reverse proxy
 

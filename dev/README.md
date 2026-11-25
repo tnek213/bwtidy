@@ -13,8 +13,8 @@ The other pages of this guide:
 - [Testing](testing.md): the test suites, how to run and write a test of each
   kind, the timeouts, the Playwright gotchas, the documentation screenshots
   and a smoke test on a real account.
-- [Releasing](release.md): the version, the documentation site, GitHub Pages
-  and publishing the image.
+- [Releasing](release.md): the version, the release notes, the documentation
+  site, GitHub Pages and publishing the image.
 
 ## Getting started
 

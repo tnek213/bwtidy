@@ -56,13 +56,13 @@ How each part works is under [Explanation](#explanation).
 
 ## How-to guides
 
-- [Run bwtidy](how-to/run.md): build and start the container, log in the
-  first time, update.
+- [Run bwtidy](how-to/run.md): start the container from the image on Docker
+  Hub or build it yourself, log in the first time, update.
 - [Connect an MCP client](how-to/mcp.md): make a token and add bwtidy to
   Claude Code, Codex, Copilot CLI or Gemini CLI.
 - [Show or hide columns](how-to/show-hide-columns.md) in the grid.
 - [Rename an attachment](how-to/rename-attachment.md).
-- [Restore a vault from a backup](restore.md), with only age, unzip, jq and
+- [Restore a vault from a backup](restore.md), with only age, Python 3 and
   the Bitwarden CLI.
 
 ## Reference
@@ -72,6 +72,7 @@ How each part works is under [Explanation](#explanation).
   its parameters.
 - [Configuration](reference/configuration.md): every environment variable
   and where bwtidy keeps its files.
+- [Release notes](releases.md): what each version brings.
 
 ## Explanation
 

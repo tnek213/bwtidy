@@ -85,6 +85,7 @@ without a login.
   configuration
 - [Explanation](docs/index.md#explanation): how bwtidy works and what it does
   to your vault
+- [Release notes](docs/releases.md): what each version brings
 
 ## Contributing
 

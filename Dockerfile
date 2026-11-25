@@ -26,9 +26,13 @@ COPY backend/pyproject.toml backend/uv.lock backend/
 RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
     uv sync --project backend --locked --only-group docs
 COPY scripts/docs-site scripts/
+## the version the restore page names, as in every backup's RESTORE.md
+COPY backend/src/bwtidy/version.py backend/src/bwtidy/
 COPY zensical.toml ./
 COPY overrides/ overrides/
 COPY docs/ docs/
+## the build has no .git, so the commit comes in as an arg (scripts/docs-site reads it)
+ARG BWTIDY_COMMIT=""
 RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
     scripts/docs-site build /site
 

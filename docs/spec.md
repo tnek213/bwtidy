@@ -1,5 +1,10 @@
 # bwtidy specification
 
+This document is written mostly for the AI agents that work on the code. You
+can use it to look up a fact and the reason behind a rule, but it is not meant
+to be read from top to bottom. To learn bwtidy, start with [the user
+docs](index.md).
+
 bwtidy is a self-hosted web UI and MCP server for keeping a Bitwarden or
 Vaultwarden vault consistent. It shows the whole vault as a wide grid, normalizes field
 names across items, applies templates, and lets an AI agent propose
@@ -1786,7 +1791,9 @@ were taken inside the write.
   `BWTIDY_COMMIT` is set, which a deployed worker's is not. Reason: with the repository gone, the backup itself says
   how to restore it. When the file cannot be read the backup is written
   without it and the log says so (a warning): a backup never fails for its
-  manual.
+  manual. The documentation site's copy of the page fills in the same line
+  with the version the site is built for (`scripts/docs-site build`), so the
+  page names a version wherever it is read.
 - Completeness check before the zip is built: every attachment listed on an
   item in `raw/items.json` and `raw/trash.json` has its member, and the
   member's length fits the listed `size`. That size is the encrypted blob's
@@ -1840,19 +1847,21 @@ were taken inside the write.
   below, which puts the items of one change log row back as the row's backup
   holds them. The disaster restore imports the exports into an empty account
   by hand, steps in `RESTORE.md` of every backup (its source is
-  [restore.md](restore.md)). It needs only age, unzip, jq and the official
-  Bitwarden CLI, nothing of bwtidy. The
-  import gives every item a new id, so a jq program in it pairs each backup
+  [restore.md](restore.md)). It needs only age, a stock `python3` (3.8 or
+  later, the standard library alone) and the official Bitwarden CLI, nothing
+  of bwtidy. Reason: whoever restores a lost vault has a plain Linux or macOS
+  machine, and Python reads more easily than a jq program. The
+  import gives every item a new id, so a Python program in it pairs each backup
   item with its new item by its content (every leaf but ids and dates, folder
-  and collections by name, its organization by name or personal), and a shell
-  function uploads each attachment from `item-attachments` to it. An
+  and collections by name, its organization by name or personal) and uploads
+  each attachment from `item-attachments` to it. An
   attachment the new item already has (by file name) is skipped, so a second
   run adds only what is missing. An attachment without a file of its own
   there (a damaged zip) is not uploaded but printed by attachment id and
   backup item id, the other attachments still go up.
 - Each organization export of a disaster restore goes into the organization
   of the same name, so the new account needs the old organization names.
-  When the backup or the account has two organizations of one name the jq
+  When the backup or the account has two organizations of one name the
   program stops before anything is uploaded. Reason: matching only by whether
   an item is in an organization would let twins in two organizations get
   each other's attachments.
@@ -2734,7 +2743,9 @@ way in `bwtidy/version.py` (`semver`), the one conversion.
 and the lock files carry generated copies (the package `bwtidy` in
 `backend/uv.lock`, the `version` and `packages[""].version` of
 `frontend/package-lock.json`). `scripts/ci` fails when one of them differs
-from pyproject's, naming the file and both versions. The image knows the
+from pyproject's, naming the file and both versions, and when the release
+notes (`docs/releases.md`) have no heading for the version in semver's
+spelling. Reason: every release tells its users what it brings. The image knows the
 commit it was built from as the committer date (YYMMDD), a space and the
 short git hash, like `261028 f2f4299`: build arg `BWTIDY_COMMIT` (empty
 without it, since the build context has no `.git`), passed by compose from

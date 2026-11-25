@@ -24,6 +24,7 @@ nav = [
     "reference/ui.md",
     "reference/mcp-tools.md",
     "reference/configuration.md",
+    "releases.md",
   ] },
   { "Explanation" = [
     "explanation/overview.md",
