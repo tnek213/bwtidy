@@ -446,8 +446,8 @@ Bitwarden" checked if the account changed).
 
 ## What does not come back
 
-Checked on the dev vault by `backend/tests/integration/test_backup_import.py`
-in the repository:
+The test `backend/tests/integration/test_backup_import.py` in the repository
+checks this on the dev vault:
 
 - Every id is new: items, attachments, folders and collections. bwtidy's
   Change log names the old ids, so its Restore buttons cannot find the
@@ -458,7 +458,7 @@ in the repository:
   groups and policies are not in the backup.
 - The trash comes back only as active items, without its deletion dates.
 
-Everything else came back as it was: every value of every item (custom
+Everything else comes back as it was: every value of every item (custom
 fields with duplicate names and trailing spaces included), passkeys,
 password history, favorites, master password reprompt, folders and
 collections by name, which item is in which folder and collections, and

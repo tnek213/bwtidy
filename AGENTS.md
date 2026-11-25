@@ -101,7 +101,10 @@ Each page of the user docs (in the four folders, and `docs/restore.md`) is
 one of the four kinds of https://diataxis.fr: a tutorial, a how-to, a
 reference or an explanation. Keep pages succinct: a fact lives on one page
 and others link to it. Be helpful and professional, with a relaxed tone that
-speaks to the reader as "you". UI that is used often gets a screenshot from
+speaks to the reader as "you". The docs describe what happens, in the present
+or future tense, never what happened in one run. A bullet list is for parallel
+items that can be read in any order, while sentences that follow from each
+other are paragraphs, so new text follows both. UI that is used often gets a screenshot from
 the docs suite. Examples use placeholder hosts such as https://bwtidy.example.
 `README.md` and `docs/index.md` share three texts, each the same in both:
 the introduction (between the comments `<!-- intro: ... -->` and

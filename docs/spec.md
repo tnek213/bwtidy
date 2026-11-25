@@ -2127,7 +2127,7 @@ and the tests prove that a backup brings the data back.
   and its cell menu has the Row group only. It sorts by its text (a secret as
   the mask) and the search tints it like a text cell when a shown value (never
   a secret) holds a word. A toolbar switch "Hide rare field columns", next to
-  Hide empty columns, hides the columns that went into Rare fields (the column
+  Hide empty columns, hides the columns that Rare fields has taken in (the column
   chooser still lists them). It is disabled while N is 0, turns on by itself
   whenever N goes from 0 to more and at page load when N is more than 0, and
   can be turned off to see both. It is not saved, like Hide empty columns. N
