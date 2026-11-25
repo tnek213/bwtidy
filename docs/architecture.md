@@ -2,7 +2,7 @@
 
 The map of the code for someone who changes it: what runs where, the layers
 and what each may import, where a new thing goes, who writes each kind of
-data and how a write flows. What bwtidy does and why is in
+data and how a write flows. The rules bwtidy follows and their reasons are in
 [spec.md](spec.md). How one function works is in its module's docstring.
 `backend/tests/repo/test_architecture_doc.py` checks that every backend
 module and every frontend directory is named here and that every path named

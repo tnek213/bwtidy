@@ -110,7 +110,7 @@ Take them in order: each continues from the vault the one before left.
 
 ## For contributors
 
-- [The spec](spec.md): what bwtidy does and why, every rule with its reason.
+- [The spec](spec.md): the rules and reasons these pages do not state.
 - [The architecture](architecture.md): the map of the code, its layers and
   what each may import, who writes each kind of data and how a write flows.
 - `CONTRIBUTING.md` in the repository: where to start, and how to report a

@@ -156,7 +156,7 @@ first.
 `dev/fixture-personal.json`, `dev/fixture-org.json` and
 `dev/fixture-org-club.json` are in Bitwarden's JSON import format
 (`bw import bitwardenjson`). All data is made up. The shape follows "The vault
-today" in `docs/spec.md`.
+it is made for" in `docs/spec.md`.
 
 Personal vault, 69 items imported:
 
