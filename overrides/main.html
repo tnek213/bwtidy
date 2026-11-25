@@ -25,6 +25,18 @@ CDN, as a running bwtidy serves the site offline. -#}
     .md-grid {
       max-width: 80rem;
     }
+    /* running text keeps a readable line length, while pictures, tables and code keep the whole column */
+    .md-typeset p:not(:has(img)),
+    .md-typeset li:not(:has(img, table, pre)),
+    .md-typeset blockquote:not(:has(img, table, pre)),
+    .md-typeset .admonition:not(:has(img, table, pre)),
+    .md-typeset details:not(:has(img, table, pre)) {
+      max-width: 80ch;
+    }
+    .md-typeset table p,
+    .md-typeset table li {
+      max-width: none;
+    }
     /* the theme breaks code anywhere, which splits a variable name over lines in a table */
     .md-typeset table:not([class]) td code {
       word-break: normal;
