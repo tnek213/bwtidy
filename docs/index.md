@@ -51,6 +51,8 @@ How each part works is under [Explanation](#explanation).
 
 ## Tutorial
 
+Take them in order: each continues from the vault the one before left.
+
 - [Your first cleanup](tutorial/first-cleanup.md): log in, fix a name and a
   field, commit, and find the write and its backup in the Change log.
 - [Your first template](tutorial/template.md): make a datatype and a

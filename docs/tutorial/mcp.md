@@ -5,8 +5,10 @@ logins that are in no folder. The agent looks through your vault and
 proposes the moves. You review its proposals in the Queue, approve them,
 and find the write and its backup in the Change log.
 
-You need bwtidy running and open in your browser, logged in (see
-[Run bwtidy](../how-to/run.md)), and an AI client that speaks MCP, such as
+This tutorial continues from [Your first template](template.md): you are
+logged in, and Old webshop and School portal are logins in no folder now, so
+your agent finds them too. If you start here, they are still notes and the
+agent leaves them out. You also need an AI client that speaks MCP, such as
 Claude Code, Codex, GitHub Copilot CLI or Gemini CLI. The pictures show
 bwtidy's test vault and only the app's side: what the agent says depends on
 the agent.
@@ -59,8 +61,10 @@ Give a reason with each proposal.
 
 The agent lists your items and folders, then calls a propose tool once for
 each folder. It tells you what it proposed. Nothing is in your vault yet:
-each proposal waits in the Queue for you. Your agent may group the logins
-differently from the pictures, or leave some where they are.
+each proposal waits in the Queue for you. In the pictures it moves six
+logins into Home, Old webshop and School portal among them, and Example
+Forge into Work. Your agent may group the logins differently, or leave some
+where they are.
 
 ## Review the proposals
 

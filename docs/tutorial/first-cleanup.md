@@ -105,6 +105,8 @@ backup holds them.
 
 ## Next steps
 
+- [Your first template](template.md), the next tutorial: it continues from
+  the vault as you left it.
 - [How edits are saved](../explanation/edits.md): when edits are written and
   what happens when a write fails.
 - [The web UI](../reference/ui.md): every page, menu and button.
