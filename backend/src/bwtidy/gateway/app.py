@@ -10,12 +10,12 @@ import contextlib
 import logging
 import os
 import secrets
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -37,6 +37,8 @@ log = logging.getLogger(__name__)
 DOCS_PATH = "/docs"
 TOO_MANY_PENDING = "Too many new accounts wait for their first login. Try again in a few minutes."
 LOCKED = "bwtidy is locked for this account. Log in in the web UI."
+## what create_gateway_app's on_worker_exit gets: the worker, once its exit is cleaned up
+WorkerExitHook = Callable[[Worker], Awaitable[None]]
 ## at a stop, how long requests in flight (an MCP stream stays open for good) may run before
 ## they are cut off and the workers get SIGTERM. A worker still finishes its own requests.
 REQUEST_DRAIN = 10
@@ -45,8 +47,11 @@ REQUEST_DRAIN = 10
 class Gateway:
     """The state behind the routes: the routing cookies, the account locks, the workers."""
 
-    def __init__(self, settings: GatewaySettings) -> None:
+    def __init__(
+        self, settings: GatewaySettings, on_worker_exit: WorkerExitHook | None = None
+    ) -> None:
         self.settings = settings
+        self._on_worker_exit = on_worker_exit
         self.accounts = Accounts(
             settings.accounts_dir,
             uid_base=settings.uid_base,
@@ -240,10 +245,26 @@ class Gateway:
 
     async def worker_exited(self, worker: Worker) -> None:
         """An account the worker asked to delete goes, else a directory whose login never
-        succeeded goes with its worker."""
-        async with self.lock(worker.key):
-            if not self.delete_on_request(worker.key, worker.path):
-                self.drop_if_pending(worker.key, worker.path)
+        succeeded goes with its worker. Then the on_worker_exit hook runs, outside the account's
+        lock so it may take the lock itself."""
+        try:
+            async with self.lock(worker.key):
+                if not self.delete_on_request(worker.key, worker.path):
+                    self.drop_if_pending(worker.key, worker.path)
+        finally:
+            await self.run_exit_hook(worker)
+
+    async def run_exit_hook(self, worker: Worker) -> None:
+        """The on_worker_exit hook, its failure logged and never raised (docs/spec.md, Gateway)."""
+        if self._on_worker_exit is None:
+            return
+        try:
+            await self._on_worker_exit(worker)
+        except Exception as error:
+            ## the type only: an exception's text may hold a value from the vault
+            log.error(
+                "The worker exit hook failed for %s: %s", worker.key.label, type(error).__name__
+            )
 
 
 class AccountRequest(BaseModel):
@@ -268,7 +289,16 @@ NO_ROUTE = {
 }
 
 
-def create_gateway_app(settings: GatewaySettings | None = None) -> FastAPI:
+def create_gateway_app(
+    settings: GatewaySettings | None = None,
+    *,
+    routers: Sequence[APIRouter] = (),
+    on_worker_exit: WorkerExitHook | None = None,
+) -> FastAPI:
+    """The gateway app. routers are included after the gateway's own routes and before the
+    documentation site and the static files, so their paths win over those. on_worker_exit is
+    awaited with every worker that exited, after the gateway's own cleanup (docs/spec.md, Gateway).
+    """
     settings = settings or GatewaySettings.from_env()
     if settings.switch_uid and os.geteuid() != 0:
         raise SettingsError(
@@ -279,7 +309,7 @@ def create_gateway_app(settings: GatewaySettings | None = None) -> FastAPI:
         raise SettingsError(
             "BWTIDY_BACKUPS_ROOT and BWTIDY_ACCOUNTS_DIR must not be one inside the other"
         )
-    gateway = Gateway(settings)
+    gateway = Gateway(settings, on_worker_exit)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -344,6 +374,9 @@ def create_gateway_app(settings: GatewaySettings | None = None) -> FastAPI:
             secure=settings.secure_cookies,
         )
         return response
+
+    for router in routers:
+        app.include_router(router)
 
     app.add_middleware(ProxyMiddleware, gateway=gateway)
 

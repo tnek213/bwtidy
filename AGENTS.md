@@ -26,8 +26,9 @@ request does not ask for spec changes.
   `docs/restore.md` (a how-to that every backup holds as RESTORE.md).
 - `dev/` the developer guide and the dev vault's fixture: `dev/README.md` (set
   up, the commands, the credentials), `dev/dev-vault.md` (the dev stacks, the
-  snapshot, the fixture), `dev/testing.md` (the suites and how to write a test)
-  and `dev/release.md` (the docs site and the image).
+  snapshot, the fixture), `dev/testing.md` (the suites and how to write a
+  test), `dev/release.md` (the docs site and the image) and `dev/demo.md`
+  (the design of the public demo).
 - How it is built: [docs/architecture.md](docs/architecture.md). Read it before
   changing structure.
 

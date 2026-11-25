@@ -510,6 +510,7 @@ the queue).
   but the two clicks above, those paths answer 401 `{"detail": "No account"}`,
   so the frontend opens the account again and shows the unlock or the
   Bitwarden login. Every other path is the gateway's: its own routes, then
+  the routes passed in `routers` (see Extra routes and the exit hook), then
   the documentation site at `/docs/` from `BWTIDY_DOCS_DIR`, then the static
   files from `BWTIDY_STATIC_DIR` (mounted last, like the single-user app
   does). The workers get no static directory, so the frontend always comes
@@ -526,6 +527,23 @@ the queue).
   stays on one line except on a narrow screen, pictures have a thin border
   and a shadow, and a click on a picture shown smaller than it is opens it
   larger, with nothing loaded from a CDN.
+- Extra routes and the exit hook: `create_gateway_app(settings, *, routers=(),
+  on_worker_exit=None)` lets an outside package that wraps the gateway (a
+  demo, for one) add its own pages and learn when a worker exits, without
+  bwtidy knowing about it. `bwtidy-gateway` passes neither, so the gateway
+  behaves as described above.
+  - `routers`: FastAPI `APIRouter`s, included in their order after the
+    gateway's own routes and before the documentation site and the static
+    files, so a router's path wins over a static file of the same path (`/`,
+    `/index.html`) but not over a route of the gateway. Paths the proxy takes
+    (under `/api/` and `/mcp`) never reach a router: the proxy runs first.
+  - `on_worker_exit`: an async callable awaited once with every `Worker`
+    that exited, after the gateway's own cleanup above (the delete marker,
+    the `.pending` directory) and outside the account's lock, so it may take
+    the lock itself. It also runs when that cleanup failed. An exception in
+    it is logged by the gateway as `The worker exit hook failed for ACCOUNT:
+    TYPE` (the exception's type only, its text could hold a value) and never
+    propagates: the gateway keeps serving and the worker is still forgotten.
 - MCP: an MCP client has no routing cookie, so a request to `/mcp` (or
   below it) is routed by its `Authorization: Bearer TOKEN` alone, a routing
   cookie plays no part. The gateway hashes the token with sha256 and looks
