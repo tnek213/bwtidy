@@ -101,9 +101,11 @@ reference or an explanation. Keep pages succinct: a fact lives on one page
 and others link to it. Be helpful and professional, with a relaxed tone that
 speaks to the reader as "you". UI that is used often gets a screenshot from
 the docs suite. Examples use placeholder hosts such as https://bwtidy.example.
-The alpha disclaimer, the blockquote "Alpha software" in `README.md` and in
-`docs/index.md`, is the same text in both, and so is the list under "At a
-glance": a change to one changes the other.
+`README.md` and `docs/index.md` share three texts, each the same in both:
+the introduction (between the comments `<!-- intro: ... -->` and
+`<!-- end of intro -->`), the alpha disclaimer (the blockquote "Alpha
+software") and the list under "At a glance". A change to one changes the
+other.
 The banner on every page of the site (`overrides/main.html`) links to the one
 in `docs/index.md`.
 A new page gets its line in the nav of `zensical.toml`, and a page links only
