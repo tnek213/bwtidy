@@ -1,8 +1,8 @@
 # bwtidy
 
-What the product is and why: [docs/spec.md](docs/spec.md). Read it before
-changing behavior. When a feature changes what the spec says, update the spec
-in the same commit. This is for the maintainer's agents. Human contributors may
+The rules of the product and their reasons, where the user docs do not state
+them: [docs/spec.md](docs/spec.md). Read it before changing behavior. When a
+feature changes what the spec says, update the spec in the same commit. This is for the maintainer's agents. Human contributors may
 leave the spec to the maintainer, so an agent reviewing a contributor's pull
 request does not ask for spec changes.
 
@@ -22,7 +22,8 @@ request does not ask for spec changes.
   script a command line over it (`scripts/docs-site` imports none of it).
 - `docs/` the user docs, from `docs/index.md` into four folders:
   `tutorial/`, `how-to/`, `reference/` and `explanation/`. Beside them
-  `docs/spec.md` (the design record), `docs/architecture.md` and
+  `docs/spec.md` (the rules and reasons the user docs do not state),
+  `docs/architecture.md` and
   `docs/restore.md` (a how-to that every backup holds as RESTORE.md).
 - `dev/` the developer guide and the dev vault's fixture: `dev/README.md` (set
   up, the commands, the credentials), `dev/dev-vault.md` (the dev stacks, the
@@ -61,8 +62,9 @@ dev vault (see dev/testing.md). A change to what the UI does comes with an e2e
 test there.
 
 A change to what a user sees updates the page under `docs/` that covers it
-(reference, how-to or explanation) in the same commit, as well as
-`docs/spec.md`.
+(reference, how-to or explanation) in the same commit. `docs/spec.md` changes
+with it only where a rule, a contract or a reason it holds changes: what a
+user sees is described in the user docs alone, and the spec links there.
 
 A change that alters what a docs test in `backend/tests/e2e/docs` shows
 reruns those tests (`scripts/docs-shots -k NAME`) and commits the changed

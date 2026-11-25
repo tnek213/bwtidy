@@ -62,6 +62,17 @@ items have a value in it.
   and `collections` in a list dialog, `folder` as a pick of the folders or a
   new one, `organization` in a dialog, a secret in a dialog that never shows
   the current value (Show what I type shows what you type).
+- `organization` of a personal item: pick the organization and at least one
+  of its collections. An organization without collections cannot take an
+  item, so create a collection in Bitwarden first.
+- `organization` of an organization item: the only choice is Personal vault.
+  bwtidy then makes a personal copy and moves the item to the trash. Its
+  attachments are copied, its passkeys and password history are lost, and
+  everyone who shares its collections loses it.
+- A field that is a text or boolean field on its own item, in a column that
+  is secret on other items: it keeps its type, so its dialog says that the
+  value is stored as plain text that an agent can read. A boolean field gets
+  a True checkbox, a linked field has no value of its own.
 - Right click, the context menu key or Shift+F10: opens the
   [cell menu](#cell-menu).
 - The eye of a secret cell: Reveal shows the value for 30 seconds or until
@@ -71,13 +82,21 @@ items have a value in it.
   [selection bar](#selection-bar). Shift-click ticks a range, the header's
   checkbox every shown row.
 - `template`: the matching template, or the closest one with how much of it
-  is filled (`Computer 3/4`). Hover a near miss for what it lacks.
+  is filled (`Computer 3/4`). An item is a near miss once two things fit
+  (its type counts as one). Hover a near miss for what it lacks. Sorting
+  the column puts the items without a template first, then the near misses
+  from the least filled, then the matches.
+- `name`: while `type` or `template` is hidden or scrolled out of view, the
+  name cell shows it after the name, the type as a small icon and the
+  template or near miss by its name.
 - Rare fields (the last column): for each item, the fields that at most N
   items use, as JSON in one cell (`{ "sudo": "", "vlan": "20" }`, a secret
   value behind an eye). Set N in its header menu, 0 (the default) turns it
-  off. N is kept for the account.
+  off. N is kept for the account. Custom fields and the fields of a login,
+  card, identity or SSH key can go in, counted over the whole vault, so a
+  search or filter never changes which ones do. The cell cannot be edited.
 - A double click on a column header's right edge fits the column to its
-  content.
+  content, at most about 50 characters wide.
 
 What a cell's look tells you:
 
@@ -118,7 +137,8 @@ disabled.
 - Rename attachments (an attachments cell): see
   [Rename an attachment](../how-to/rename-attachment.md).
 - Add field: adds a custom field to the item, with a name, a value and the
-  type text or hidden.
+  type text or hidden. An empty field of that name the item already has
+  keeps its type.
 - Convert to template…: maps the item's values onto the coordinates of a
   template you pick. For another item type bwtidy creates a new item and
   moves the old one to the trash.
@@ -145,7 +165,9 @@ The three dots in a column header open its menu. A field column's menu:
   above.
 - Manage folders… (the Folder column): lists every folder with its number of
   items. Rename gives a folder a new name in place, Delete deletes an empty
-  one (a folder that holds items, also in the trash, cannot be deleted).
+  one (a folder that holds items, also in the trash, cannot be deleted). A
+  folder with a rename or delete in the queue takes no other until it is
+  written.
 
 A merge that finds items with a value in more than one of the columns asks
 which value each of them keeps (Choose the values to keep).
@@ -160,7 +182,8 @@ Below the grid while any row is ticked.
 - N selected: how many items are ticked.
 - Move to trash: moves them all to the trash in one write, after one
   question that lists them.
-- Clear: unticks every row.
+- Clear: unticks every row. A search or filter that changes the shown rows
+  unticks them too.
 
 ### New item
 
@@ -227,6 +250,13 @@ The template editor:
   a match) per row, and ✕ that removes the row.
 - Save: saves the template. A coordinate no item has gets a light warning
   background.
+- A New field name that equals a field of the vault apart from case and
+  spaces is offered as that field instead.
+
+The values you copy most belong in the built-in login slots
+(`login.username`, `login.password`, `login.totp`): the Bitwarden browser
+extension copies those straight from its item list, while a custom field
+needs the item opened.
 
 ### Datatypes
 
@@ -251,7 +281,8 @@ The datatype editor:
 - Description.
 - Examples and Counter-examples, one per line: values that must match and
   values that must not. A tick or a cross marks each line, red when it is
-  wrong. Make them up, an agent can read them.
+  wrong, and hovering it says how far the line is from a match. Make them
+  up, an agent can read them.
 - Try: values to check, never saved.
 - Save: on once the examples are right and the name is free.
 
@@ -267,7 +298,8 @@ proposals until you decide. See [How edits are saved](../explanation/edits.md).
 - Auto-commit: After seconds and Or at changes set when your edits are
   written, Save keeps them.
 - The tabs Pending, Applied, Rejected and Failed, each with the number of
-  entries you have not seen.
+  entries you have not seen. A tab open for 4 seconds counts its entries as
+  seen, in this browser.
 - An entry: its summary, then its number, its source (ui or mcp), when it
   was made and its operation, and a table of each changed cell (Item, Column,
   Before, After) with the secret values masked.
@@ -295,9 +327,11 @@ right before that write, newest first.
 
 
 - From, To, Source, Operation, Field, Items and Result narrow the rows.
-  Clear filters empties them all.
+  Clear filters empties them all. Items takes a part of an item's name, and
+  asks for more of it when over 100 items fit. The page shows the newest
+  200 rows that match.
 - Diff report: lists every operation on every field of the shown rows, to
-  Copy as text.
+  Copy as text. It never holds a value.
 - The columns: Time, Source, Operation (hover it for what it did), Items,
   Result and Backup.
 - A backup's name: downloads the encrypted file. Decrypt it with
@@ -306,7 +340,13 @@ right before that write, newest first.
   dialog that says what happens to each item. On a folder's row it gives the
   folder its old name back, or creates a deleted one again, and on an
   attachment rename's row the attachment its old name. The restore is a
-  write like any other, with a backup first and a row of its own.
+  write like any other, with a backup first and a row of its own, which
+  says From backup NAME and links to the change it undid while that one is
+  on the page.
+- A change whose backup is gone (deleted, or past the retention) shows the
+  backup's name struck through and has no Restore.
+- Changes next to each other that share one backup show it in full on the
+  topmost row and fainter on the rows under it. Restore works on each.
 - A small restore icon marks a change that a later restore undid. Its
   tooltip says when and which fields of which items.
 - Delete on a backup row: deletes that backup for good, after a question.
@@ -323,8 +363,9 @@ Password generator and Delete data.
 
 
 - Date and time format: System (the browser's own), ISO 8601, Europe, Europe
-  (dots) or USA. Every date and time follows it. Kept for the account, so
-  every browser shows the same.
+  (dots) or USA, each shown with the current time in its format. Every date
+  and time follows it. Kept for the account, so every browser shows the
+  same.
 - Layout: Normal or Compact, which fits more in a small window. Kept in this
   browser only.
 - Hide bwtidy's own note: leaves the note that keeps your templates and
@@ -389,6 +430,11 @@ the form under it works as usual. After the first login of any account it
 never shows again. It comes back only when every account is deleted, as on a
 fresh start.
 
+The eye at the end of the master password field shows what you type until
+the form is sent. Under the unlock and the Bitwarden login the page names
+the account, with Switch account to pick another one. The Bitwarden login
+shows the account's server and email read-only.
+
 
 ![The account form with the server and email filled in and Continue outlined](../images/tutorial-account-form.png)
 
@@ -396,9 +442,9 @@ fresh start.
 ## App bar
 
 - bwtidy (the title): goes to the Vault.
-- Vault, Types, Queue, Change log: the pages. Queue's number counts the
-  pending entries, its tooltip how many are your unsaved edits and how many
-  an agent's proposals.
+- Vault, Types, Queue, Change log: the pages, the open one underlined.
+  Queue's number counts the pending entries, its tooltip how many are your
+  unsaved edits and how many an agent's proposals.
 - Commit now: writes your unsaved edits at once. There while you have some,
   with a spinner while a write runs (hover it for what it does).
 - The account: the email of the open account, with the server's host when

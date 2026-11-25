@@ -106,7 +106,7 @@ without a login.
 - [AGENTS.md](AGENTS.md): the rules every change follows and the checks it
   must pass
 - [The architecture](docs/architecture.md): where the code lives
-- [The spec](docs/spec.md): what bwtidy does and why
+- [The spec](docs/spec.md): the rules and reasons the user docs do not state
 
 ## License
 
