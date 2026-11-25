@@ -1,8 +1,19 @@
 # Contributing
 
 bwtidy is alpha software, so expect changes: features, schemas and
-behavior move between versions. Issues and changes are welcome, but there is
-no promise of a review time or of a change going in.
+behavior move between versions. It has one maintainer for now and is meant to
+grow in the open, so issues, ideas and changes are welcome. There is no
+promise of a review time or of a change going in.
+
+## Before you start on a feature
+
+Discuss a new feature first, in a "Feature request" issue or under Ideas in
+the Discussions, before you write it. Not every feature fits what bwtidy is
+for, and talking first saves you work on a change that will not go in. A bug
+fix or a docs fix can go straight to a pull request.
+
+If a feature you want does not fit, you are welcome to fork: the license
+allows it.
 
 ## Where to start
 
@@ -32,6 +43,31 @@ Dependencies change only through the lock files (`backend/uv.lock`,
 changed lock file goes into the change. Every build and test uses them locked
 and fails when one is out of date. `scripts/update-deps` updates every
 dependency within its declared range and lists the updates beyond it. [AGENTS.md](AGENTS.md) has the details.
+
+## Commits
+
+Write commit messages as https://cbea.ms/git-commit/ describes:
+
+- A subject line in the imperative mood ("Add", "Fix", "Explain"), capitalized,
+  without a period at the end, about 50 characters and at most 72.
+- A body only when the change needs more detail or its motivation explained.
+  Leave a blank line after the subject and wrap the body at 72 characters. It
+  says what changed and why, the diff shows how.
+
+bwtidy does not use Conventional Commits: no `feat:`, `fix:` or other prefixes
+in the subject.
+
+Sign your commits if you can (SSH or GPG, so GitHub shows them as
+Verified). A pull request whose commits are all signed and tidy may be merged
+with its commits kept. Otherwise it is squashed into one commit, which
+GitHub signs.
+
+## License of your contribution
+
+bwtidy is licensed under the GNU Affero General Public License, version 3 only
+(`LICENSE`). By opening a pull request you agree that your contribution is
+published under that same license, and you confirm that you have the right to
+submit it.
 
 ## Reporting a bug or asking for a feature
 
