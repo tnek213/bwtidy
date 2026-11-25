@@ -1,5 +1,10 @@
 # bwtidy specification
 
+This document is written mostly for the AI agents that work on the code. You
+can use it to look up a fact and the reason behind a rule, but it is not meant
+to be read from top to bottom. To learn bwtidy, start with [the user
+docs](index.md).
+
 bwtidy is a self-hosted web UI and MCP server for keeping a Bitwarden or
 Vaultwarden vault consistent. It shows the whole vault as a wide grid, normalizes field
 names across items, applies templates, and lets an AI agent propose
