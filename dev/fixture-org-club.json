@@ -1,0 +1,30 @@
+{
+  "encrypted": false,
+  "collections": [
+    {
+      "id": "a0e01bcb-8846-44ac-b0c8-b01394f6adfa",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "name": "Shared",
+      "externalId": null
+    }
+  ],
+  "items": [
+    {
+      "id": "12f76e09-64ac-4121-af47-951f5d156b6e",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "folderId": null,
+      "type": 2,
+      "reprompt": 0,
+      "name": "Club locker code",
+      "notes": "Locker 14 in the club house, the code is on the board by the door",
+      "favorite": false,
+      "fields": [],
+      "collectionIds": [
+        "a0e01bcb-8846-44ac-b0c8-b01394f6adfa"
+      ],
+      "secureNote": {
+        "type": 0
+      }
+    }
+  ]
+}

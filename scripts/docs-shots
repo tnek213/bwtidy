@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""docs-shots: take the documentation screenshots, the docs tests in backend/tests/e2e/docs.
+
+  scripts/docs-shots [E2E ARGS]
+
+Without a partial selection it is the full run: it runs scripts/e2e tests/e2e/docs with
+BWTIDY_DOCS_SHOTS=1, so the tests write every image again. The tests write into a staging
+directory inside docs/images (BWTIDY_DOCS_SHOTS_DIR), and only a run that passed moves the
+images in it over docs/images. A failed run removes the staging directory and leaves docs/images
+as it was. After a full run that passed, it also deletes each *.png in docs/images that no test
+wrote during the run (older than the run's start) and prints its name, then scripts/docs-lint
+catches an image no page links. A run is partial with -k, -m, a test path
+(tests/e2e/docs/test_x.py), --lf, --sw, --deselect, --ignore or --collect-only: it deletes
+nothing, an image it does not take stays as it was. Either way it then runs scripts/docs-lint.
+Other arguments (--no-reset, -x) go to scripts/e2e. Exits with the first failing code.
+"""
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS = ROOT / "scripts"
+IMAGES = ROOT / "docs" / "images"
+SUITE = "tests/e2e/docs"
+LINT = SCRIPTS / "docs-lint"
+ENABLE_VAR = "BWTIDY_DOCS_SHOTS"
+DIR_VAR = "BWTIDY_DOCS_SHOTS_DIR"
+
+
+## the arguments after which a passing run has not taken every image, as pytest reads them
+PARTIAL = (
+    "-k",
+    "-m",
+    "tests/",
+    "backend/tests/",
+    "--lf",
+    "--last-failed",
+    "--sw",
+    "--stepwise",
+    "--deselect",
+    "--ignore",
+    "--collect-only",
+    "--setup-plan",
+)
+## a run's images are older than its start by at most the clock's coarseness, this is generous
+CLOCK_SLACK = 1.0
+
+
+def partial(args: list[str]) -> bool:
+    """A test path, -k or another selection means the run does not write every image."""
+    return any(arg == "--co" or arg.startswith(PARTIAL) for arg in args)
+
+
+def delete_stale(started: float) -> None:
+    """Delete the images that no test of the run wrote, printing each name.
+
+    A run that wrote no image at all (every test skipped) deletes none.
+    """
+    images = sorted(IMAGES.glob("*.png"))
+    stale = [image for image in images if image.stat().st_mtime < started - CLOCK_SLACK]
+    if len(stale) == len(images):
+        if stale:
+            print("docs-shots: the run wrote no image, deleting none")
+        return
+    for image in stale:
+        image.unlink()
+        print(f"docs-shots: deleted {image.name}, no test wrote it")
+
+
+def publish(staging: Path) -> None:
+    """Move every image of the staging directory over docs/images, a rename on one file system."""
+    for image in sorted(staging.glob("*.png")):
+        os.replace(image, IMAGES / image.name)
+
+
+def e2e_args(args: list[str]) -> list[str]:
+    ## without a test path scripts/e2e would run all of tests/e2e, -k there too
+    if any(arg.startswith(("tests/", "backend/tests/")) for arg in args):
+        return args
+    return [SUITE, *args]
+
+
+def main(args: list[str]) -> int:
+    if args[:1] in (["-h"], ["--help"]):
+        print(__doc__)
+        return 0
+    full = not partial(args)
+    started = time.time()
+    IMAGES.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=".staging-", dir=IMAGES))
+    try:
+        env = dict(os.environ, **{ENABLE_VAR: "1", DIR_VAR: str(staging)})
+        command = [str(SCRIPTS / "e2e"), *e2e_args(args)]
+        code = subprocess.run(command, env=env).returncode
+        if code != 0:
+            return code
+        publish(staging)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    if full:
+        delete_stale(started)
+    return subprocess.run([str(LINT)]).returncode
+
+
+if __name__ == "__main__":
+    os.chdir(ROOT)
+    sys.exit(main(sys.argv[1:]))

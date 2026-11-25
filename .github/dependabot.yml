@@ -1,0 +1,50 @@
+# Weekly updates of every locked dependency, so the lock files, the image digests and the action
+# SHAs do not go stale. Minor and patch updates come as one pull request per ecosystem and
+# directory, a new major version as a pull request of its own.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      uv-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # the Bitwarden CLI of the image, pinned to one version in its package.json
+  - package-ecosystem: npm
+    directory: /docker/bitwarden-cli
+    schedule:
+      interval: weekly
+    groups:
+      bitwarden-cli-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      docker-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]

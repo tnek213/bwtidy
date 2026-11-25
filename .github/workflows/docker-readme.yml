@@ -1,0 +1,42 @@
+# Copies README.md to the Overview of docker.io/tnek213/bwtidy and the repo's description to its
+# short description, so Docker Hub says what GitHub says. Runs when either changes on main.
+name: Docker Hub README
+
+on:
+  push:
+    branches: [main]
+    paths: [README.md, .github/workflows/docker-readme.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-readme
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check the token
+        env:
+          DOCKERHUB_README_TOKEN: ${{ secrets.DOCKERHUB_README_TOKEN }}
+        run: |
+          if [ -z "$DOCKERHUB_README_TOKEN" ]; then
+            echo "set the repository secret DOCKERHUB_README_TOKEN (a Docker Hub access token with Read, Write, Delete, which the description API needs)" >&2
+            exit 1
+          fi
+      # v5.0.0
+      - uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa
+        with:
+          username: tnek213
+          password: ${{ secrets.DOCKERHUB_README_TOKEN }}
+          repository: tnek213/bwtidy
+          short-description: ${{ github.event.repository.description }}
+          readme-filepath: README.md
+          # the README's relative links and images become links into the GitHub repo
+          enable-url-completion: true

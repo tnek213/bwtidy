@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+"""dev-vault: a Vaultwarden dev stack for this worktree, with a seeded test vault.
+
+  scripts/dev-vault up          start Vaultwarden and the app container (Dockerfile target dev)
+  scripts/dev-vault setup       register the test accounts, create the orgs, log bw in, seed
+  scripts/dev-vault seed        import the fixture into an empty vault (setup does it too)
+  scripts/dev-vault down        stop the stack and delete its volumes
+                                (without BWTIDY_STACK: every stack of this worktree)
+  scripts/dev-vault reset       down, up, setup (from the snapshot image in seconds)
+                                (without BWTIDY_STACK: stack 1 and every other stack that is up)
+  scripts/dev-vault exec ARGS   run ARGS in the app container, e.g. exec bw status
+                                (exec --root ARGS runs them as root)
+
+Ports and the compose project name are picked per worktree (.dev-vault.env), so
+several worktrees run their own stacks side by side. Vaultwarden serves HTTPS with
+a self-signed certificate (.dev-vault/), because bw and the web vault refuse plain
+HTTP servers. Inside the stack the server is https://vaultwarden.
+
+A worktree can run several stacks (scripts/e2e and scripts/integration --stacks N). BWTIDY_STACK=K
+picks stack K for every command: stack 1 (the default) is .dev-vault.env, .dev-vault/ and the
+project bwtidy-WORKTREE, stack K from 2 up is .dev-vault-K.env, .dev-vault-K/ and
+bwtidy-WORKTREE-K. Only stack 1 builds the snapshot, the others start from it.
+
+The seeded state (Vaultwarden's /data and the dev account's bw CLI state) is kept as a local image,
+bwtidy-dev-vaultwarden:HASH, where HASH is a hash of this script, scripts/devlib/seed.py and
+snapshot.py, everything under dev/, compose.dev.yaml, the Dockerfile and the bw CLI's lock file
+(docker/bitwarden-cli). When that image exists, up starts Vaultwarden from it and copies the CLI
+state into the app container, and setup only checks that bw is logged in. When it does not, setup
+builds the state as before and then saves it as that image. A change of any input gives a new hash,
+so the next reset builds a new snapshot, and so does a snapshot older than SNAPSHOT_MAX_AGE. The
+image is never pushed.
+
+Dev credentials only, see dev/README.md. This never talks to bitwarden.com.
+"""
+
+import importlib.util
+import os
+import re
+import shutil
+import subprocess
+import sys
+from collections.abc import Mapping
+from pathlib import Path
+
+from devlib import compose, git, seed, snapshot, stacks
+from devlib.paths import ROOT
+from devlib.stacks import STACK_VAR, Stack
+
+USAGE = "usage: dev-vault up | setup | seed | down | reset | exec [--root] ARGS"
+
+
+def up(stack: Stack) -> int:
+    if stack.env_file.exists():
+        env = stack.env()
+        print(f"dev-vault: reusing {stack.env_file.name}")
+    else:
+        image = snapshot.snapshot_image()
+        if stack.number > 1:
+            snapshot.wait_for_snapshot(stack, image)
+        age = snapshot.snapshot_age(image)
+        if age is not None and age < snapshot.SNAPSHOT_MAX_AGE:
+            print(f"dev-vault: starting from the snapshot {image}")
+            env = stacks.write_env(stack.env_file, stack.project, image, stack.dir.name)
+        else:
+            why = "no snapshot" if age is None else "too old a snapshot"
+            print(f"dev-vault: {why} {image}, setup builds the vault and saves it")
+            env = stacks.write_env(stack.env_file, stack.project, tls=stack.dir.name)
+    compose.make_cert(stack)
+    ## compose build needs buildx 0.17 or later, plain docker build works with older ones.
+    ## The tag is compose's default image name for the app service, so up uses it as is.
+    compose.run(
+        [
+            "docker",
+            "build",
+            "--target",
+            "dev",
+            "--build-arg",
+            f"BWTIDY_COMMIT={git.commit('dev-vault', stack.root)}",
+            "-t",
+            f"{env['COMPOSE_PROJECT_NAME']}-app",
+            ".",
+        ]
+    )
+    compose.run(compose.compose(stack, "up", "-d"))
+    if env.get("BWTIDY_VW_IMAGE"):
+        snapshot.restore_cli_state(stack)
+    url = compose.vault_url(env)
+    compose.wait_alive(url, stack.cert)
+    print(
+        f"dev-vault: {env['COMPOSE_PROJECT_NAME']} is up, web vault {url}, "
+        f"app port {env['BWTIDY_APP_PORT']}"
+    )
+    return 0
+
+
+def down_stack(stack: Stack) -> None:
+    if stack.env_file.exists():
+        compose.run(compose.compose(stack, "down", "-v", "--rmi", "local"))
+        stack.env_file.unlink()
+    else:
+        print(f"dev-vault: no {stack.env_file.name}, nothing to stop")
+    shutil.rmtree(stack.dir, ignore_errors=True)
+
+
+def down(root: Path, picked: int | None) -> int:
+    """Stop the stack picked (BWTIDY_STACK), without one every stack of the worktree."""
+    if picked is not None:
+        down_stack(Stack(picked, root))
+        return 0
+    for number in sorted({1, *stacks.stacks_present(root)}):
+        down_stack(Stack(number, root))
+    ## a directory of a stack whose env file is gone
+    for path in root.glob(".dev-vault-*"):
+        if path.is_dir() and re.fullmatch(r"\.dev-vault-\d+", path.name):
+            shutil.rmtree(path, ignore_errors=True)
+    return 0
+
+
+def reset(root: Path, picked: int | None) -> int:
+    """down, up and setup of the stack picked (BWTIDY_STACK).
+
+    Without one stack 1 and every other stack of the worktree that has an env file.
+    """
+    others = [] if picked is not None else [k for k in stacks.stacks_present(root) if k > 1]
+    if others:
+        stacks.run_stacks([["reset"]], [1, *others])
+        return 0
+    stack = Stack(picked or 1, root)
+    down_stack(stack)
+    up(stack)
+    return setup(stack)
+
+
+def seed_command(stack: Stack) -> int:
+    if not stack.env_file.exists():
+        raise SystemExit("dev-vault: no stack, run scripts/dev-vault up and setup first")
+    session = seed.unlock(stack)
+    try:
+        seed.bw(stack, "sync", session=session)
+        orgs = []
+        for name in seed.ORGS:
+            org = seed.find_org(stack, session, name)
+            if not org:
+                raise SystemExit(f"dev-vault: no org {name}, run scripts/dev-vault setup first")
+            orgs.append(org)
+        if not seed.vault_empty(stack, session):
+            raise SystemExit("dev-vault: the vault is not empty, reset gives a fresh one")
+        seed.seed(stack, orgs, session)
+    finally:
+        seed.bw(stack, "lock")
+    print("dev-vault: seed done")
+    return 0
+
+
+def setup(stack: Stack) -> int:
+    if not stack.env_file.exists():
+        raise SystemExit("dev-vault: no stack, run scripts/dev-vault up first")
+    env = stack.env()
+    port = env["BWTIDY_VW_PORT"]
+    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+    compose.wait_alive(compose.vault_url(env), stack.cert)
+    if seed.from_snapshot_in_place(stack, env):
+        print("dev-vault: setup done")
+        return 0
+    seed.ensure_login(stack, port)
+    session = seed.unlock(stack)
+    seed.bw(stack, "sync", session=session)
+    orgs = []
+    for name, (collections, _) in seed.ORGS.items():
+        org = seed.ensure_org(stack, port, session, seed.EMAIL, name)
+        seed.ensure_collections(stack, org, collections, session)
+        orgs.append(org)
+    ## bw list reads the local cache, which knows nothing of the collections created above
+    seed.bw(stack, "sync", session=session)
+    seeded = seed.vault_empty(stack, session)
+    if seeded:
+        seed.seed(stack, orgs, session)
+    else:
+        print("dev-vault: the vault has items, skipping seed")
+    seed.bw(stack, "lock")
+    seed.ensure_restore_account(stack, port)
+    snapshot.keep_snapshot(stack, seeded)
+    print("dev-vault: setup done")
+    return 0
+
+
+def exec_app(stack: Stack, args: list[str]) -> int:
+    flags = [] if sys.stdin.isatty() and sys.stdout.isatty() else ["-T"]
+    if args[:1] == ["--root"]:
+        flags += ["--user", "0"]
+        args = args[1:]
+    return subprocess.run(compose.compose(stack, "exec", *flags, "app", *args), cwd=ROOT).returncode
+
+
+def main(args: list[str], environ: Mapping[str, str] = os.environ) -> int:
+    """Run the command on the stack BWTIDY_STACK picks (stack 1 when unset)."""
+    stack = Stack(stacks.stack_number(environ))
+    picked = stack.number if environ.get(STACK_VAR) else None
+    match args:
+        case ["up"]:
+            return up(stack)
+        case ["setup"]:
+            return setup(stack)
+        case ["seed"]:
+            return seed_command(stack)
+        case ["down"]:
+            return down(ROOT, picked)
+        case ["reset"]:
+            return reset(ROOT, picked)
+        case ["exec", *rest] if rest and rest != ["--root"]:
+            return exec_app(stack, rest)
+    print(USAGE, file=sys.stderr)
+    return 2
+
+
+def needs_backend_venv(args: list[str]) -> bool:
+    return args[:1] in (["setup"], ["reset"]) and importlib.util.find_spec("playwright") is None
+
+
+if __name__ == "__main__":
+    os.chdir(ROOT)
+    if needs_backend_venv(sys.argv[1:]):
+        ## Playwright lives in the backend dev group, so setup reruns itself in that venv
+        uv = [
+            "uv",
+            "run",
+            "--locked",
+            "--quiet",
+            "--project",
+            str(ROOT / "backend"),
+            "python3",
+            __file__,
+        ]
+        os.execvp("uv", uv + sys.argv[1:])
+    sys.exit(main(sys.argv[1:]))

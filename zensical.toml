@@ -1,0 +1,84 @@
+# The documentation site: scripts/docs-site builds and previews it, the image serves it at /docs/,
+# .github/workflows/docs.yml publishes it on GitHub Pages.
+[project]
+site_name = "bwtidy"
+site_description = "A web UI and MCP server for keeping a Bitwarden vault tidy"
+docs_dir = "docs"
+repo_url = "https://github.com/tnek213/bwtidy"
+repo_name = "tnek213/bwtidy"
+# no site_url: the pages link to each other relatively, so the site works under /docs/ and /bwtidy/
+
+nav = [
+  { "Home" = "index.md" },
+  { "Tutorial" = [
+    "tutorial/first-cleanup.md",
+  ] },
+  { "How-to guides" = [
+    "how-to/run.md",
+    "how-to/mcp.md",
+    "how-to/show-hide-columns.md",
+    "how-to/rename-attachment.md",
+    "restore.md",
+  ] },
+  { "Reference" = [
+    "reference/ui.md",
+    "reference/mcp-tools.md",
+    "reference/configuration.md",
+  ] },
+  { "Explanation" = [
+    "explanation/overview.md",
+    "explanation/login.md",
+    "explanation/edits.md",
+    "explanation/secrets.md",
+    "explanation/mcp.md",
+    "explanation/tool-note.md",
+    "explanation/bw-cli.md",
+    "explanation/isolation.md",
+  ] },
+  { "For contributors" = [
+    "spec.md",
+    { "The architecture, a map of the code" = "architecture.md" },
+  ] },
+]
+
+[project.theme]
+language = "en"
+# main.html there puts the alpha disclaimer as a banner above every page
+custom_dir = "overrides"
+# the system's fonts, so a page loads nothing from another host
+font = false
+features = [
+  "content.code.copy",
+  "navigation.footer",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+]
+
+# the first palette follows the system, the toggle steps through light and dark
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+md_in_html = {}
+toc.permalink = true
+pymdownx.highlight.anchor_linenums = true
+pymdownx.inlinehilite = {}
+pymdownx.superfences = {}

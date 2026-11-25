@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/.venv
+**/dist
+**/__pycache__
+.dev-vault*
+.integration-logs
+**/.ruff_cache
+**/.pytest_cache
+**/.testmondata*
+/site
+/.cache
