@@ -11,6 +11,7 @@ on:
       - README.md
       - SECURITY.md
       - CONTRIBUTING.md
+      - CODE_OF_CONDUCT.md
       - AGENTS.md
       - CLAUDE.md
       - LICENSE
