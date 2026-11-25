@@ -3,6 +3,29 @@
 What each version of bwtidy brings, newest first. How to run a version is in
 [Run bwtidy](how-to/run.md).
 
+## Road to 1.0
+
+The next release is 1.0.0-beta.1. bwtidy is then feature complete for 1.0,
+and the beta is for finding bugs and for feedback from real vaults. From the
+beta on, a stored format (the database, the bwtidy note, the backups, the
+settings) changes only with a migration.
+
+The beta becomes a release candidate when all of these hold:
+
+- At least 10 "Works for me" reports from different people in the
+  [Works for me discussion](https://github.com/tnek213/bwtidy/discussions/16),
+  with Bitwarden and Vaultwarden each at least once.
+- 8 weeks in beta with no bug that lost or damaged vault data, and no open
+  security report.
+- No serious bug open.
+- An upgrade from one beta to the next done with a migration, and tested.
+- Docker Hub pulls of at least 0.01% of the pulls of `vaultwarden/server`,
+  measured on the day of the decision.
+
+The release candidate becomes 1.0.0 after another 8 weeks with no serious
+bug. Patch releases (1.0.0-beta.2, 1.0.0-beta.3 and so on) come whenever
+something is fixed or the Bitwarden CLI has a new release.
+
 ## 0.1.0-alpha.1
 
 The first release: a web UI and MCP server that shows a Bitwarden or
