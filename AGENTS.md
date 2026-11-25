@@ -63,7 +63,13 @@ A change to what a user sees updates the page under `docs/` that covers it
 
 A change that alters what a docs test in `backend/tests/e2e/docs` shows
 reruns those tests (`scripts/docs-shots -k NAME`) and commits the changed
-images in `docs/images` in the same commit. A new or renamed image keeps
+images in `docs/images` in the same commit. The pre-push hook
+(`scripts/install-hooks` installs it, once per clone) makes sure of it: it
+runs `scripts/ci` on what is pushed, and for a push that touches
+`frontend/src/` or `backend/tests/e2e/docs/` it takes every screenshot again,
+commits the changed images as "Take the docs screenshots again" and stops the
+push, which then goes through when pushed again (dev/testing.md, "The
+pre-push hook"). A new or renamed image keeps
 `scripts/docs-lint` passing: every image is linked from some markdown file
 and every image link points to a file.
 

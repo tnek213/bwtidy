@@ -1,0 +1,9 @@
+#!/bin/sh
+# git's pre-push hook (scripts/install-hooks links it). It runs scripts/pre-push of the checkout
+# being pushed from, whichever checkout the link points into, so the checks match its code.
+top=$(git rev-parse --show-toplevel) || exit 1
+if [ ! -x "$top/scripts/pre-push" ]; then
+    echo "pre-push: $top has no scripts/pre-push, nothing checked" >&2
+    exit 0
+fi
+exec "$top/scripts/pre-push" "$@"
