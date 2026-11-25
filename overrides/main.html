@@ -12,9 +12,20 @@ CDN, as a running bwtidy serves the site offline. -#}
     [data-md-color-scheme="slate"] .md-banner {
       background-color: #f0b400;
     }
+    /* one slim line: the colour draws the eye, the size need not */
     .md-banner .md-banner__inner {
-      font-size: .75rem;
+      margin-top: .15rem;
+      margin-bottom: .15rem;
+      font-size: .6rem;
       font-weight: 700;
+    }
+    .md-banner .md-banner__inner p[data-disclaimer] {
+      max-width: none;
+      margin: 0;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .md-banner .md-banner__inner a,
     .md-banner .md-banner__inner a:hover {
@@ -25,9 +36,29 @@ CDN, as a running bwtidy serves the site offline. -#}
     .md-grid {
       max-width: 80rem;
     }
-    /* the theme breaks code anywhere, which splits a variable name over lines in a table */
-    .md-typeset table:not([class]) td code {
+    /* running text keeps a readable line length, while pictures, tables and code keep the whole column */
+    .md-typeset p:not(:has(img)),
+    .md-typeset li:not(:has(img, table, pre)),
+    .md-typeset blockquote:not(:has(img, table, pre)),
+    .md-typeset .admonition:not(:has(img, table, pre)),
+    .md-typeset details:not(:has(img, table, pre)) {
+      max-width: 80ch;
+    }
+    .md-typeset table p,
+    .md-typeset table li {
+      max-width: none;
+    }
+    /* inline code stays on one line, in text and tables alike (the theme breaks it anywhere, even
+       at a hyphen), and may break only on a narrow screen where it would not fit at all */
+    .md-typeset :not(pre) > code {
+      white-space: nowrap;
       word-break: normal;
+    }
+    @media screen and (max-width: 44.9375em) {
+      .md-typeset :not(pre) > code {
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
     }
     /* a screenshot of a white UI on a white page needs an edge */
     .md-typeset img:not(.twemoji):not(.emojione):not(.gemoji) {

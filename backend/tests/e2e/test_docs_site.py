@@ -59,14 +59,47 @@ def test_search_finds_pages(page: Page):
 THEME_COLUMN = 810
 
 
-def test_the_content_column_is_wide_and_keeps_a_variable_on_one_line(page: Page):
+def test_the_content_column_is_wide_and_keeps_inline_code_on_one_line(page: Page):
     page.goto("/docs/reference/configuration/")
     width = page.locator(".md-content").evaluate("e => e.getBoundingClientRect().width")
     assert width > THEME_COLUMN + 150
-    variables = page.locator("article td:first-child code")
-    assert variables.count() > 10
-    split = variables.evaluate_all("codes => codes.filter(c => c.getClientRects().length > 1)")
+    codes = page.locator("article :not(pre) > code")
+    assert codes.count() > 10
+    split = codes.evaluate_all(
+        "codes => codes.filter(c => c.getClientRects().length > 1).map(c => c.textContent)"
+    )
     assert split == []
+    assert page.locator("article td code", has_text="bwtidy-backups").count() > 0
+
+
+def test_running_text_wraps_at_a_readable_length_while_pictures_use_the_column(page: Page):
+    page.goto("/docs/tutorial/first-cleanup/")
+    column = page.locator("article").evaluate("e => e.getBoundingClientRect().width")
+    ## the longest line a paragraph may hold, measured in the paragraph's own font
+    limit = page.locator("article p").first.evaluate(
+        "p => { const s = document.createElement('span'); s.textContent = '0'.repeat(80);"
+        " p.appendChild(s); const w = s.getBoundingClientRect().width; s.remove(); return w }"
+    )
+    text = page.locator("article p:not(:has(img))")
+    assert text.count() > 3
+    widest = max(text.evaluate_all("ps => ps.map(p => p.getBoundingClientRect().width)"))
+    assert widest <= limit * 1.01
+    assert widest < column - 150
+    picture = page.locator("article p:has(img)").first
+    assert picture.evaluate("p => p.getBoundingClientRect().width") > column - 50
+    page.goto("/docs/reference/configuration/")
+    table = page.locator("article table").first
+    assert table.evaluate("t => t.getBoundingClientRect().width") > limit + 100
+
+
+def test_the_disclaimer_banner_is_one_slim_line(page: Page):
+    page.goto("/docs/reference/configuration/")
+    text = page.locator("[data-disclaimer]")
+    expect(text).to_be_visible()
+    height = text.evaluate("p => p.getBoundingClientRect().height")
+    line = text.evaluate("p => parseFloat(getComputedStyle(p).lineHeight)")
+    assert height < line * 1.5
+    assert page.locator(".md-banner").evaluate("b => b.getBoundingClientRect().height") < 30
 
 
 def test_a_picture_shown_smaller_opens_larger_from_the_site_itself(page: Page):
