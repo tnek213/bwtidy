@@ -194,3 +194,53 @@ def test_last_commit_is_the_checkouts_in_the_image_workflows_form(docs_site):
         pytest.skip("not a git checkout")
     assert commit is not None
     assert len(commit.split()[0]) == 6 and len(commit.split()[1]) >= 7
+
+
+PICTURE = '<p><img alt="x" src="a.png"></p>'
+CODE = '<div class="highlight"><pre><code>x</code></pre></div>'
+
+
+def page(*parts: str) -> str:
+    return "<body>\n" + "\n".join(parts) + "\n</body>"
+
+
+def test_broken_lists_finds_a_list_that_restarts_after_a_picture(tmp_path, docs_site):
+    html = page("<ol><li>One</li><li>Two</li></ol>", PICTURE, "<ol><li>Three</li></ol>")
+    write(tmp_path, "tutorial/a/index.html", html)
+    assert docs_site.broken_lists(tmp_path) == [
+        "tutorial/a/index.html:4: an ordered list starts at 1 again after a picture or code block"
+    ]
+
+
+def test_broken_lists_finds_a_list_that_restarts_after_a_code_block(tmp_path, docs_site):
+    write(tmp_path, "a/index.html", page("<ol><li>One</li></ol>", CODE, "<ol><li>Two</li></ol>"))
+    assert len(docs_site.broken_lists(tmp_path)) == 1
+
+
+def test_broken_lists_passes_one_list_with_a_picture_inside(tmp_path, docs_site):
+    item = f"<li><p>One</p>{PICTURE}{CODE}</li><li>Two</li>"
+    write(tmp_path, "a/index.html", page(f"<ol>{item}</ol>"))
+    assert docs_site.broken_lists(tmp_path) == []
+
+
+def test_broken_lists_passes_two_lists_with_text_between(tmp_path, docs_site):
+    html = page("<ol><li>One</li></ol>", "<p>Then, a new part.</p>", "<ol><li>One</li></ol>")
+    write(tmp_path, "a/index.html", html)
+    assert docs_site.broken_lists(tmp_path) == []
+
+
+def test_broken_lists_passes_a_list_with_a_start_number(tmp_path, docs_site):
+    html = page("<ol><li>One</li></ol>", PICTURE, '<ol start="2"><li>Two</li></ol>')
+    write(tmp_path, "a/index.html", html)
+    assert docs_site.broken_lists(tmp_path) == []
+
+
+def test_build_fails_naming_the_page_and_line_of_a_broken_list(
+    repo, monkeypatch, capsys, docs_site
+):
+    broken = page("<p data-disclaimer></p><ol><li>One</li></ol>", PICTURE, "<ol><li>Two</li></ol>")
+    fake_zensical(monkeypatch, {"how-to/run/index.html": broken}, docs_site)
+    assert docs_site.build(None) == 1
+    assert (
+        "docs-site: how-to/run/index.html:4: an ordered list starts at 1" in capsys.readouterr().err
+    )

@@ -27,7 +27,7 @@ matches its format, never whether the value is right.
    it matches and a cross when it does not, red when it is on the wrong
    side.
 
-   ![The New datatype dialog filled in for Web address, with two examples ticked, two counter-examples crossed and Save outlined](../images/tutorial-datatype-editor.png)
+    ![The New datatype dialog filled in for Web address, with two examples ticked, two counter-examples crossed and Save outlined](../images/tutorial-datatype-editor.png)
 
 5. Click Save.
 
@@ -48,7 +48,7 @@ matches it when it has the template's type and a value in every coordinate
 4. In the row of `login.uris`, pick Web address as the Datatype (1), then
    click Save (2).
 
-   ![The coordinates of the new template, login.username, login.password and login.uris, with the datatype Web address and Save outlined and numbered 1 and 2](../images/tutorial-template-editor.png)
+    ![The coordinates of the new template, login.username, login.password and login.uris, with the datatype Web address and Save outlined and numbered 1 and 2](../images/tutorial-template-editor.png)
 
 bwtidy keeps the datatype and the template in its own note in your vault
 and saves them right away, see [The bwtidy note](../explanation/tool-note.md).
@@ -93,11 +93,11 @@ cannot fill them in. The template turns them into logins.
    `fields.Password` if you did not rename it in the first tutorial). Leave
    `login.uris` empty and click Convert.
 
-   ![The dialog Convert Old webshop to a template, with the mapping of its username and password, login.uris left empty and Convert outlined](../images/tutorial-convert-dialog.png)
+    ![The dialog Convert Old webshop to a template, with the mapping of its username and password, login.uris left empty and Convert outlined](../images/tutorial-convert-dialog.png)
 
-   The note is a Secure note and the template a Login, so bwtidy creates a
-   new login with the values and moves the note to the trash, as the
-   dialog says.
+    The note is a Secure note and the template a Login, so bwtidy creates a
+    new login with the values and moves the note to the trash, as the
+    dialog says.
 
 4. Do the same for School portal.
 5. Clear Search and click Commit now in the app bar.
@@ -114,7 +114,7 @@ with an empty mark: they still lack an address.
    The line under it says how far the address is from Web address, and
    what it expected.
 
-   ![The uris dialog of Old webshop with shop.example.test typed and the line matches format 58%, expected h at position 1 under it](../images/tutorial-uri-check.png)
+    ![The uris dialog of Old webshop with shop.example.test typed and the line matches format 58%, expected h at position 1 under it](../images/tutorial-uri-check.png)
 
 2. Put `https://` in front. The line says matches format. Click Save.
 3. Give School portal the address `https://school.example.test` the same
