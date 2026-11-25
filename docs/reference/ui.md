@@ -42,7 +42,7 @@ items have a value in it.
   match its [datatype](#datatypes) (an empty one too), Partial those that
   match in part.
 - Hide empty columns: hides the columns with no value in the shown rows.
-- Hide rare field columns: hides the columns that went into Rare fields (see
+- Hide rare field columns: hides the columns that Rare fields has taken in (see
   [Cells](#cells)). Off while Rare fields is off, and on by itself once N is
   above 0.
 - Show queued changes: shows the changes waiting in the queue as if they

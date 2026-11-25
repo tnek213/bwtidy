@@ -29,32 +29,34 @@ changed your master password can still open the old backups (see
 
 ## How bwtidy writes it
 
-- The first login creates the note when there is none, and a login updates
-  its password fields when the master password changed. These writes go
-  straight to `bw serve`, without the queue or a backup, as they run before
-  the session starts.
-- Every other change saves one section through the queue, like any edit,
-  with a backup first. The section is applied to the note as it is at that
-  moment, so two saves from two tabs both land. When an item is converted
-  to a new one, its generator setting and To fill in entry move with it in
-  the same write.
-- The To fill in list keeps itself current: whenever bwtidy loads the vault
-  it drops the fields that have a value now (filled in bwtidy or any other
-  Bitwarden app) and items that are gone, and queues that change.
+The first login creates the note when there is none, and a login updates
+its password fields when the master password changed. These writes go
+straight to `bw serve`, without the queue or a backup, as they run before
+the session starts.
+
+Every other change saves one section through the queue, like any edit, with
+a backup first. The section is applied to the note as it is at that moment,
+so two saves from two tabs both land. When an item is converted to a new
+one, its generator setting and To fill in entry move with it in the same
+write.
+
+The To fill in list keeps itself current: whenever bwtidy loads the vault it
+drops the fields that have a value now (filled in bwtidy or any other
+Bitwarden app) and items that are gone, and queues that change.
 
 ## How it is protected
 
-- In the grid its row is grey and read-only, and bwtidy refuses every other
-  edit or restore of the note. Templates are edited on the Types page.
-- bwtidy remembers the note by its id, so a rename loses nothing (see
-  [Renaming the note](#renaming-the-note)). Settings, Display can hide its
-  row.
-- An agent never sees it, not even in a list.
-- bwtidy writes the two password fields as hidden fields, whatever type you
-  gave them, and the next login makes one you turned into a text field
-  hidden again. If you move the note into an organization, the next login
-  that has to write them fails and asks you to move it back to your
-  personal vault, so your master password never lands in a shared item.
+In the grid its row is grey and read-only, and bwtidy refuses every other
+edit or restore of the note. Templates are edited on the Types page. bwtidy
+remembers the note by its id, so a rename loses nothing (see [Renaming the
+note](#renaming-the-note)). Settings, Display can hide its row. An agent
+never sees it, not even in a list.
+
+bwtidy writes the two password fields as hidden fields, whatever type you
+gave them, and the next login makes one you turned into a text field hidden
+again. If you move the note into an organization, the next login that has to
+write them fails and asks you to move it back to your personal vault, so
+your master password never lands in a shared item.
 
 ## Renaming the note
 

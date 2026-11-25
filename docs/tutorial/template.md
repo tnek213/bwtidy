@@ -132,10 +132,10 @@ mark.
 
 ## Find it in the Change log
 
-Click Change log. The conversion of the two notes went in one write (1),
-the two addresses in the next (2), each with the backup bwtidy took right
-before it. The conversion rows name the notes by their id, as they are in
-the trash now. Further down, the saves of the datatype and the template
+Click Change log. The conversion of the two notes goes into one write (1),
+the two addresses into the next (2), each with the backup bwtidy takes right
+before it. The conversion rows name the notes by their id, as the notes are in
+the trash. Further down, the saves of the datatype and the template
 have rows of their own, as writes to the bwtidy note.
 
 ![The Change log with the two address rows and the two Apply template rows, the Backup of each write outlined and numbered 1 and 2](../images/tutorial-template-change-log.png)

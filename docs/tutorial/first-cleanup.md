@@ -90,14 +90,14 @@ then writes both edits. A spinner in the app bar shows while it works.
 
 ## Find it in the Change log
 
-Click Change log. It lists every write, newest first. Your two edits went
-in one write, with a row each that names the items they changed.
+Click Change log. It lists every write, newest first. Your two edits go
+into one write, with a row each that names the items they changed.
 
 ![The Change log with the two written edits, their backup outlined and the backup's own row outlined below them](../images/tutorial-change-log.png)
 
 The Backup column names the backup of the vault as it was right before the
 write. That backup's own row, further down, links the file, encrypted with
-your master password. The backup at the top was taken right after the
+your master password. The backup at the top is taken right after the
 write, ready for the next one.
 
 Changed your mind? Restore on an edit's row puts its items back as that
