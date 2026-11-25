@@ -38,6 +38,12 @@ runs it with `uv run --locked --only-group docs`. `serve` takes Zensical's optio
 after it (`--dev-addr localhost:8001` when the port is taken) and leaves
 `site/` and `.cache/` in the checkout, both git-ignored.
 
+The build puts the site's version into its copy of `docs/restore.md`, on the
+line `Written for bwtidy COMMIT.`, as every backup does in its `RESTORE.md`:
+`backend/pyproject.toml`'s version as semver spells it, then the commit from
+`BWTIDY_COMMIT` (the Dockerfile's docs stage takes it as a build arg) or else
+the checkout's last commit. The page in the checkout keeps `COMMIT`.
+
 The theme overrides are in `overrides/` (outside `docs/`, so they are not
 built as pages). Its `main.html` fills the theme's `announce` block with the
 alpha disclaimer banner on every page, which links to the disclaimer at the

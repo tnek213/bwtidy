@@ -1786,7 +1786,9 @@ were taken inside the write.
   `BWTIDY_COMMIT` is set, which a deployed worker's is not. Reason: with the repository gone, the backup itself says
   how to restore it. When the file cannot be read the backup is written
   without it and the log says so (a warning): a backup never fails for its
-  manual.
+  manual. The documentation site's copy of the page fills in the same line
+  with the version the site is built for (`scripts/docs-site build`), so the
+  page names a version wherever it is read.
 - Completeness check before the zip is built: every attachment listed on an
   item in `raw/items.json` and `raw/trash.json` has its member, and the
   member's length fits the listed `size`. That size is the encrypted blob's

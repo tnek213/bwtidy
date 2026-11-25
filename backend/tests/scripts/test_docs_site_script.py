@@ -1,9 +1,14 @@
+import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from bwtidy.backups.collect import RESTORE_DOC_COMMIT
+
 BANNER = "<p data-disclaimer>bwtidy is alpha software</p>"
+REAL_ROOT = Path(__file__).resolve().parents[3]
+COMMIT = "261111 7db8830"
 
 
 @pytest.fixture(scope="module")
@@ -20,24 +25,37 @@ def write(root: Path, name: str, text: str) -> None:
 @pytest.fixture
 def repo(tmp_path: Path, monkeypatch, docs_site) -> Path:
     root = tmp_path / "repo"
-    write(root, "zensical.toml", '[project]\nnav = ["index.md", "how-to/run.md"]\n')
+    nav = '["index.md", "how-to/run.md", "restore.md"]'
+    write(root, "zensical.toml", f"[project]\nnav = {nav}\n")
     write(root, "docs/index.md", "# Home\n")
     write(root, "docs/how-to/run.md", "# Run\n")
+    write(root, "docs/restore.md", f"# Restore\n\n{RESTORE_DOC_COMMIT} The project: there\n")
     write(root, "overrides/main.html", "{% extends 'base.html' %}\n")
+    write(root, "backend/pyproject.toml", '[project]\nname = "bwtidy"\nversion = "0.1.0a1"\n')
+    version = root / "backend" / "src" / "bwtidy" / "version.py"
+    version.parent.mkdir(parents=True)
+    shutil.copy(REAL_ROOT / "backend" / "src" / "bwtidy" / "version.py", version)
     monkeypatch.setattr(docs_site, "ROOT", root)
+    ## the commit as the Dockerfile passes it, so no test runs git
+    monkeypatch.setenv("BWTIDY_COMMIT", COMMIT)
     return root
 
 
-def fake_zensical(monkeypatch, pages: dict[str, str], docs_site) -> None:
-    """Stand in for Zensical: write the given pages into site/ of the build directory."""
+def fake_zensical(monkeypatch, pages: dict[str, str], docs_site) -> dict[str, str]:
+    """Stand in for Zensical: write the given pages into site/ of the build directory.
+
+    Returns what it saw: the restore page it was handed, under "restore.md"."""
+    seen: dict[str, str] = {}
 
     def run(cmd, cwd):
         assert (Path(cwd) / "overrides" / "main.html").is_file()
+        seen["restore.md"] = (Path(cwd) / "docs" / "restore.md").read_text()
         for name, text in pages.items():
             write(Path(cwd) / "site", name, text)
         return subprocess.CompletedProcess(cmd, 0)
 
     monkeypatch.setattr(docs_site.subprocess, "run", run)
+    return seen
 
 
 def test_without_banner_names_the_bare_pages(tmp_path, docs_site):
@@ -138,3 +156,41 @@ def test_a_failure_while_putting_the_site_in_place_restores_the_old_one(
     assert (target / "index.html").read_text() == "old"
     assert (target / "sitemap.xml").read_text() == "old"
     assert sorted(p.name for p in tmp_path.iterdir()) == ["out", "repo"]
+
+
+def test_the_restore_page_names_the_version_the_site_is_built_for(repo, monkeypatch, docs_site):
+    """As every backup's RESTORE.md names the image's version (backups/collect.py)."""
+    seen = fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 0
+    assert seen["restore.md"] == (
+        f"# Restore\n\nWritten for bwtidy 0.1.0-alpha.1 ({COMMIT}). The project: there\n"
+    )
+    assert RESTORE_DOC_COMMIT in (repo / "docs" / "restore.md").read_text()
+
+
+def test_without_a_commit_the_restore_page_names_the_version_alone(repo, monkeypatch, docs_site):
+    monkeypatch.delenv("BWTIDY_COMMIT")
+    monkeypatch.setattr(docs_site, "last_commit", lambda: None)
+    seen = fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 0
+    assert "Written for bwtidy 0.1.0-alpha.1. The project" in seen["restore.md"]
+
+
+def test_build_fails_when_the_restore_page_lacks_the_line(repo, monkeypatch, capsys, docs_site):
+    write(repo, "docs/restore.md", "# Restore\n\nWritten for bwtidy.\n")
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 1
+    assert "docs/restore.md has no line 'Written for bwtidy COMMIT.'" in capsys.readouterr().err
+
+
+def test_the_line_is_the_one_backups_fill_in(docs_site):
+    assert docs_site.RESTORE_DOC_COMMIT == RESTORE_DOC_COMMIT
+    assert RESTORE_DOC_COMMIT in (REAL_ROOT / "docs" / "restore.md").read_text()
+
+
+def test_last_commit_is_the_checkouts_in_the_image_workflows_form(docs_site):
+    commit = docs_site.last_commit()
+    if not (REAL_ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
+    assert commit is not None
+    assert len(commit.split()[0]) == 6 and len(commit.split()[1]) >= 7

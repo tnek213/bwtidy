@@ -23,8 +23,16 @@ naming each such page. Zensical writes its output and its cache inside the proje
 copies zensical.toml, docs/ and overrides/ into a temp directory and builds there: nothing in the
 checkout changes and two builds never meet. `serve` runs in the checkout and leaves site/ and
 .cache/ there, both git-ignored.
+
+Every backup holds docs/restore.md as RESTORE.md, with the version of the image in place of
+COMMIT on its line "Written for bwtidy COMMIT." (RESTORE_DOC_COMMIT in backups/collect.py).
+`build` does the same in its copy, with the version the site is built for: the one of
+backend/pyproject.toml spelled the semver way, then the commit, from BWTIDY_COMMIT (the
+Dockerfile passes it) or else the checkout's last commit, as `0.1.0-alpha.1 (261111 7db8830)`.
+It fails when the page lacks the line. `serve` shows the page as it is.
 """
 
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -42,6 +50,10 @@ CONFIG = "zensical.toml"
 DOCS = "docs"
 OVERRIDES = "overrides"
 BANNER_MARKER = "data-disclaimer"
+## the line of the restore page that the version goes into, the same as RESTORE_DOC_COMMIT in
+## backend/src/bwtidy/backups/collect.py (a test checks they agree)
+RESTORE_PAGE = "restore.md"
+RESTORE_DOC_COMMIT = "Written for bwtidy COMMIT."
 ## what Zensical writes at the top of every site, so a directory that holds both is a build
 BUILD_MARKERS = ("index.html", "sitemap.xml")
 ZENSICAL = [
@@ -75,6 +87,48 @@ def left_out() -> list[str]:
         nav = set(nav_pages(tomllib.load(file)["project"]["nav"]))
     pages = (path.relative_to(ROOT / DOCS).as_posix() for path in (ROOT / DOCS).rglob("*.md"))
     return sorted(page for page in pages if page not in nav)
+
+
+def last_commit() -> str | None:
+    """The checkout's last commit as the image workflow names it, None outside a git checkout."""
+    try:
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%cd %h", "--date=format:%y%m%d"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def site_version() -> str:
+    """The version the site is built for, as /api/health spells it."""
+    with (ROOT / "backend" / "pyproject.toml").open("rb") as file:
+        version = tomllib.load(file)["project"]["version"]
+    ## stdlib only, so it loads by path without bwtidy's dependencies
+    path = ROOT / "backend" / "src" / "bwtidy" / "version.py"
+    spec = importlib.util.spec_from_file_location("bwtidy_version", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    semver = module.semver(version)
+    commit = os.environ.get("BWTIDY_COMMIT", "").strip() or last_commit()
+    return f"{semver} ({commit})" if commit else semver
+
+
+def fill_in_version(docs: Path, version: str) -> bool:
+    """Put the version into the copy of the restore page, False when it lacks the line."""
+    page = docs / RESTORE_PAGE
+    text = page.read_text(encoding="utf-8")
+    if RESTORE_DOC_COMMIT not in text:
+        return False
+    filled = text.replace(RESTORE_DOC_COMMIT, f"Written for bwtidy {version}.", 1)
+    page.write_text(filled, encoding="utf-8")
+    return True
 
 
 def without_banner(site: Path) -> list[str]:
@@ -135,6 +189,12 @@ def build(target: Path | None) -> int:
         shutil.copy2(ROOT / CONFIG, project / CONFIG)
         shutil.copytree(ROOT / DOCS, project / DOCS)
         shutil.copytree(ROOT / OVERRIDES, project / OVERRIDES)
+        if not fill_in_version(project / DOCS, site_version()):
+            print(
+                f"docs-site: docs/{RESTORE_PAGE} has no line {RESTORE_DOC_COMMIT!r}",
+                file=sys.stderr,
+            )
+            return 1
         built = subprocess.run([*ZENSICAL, "build", "--strict"], cwd=project)
         if built.returncode != 0:
             return 1
