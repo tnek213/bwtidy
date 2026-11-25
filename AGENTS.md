@@ -137,4 +137,5 @@ the site's strict build in `scripts/ci` fails (`scripts/docs-site`).
   License section, the About page, the authors in `backend/pyproject.toml`).
   A rule carries its reason, never its date, its history or who made it.
   Examples use placeholder hosts such as https://bwtidy.example.
-- Commit messages: one imperative line, capitalized, no body.
+- Commit messages follow the style in CONTRIBUTING.md (Commits). An agent
+  writes the subject only, never a body, and keeps it at most 72 characters.
