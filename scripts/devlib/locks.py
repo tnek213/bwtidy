@@ -1,10 +1,13 @@
 """The npm lock files: each lists what its package.json asks for, else npm ci refuses it.
 
-scripts/ci runs npm ci only in a fresh worktree, so this check finds a package.json changed
-without npm install before a build or the CI workflow does. The backend needs no such check:
-every uv call of the scripts runs with --locked, which fails on a stale backend/uv.lock.
+scripts/ci runs npm ci in a fresh worktree and whenever the frontend lock file differs from the
+one node_modules was installed from (a stamp file, see npm_install_needed), so this check finds
+a package.json changed without npm install before a build or the CI workflow does.
+The backend needs no such check: every uv call of the scripts runs with --locked, which fails
+on a stale backend/uv.lock.
 """
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -35,3 +38,24 @@ def lock_mismatch(root: Path = ROOT) -> str | None:
     """Every npm lock file that does not match its package.json, one line each, else None."""
     problems = [npm_lock_mismatch(project, root) for project in NPM_PROJECTS]
     return "\n".join(p for p in problems if p) or None
+
+
+## npm's hidden lockfile omits packages skipped for the platform, so it cannot be compared
+STAMP = Path("node_modules") / ".bwtidy-lock-sha256"
+
+
+def _lock_sha256(project: Path, root: Path) -> str:
+    return hashlib.sha256((root / project / "package-lock.json").read_bytes()).hexdigest()
+
+
+def npm_install_needed(project: Path, root: Path = ROOT) -> bool:
+    """Whether npm ci must run: no node_modules, or no stamp of the current lock file."""
+    stamp = root / project / STAMP
+    if not stamp.is_file():
+        return True
+    return stamp.read_text().strip() != _lock_sha256(project, root)
+
+
+def write_npm_stamp(project: Path, root: Path = ROOT) -> None:
+    """Record the lock file PROJECT/node_modules was just installed from."""
+    (root / project / STAMP).write_text(_lock_sha256(project, root) + "\n")

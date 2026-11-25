@@ -588,10 +588,13 @@ Besides lint, types, the build and the tests, `scripts/ci` runs these.
 Dependencies change only through the lock files, and every script installs
 from them locked (AGENTS.md, Checks): `uv sync --locked` and `uv run --locked`
 fail on a `backend/uv.lock` that is out of date, `npm ci` on a
-`package-lock.json` that does not match its `package.json`. Since `scripts/ci`
-runs `npm ci` only in a fresh worktree, its check `lock files`
-(`scripts/devlib/locks.py`) compares each npm lock file (`frontend/`,
-`docker/bitwarden-cli/`) with its `package.json` every time.
+`package-lock.json` that does not match its `package.json`. `scripts/ci` runs
+`npm ci` in a fresh worktree and again when `frontend/package-lock.json`
+changed since the last install (it stamps
+`frontend/node_modules/.bwtidy-lock-sha256` with the lock file's sha256). Its
+check `lock files` (`scripts/devlib/locks.py`) compares each npm lock
+file (`frontend/`, `docker/bitwarden-cli/`) with its `package.json` every
+time.
 
 Each dependency is declared with a compatible range in npm's caret sense
 (AGENTS.md, Checks), which `tests/repo/test_dependency_ranges.py` checks for

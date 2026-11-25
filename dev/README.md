@@ -21,7 +21,7 @@ The other pages of this guide:
 ```sh
 uv sync --locked --project backend   # backend venv with dev tools
 npm ci --prefix frontend             # frontend dependencies
-scripts/ci                           # all fast checks, backend and frontend
+scripts/ci                           # all fast checks, reinstalls the frontend when its lock changed
 scripts/ci --fix                     # let ruff fix what it can, then check
 scripts/install-hooks                # once: test every push, take the docs screenshots of a UI change
 ```

@@ -41,6 +41,7 @@ from devlib.paths import ROOT, SCRIPTS
 
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
+FRONTEND_DIR = Path("frontend")
 
 ## scripts carry no .py, so ruff and ty skip them unless they are named outright
 SCRIPT_FILES = [str(p) for p in sorted(SCRIPTS.iterdir()) if p.is_file()]
@@ -175,8 +176,11 @@ def run(check: Check, fix: bool) -> str | None:
 def ensure_deps() -> None:
     ## a fresh worktree has neither .venv nor node_modules
     subprocess.run(["uv", "sync", "--locked", "--quiet"], cwd=BACKEND, check=True)
-    if not (FRONTEND / "node_modules").exists():
+    if locks.npm_install_needed(FRONTEND_DIR):
+        if (FRONTEND / "node_modules").exists():
+            print("ci: frontend/package-lock.json changed, running npm ci", flush=True)
         subprocess.run(["npm", "ci", "--no-fund", "--no-audit"], cwd=FRONTEND, check=True)
+        locks.write_npm_stamp(FRONTEND_DIR)
 
 
 def main(args: list[str]) -> int:
