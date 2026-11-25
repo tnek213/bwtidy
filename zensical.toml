@@ -12,6 +12,8 @@ nav = [
   { "Home" = "index.md" },
   { "Tutorial" = [
     "tutorial/first-cleanup.md",
+    "tutorial/template.md",
+    "tutorial/mcp.md",
   ] },
   { "How-to guides" = [
     "how-to/run.md",

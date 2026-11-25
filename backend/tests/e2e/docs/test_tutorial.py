@@ -10,7 +10,6 @@ their order.
 """
 
 import re
-import time
 from datetime import UTC, datetime
 
 from playwright.sync_api import Page, expect
@@ -19,7 +18,14 @@ from support.elsewhere import active_ids, last_change_id, put_back
 from support.login import EMAIL, PASSWORD, SERVER
 from support.pages import UNLOCK_TIMEOUT, cell, grid, settle
 
-from tests.support.docs_shots import GROUP, FixedValues, parse, shot, wait_for_grid
+from tests.support.docs_shots import (
+    GROUP,
+    FixedValues,
+    hide_revision_dates,
+    shot,
+    wait_for_grid,
+    wait_for_next_backup,
+)
 
 ## the item whose name the tutorial edits, and its new name
 RENAMED_ITEM = "Library"
@@ -34,8 +40,6 @@ DEFAULT_AUTO_COMMIT = {"afterSeconds": 180, "maxEntries": 20}
 ## the newest instant the Queue and the Change log show
 QUEUE_NEWEST = datetime(2026, 11, 17, 9, 41, 35, tzinfo=UTC)
 CHANGE_LOG_NEWEST = datetime(2026, 11, 17, 9, 42, 44, tzinfo=UTC)
-## seconds for the backup a write starts in the background
-BACKUP_TIMEOUT = 120
 
 
 def test_tutorial(page: Page, api: Api) -> None:
@@ -195,28 +199,4 @@ def clean_up(page: Page, api: Api) -> None:
         frame="band",
         around=[log.locator("thead"), backup],
         highlight=[used, backup],
-    )
-
-
-def wait_for_next_backup(api: Api) -> None:
-    """Wait for the backup a write starts in the background, so the Change log shows it."""
-    newest = max(api.get("/api/change-log"), key=lambda entry: entry["id"])
-    written, used = parse(newest["at"]), newest["backup"]
-
-    def taken() -> bool:
-        return any(
-            backup["name"] != used and parse(backup["time"]) >= written
-            for backup in api.get("/api/backups")
-        )
-
-    deadline = time.monotonic() + BACKUP_TIMEOUT
-    while not taken():
-        assert time.monotonic() < deadline, "no backup after the write"
-        time.sleep(1)
-
-
-def hide_revision_dates(page: Page) -> None:
-    """A band shows revisionDate too, the date of the last seeding, which changes the image."""
-    page.locator(".ag-row .ag-cell[col-id='revisionDate']").evaluate_all(
-        "cells => cells.forEach(cell => cell.setAttribute('data-shot-hide', ''))"
     )
