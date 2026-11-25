@@ -69,6 +69,26 @@ def test_the_content_column_is_wide_and_keeps_a_variable_on_one_line(page: Page)
     assert split == []
 
 
+def test_running_text_wraps_at_a_readable_length_while_pictures_use_the_column(page: Page):
+    page.goto("/docs/tutorial/first-cleanup/")
+    column = page.locator("article").evaluate("e => e.getBoundingClientRect().width")
+    ## the longest line a paragraph may hold, measured in the paragraph's own font
+    limit = page.locator("article p").first.evaluate(
+        "p => { const s = document.createElement('span'); s.textContent = '0'.repeat(80);"
+        " p.appendChild(s); const w = s.getBoundingClientRect().width; s.remove(); return w }"
+    )
+    text = page.locator("article p:not(:has(img))")
+    assert text.count() > 3
+    widest = max(text.evaluate_all("ps => ps.map(p => p.getBoundingClientRect().width)"))
+    assert widest <= limit * 1.01
+    assert widest < column - 150
+    picture = page.locator("article p:has(img)").first
+    assert picture.evaluate("p => p.getBoundingClientRect().width") > column - 50
+    page.goto("/docs/reference/configuration/")
+    table = page.locator("article table").first
+    assert table.evaluate("t => t.getBoundingClientRect().width") > limit + 100
+
+
 def test_a_picture_shown_smaller_opens_larger_from_the_site_itself(page: Page):
     ## a running bwtidy serves the site offline, so its scripts, styles and pictures are its own
     hosts: set[str] = set()

@@ -521,8 +521,10 @@ the queue).
   FastAPI's own API pages (`/docs`, `/redoc`) are off. Without
   `BWTIDY_DOCS_DIR` there is no site. How the site is built is in
   [architecture.md](architecture.md), The container. Its content column is
-  wider than the theme's, and a click on a picture shown smaller than it is
-  opens it larger, with nothing loaded from a CDN.
+  wider than the theme's, running text keeps to at most 80 characters a
+  line while pictures, tables and code use the whole column, and a click on
+  a picture shown smaller than it is opens it larger, with nothing loaded
+  from a CDN.
 - MCP: an MCP client has no routing cookie, so a request to `/mcp` (or
   below it) is routed by its `Authorization: Bearer TOKEN` alone, a routing
   cookie plays no part. The gateway hashes the token with sha256 and looks
