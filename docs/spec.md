@@ -36,6 +36,12 @@ CLI call pays a Node startup (the login and the backups still run the CLI,
 see Backups). How bwtidy is built (what runs where, the modules, how a write
 flows, where state lives) is in [architecture.md](architecture.md).
 
+The image adds to its base, Debian 13 with Python (`python:3.13-slim-trixie`),
+only what runs: the backend's venv, Node.js with the Bitwarden CLI's installed
+packages, the static files and the docs site. npm, uv and the sources stay in
+the build stages (`dev/release.md`), because every package in the image is
+code a scanner reports on and an attacker could use.
+
 ## Worker mode
 
 Several Bitwarden accounts (for example each person's own account and a shared

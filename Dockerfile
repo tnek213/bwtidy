@@ -13,6 +13,13 @@ RUN npm ci --no-fund --no-audit
 COPY frontend/ ./
 RUN npm run build
 
+## the Bitwarden CLI and every package it brings along, as its own lock file pins them. npm stays
+## in this stage: the app stage takes node and the installed tree only.
+FROM node AS bitwarden-cli
+WORKDIR /usr/local/lib/bitwarden-cli
+COPY docker/bitwarden-cli/package.json docker/bitwarden-cli/package-lock.json ./
+RUN npm ci --no-fund --no-audit
+
 FROM python:3.13-slim-trixie@sha256:7249d5587b78209a006dc4a3b5340678f84ea729239193aa559962cd8c1fce50 AS python
 
 ## the documentation site the gateway serves at /docs/, built strictly with the Zensical that
@@ -34,15 +41,8 @@ RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
 
 FROM python AS app
 
-COPY --from=node /usr/local/bin/node /usr/local/bin/node
-COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
-## the Bitwarden CLI and every package it brings along, as its own lock file pins them
-WORKDIR /usr/local/lib/bitwarden-cli
-COPY docker/bitwarden-cli/package.json docker/bitwarden-cli/package-lock.json ./
-RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
-    && npm ci --no-fund --no-audit \
-    && npm cache clean --force \
-    && rm -rf /root/.config /root/.npm
+COPY --from=bitwarden-cli /usr/local/bin/node /usr/local/bin/node
+COPY --from=bitwarden-cli /usr/local/lib/bitwarden-cli/node_modules /usr/local/lib/bitwarden-cli/node_modules
 
 ## bw exits once it has answered instead of 2 s later (see the file). exec keeps the pid, so a
 ## SIGTERM to bw reaches node. The workers run bw as the account's uid, hence the file modes.
