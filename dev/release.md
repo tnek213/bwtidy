@@ -1,7 +1,7 @@
 # Releasing
 
-The version, the documentation site and its publishing on GitHub Pages, and
-publishing the image.
+The version and its release notes, the documentation site and its publishing
+on GitHub Pages, and publishing the image.
 
 ## The version
 
@@ -15,6 +15,14 @@ the lock files carry generated copies: the package `bwtidy` in
 names the file and both versions. After a change to the version, `uv lock` in
 `backend/` and `npm install --package-lock-only` in `frontend/` write the
 copies in the lock files.
+
+## The release notes
+
+`docs/releases.md` holds a few lines for each version, newest first, written
+for users: what the version brings, under a heading that starts with the
+version as `frontend/package.json` spells it (`## 0.1.0-alpha.1`). `scripts/ci`
+fails while it has no heading for the current version, so the entry goes into
+the commit that changes the version.
 
 ## The documentation site
 
@@ -107,9 +115,15 @@ Set it up once:
 - Make a Docker Hub personal access token with Read and Write and store it as the
   repository secret: `gh secret set DOCKERHUB_TOKEN --repo tnek213/bwtidy`.
 
-To release, bump the version in `backend/pyproject.toml` and `frontend/package.json`,
-update the lock files as [The version](#the-version) says, push, then publish
-a GitHub release with the tag `vVERSION`. That pushes `VERSION` and `latest`.
+To release:
+
+1. Write the version's entry at the top of `docs/releases.md`
+   ([The release notes](#the-release-notes)).
+2. Bump the version in `backend/pyproject.toml` and `frontend/package.json`
+   and update the lock files as [The version](#the-version) says, in the same
+   commit as the entry, then push.
+3. Publish a GitHub release with the tag `vVERSION`, its notes the text of
+   the version's entry. That pushes `VERSION` and `latest`.
 
 Every pushed image gets a signed SLSA build provenance attestation
 (`actions/attest-build-provenance`), stored on GitHub and pushed next to the image, plus

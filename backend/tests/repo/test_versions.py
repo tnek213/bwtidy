@@ -10,12 +10,15 @@ DRIFTED = "0.1.0-alpha.2"
 
 
 class FakeRepo:
-    """The four files that carry the version, under a root of their own, all in agreement."""
+    """The four files that carry the version and the release notes, under a root of their
+    own, all in agreement."""
 
     def __init__(self, root: Path) -> None:
         self.root = root
         (root / "backend").mkdir()
         (root / "frontend").mkdir()
+        (root / "docs").mkdir()
+        self.release_notes(f"# Release notes\n\n## {SEMVER}\n\nThe first.\n")
         (root / "backend" / "pyproject.toml").write_text(
             f'[project]\nname = "bwtidy"\nversion = "{PYTHON}"\n'
         )
@@ -29,6 +32,9 @@ class FakeRepo:
             '[[package]]\nname = "anyio"\nversion = "4.11.0"\n\n'
             f'[[package]]\nname = "bwtidy"\nversion = "{version}"\n'
         )
+
+    def release_notes(self, text: str) -> None:
+        (self.root / "docs" / "releases.md").write_text(text)
 
     def package_json(self, version: str) -> None:
         (self.root / "frontend" / "package.json").write_text(
@@ -108,6 +114,50 @@ def test_ci_names_a_uv_lock_without_bwtidy(repo):
     mismatch = versions.version_mismatch()
     assert mismatch is not None
     assert "backend/uv.lock has no package bwtidy" in mismatch
+
+
+def test_ci_names_release_notes_without_the_version(repo):
+    repo.release_notes("# Release notes\n\n## 0.0.9\n\nOlder.\n")
+    assert versions.version_mismatch() == (
+        f"docs/releases.md has no heading for {SEMVER}, the version as frontend/package.json "
+        f"spells it: write its release notes under '## {SEMVER}' "
+        "(dev/release.md, The release notes)"
+    )
+
+
+def test_a_longer_version_is_not_the_version(repo):
+    repo.release_notes(f"# Release notes\n\n## {SEMVER}0\n\nThe tenth alpha.\n")
+    mismatch = versions.version_mismatch()
+    assert mismatch is not None
+    assert mismatch.startswith(f"docs/releases.md has no heading for {SEMVER},")
+
+
+def test_the_version_in_prose_is_no_heading(repo):
+    repo.release_notes(f"# Release notes\n\nSince {SEMVER} it can do more.\n")
+    assert versions.version_mismatch() is not None
+
+
+def test_a_heading_with_more_after_the_version_counts(repo):
+    repo.release_notes(f"# Release notes\n\n### {SEMVER} (2026-11-25)\n\nThe first.\n")
+    assert versions.version_mismatch() is None
+
+
+def test_ci_names_missing_release_notes(repo):
+    (repo.root / "docs" / "releases.md").unlink()
+    mismatch = versions.version_mismatch()
+    assert mismatch is not None
+    assert mismatch.startswith("cannot read docs/releases.md:")
+
+
+def test_ci_names_both_a_drifted_package_json_and_missing_release_notes(repo):
+    repo.package_json(DRIFTED)
+    repo.release_notes(f"# Release notes\n\n## {DRIFTED}\n\nToo early.\n")
+    mismatch = versions.version_mismatch()
+    assert mismatch is not None
+    assert [line.split(" ")[0] for line in mismatch.splitlines()] == [
+        "frontend/package.json",
+        "docs/releases.md",
+    ]
 
 
 def test_health_text_is_the_version_and_the_commit():

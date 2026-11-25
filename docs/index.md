@@ -72,6 +72,7 @@ How each part works is under [Explanation](#explanation).
   its parameters.
 - [Configuration](reference/configuration.md): every environment variable
   and where bwtidy keeps its files.
+- [Release notes](releases.md): what each version brings.
 
 ## Explanation
 

@@ -2734,7 +2734,9 @@ way in `bwtidy/version.py` (`semver`), the one conversion.
 and the lock files carry generated copies (the package `bwtidy` in
 `backend/uv.lock`, the `version` and `packages[""].version` of
 `frontend/package-lock.json`). `scripts/ci` fails when one of them differs
-from pyproject's, naming the file and both versions. The image knows the
+from pyproject's, naming the file and both versions, and when the release
+notes (`docs/releases.md`) have no heading for the version in semver's
+spelling. Reason: every release tells its users what it brings. The image knows the
 commit it was built from as the committer date (YYMMDD), a space and the
 short git hash, like `261028 f2f4299`: build arg `BWTIDY_COMMIT` (empty
 without it, since the build context has no `.git`), passed by compose from
