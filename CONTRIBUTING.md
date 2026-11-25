@@ -13,7 +13,9 @@ behavior that breaks it to tnek213.recollect098@slmail.me.
 Discuss a new feature first, in a "Feature request" issue or under Ideas in
 the Discussions, before you write it. Not every feature fits what bwtidy is
 for, and talking first saves you work on a change that will not go in. A bug
-fix or a docs fix can go straight to a pull request.
+fix or a docs fix can go straight to a pull request. Every docs page links to
+the "Docs improvement" issue form, with the page already filled in, for a
+suggestion that you do not write yourself.
 
 If a feature you want does not fit, you are welcome to fork: the license
 allows it.
