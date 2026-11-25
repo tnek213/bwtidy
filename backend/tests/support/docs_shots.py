@@ -15,6 +15,7 @@ import json
 import math
 import os
 import re
+import time
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -364,3 +365,32 @@ class FixedValues:
         data = response.json()
         self.learn(data)
         route.fulfill(response=response, body=json.dumps(self.rewrite(data)))
+
+
+## seconds for the backup a write starts in the background
+BACKUP_TIMEOUT = 120
+
+
+def wait_for_next_backup(api: Any) -> None:
+    """Wait for the backup the newest write started in the background, so a Change log shot shows
+    it every time. api is the e2e tests' Api."""
+    newest = max(api.get("/api/change-log"), key=lambda entry: entry["id"])
+    written, used = parse(newest["at"]), newest["backup"]
+
+    def taken() -> bool:
+        return any(
+            backup["name"] != used and parse(backup["time"]) >= written
+            for backup in api.get("/api/backups")
+        )
+
+    deadline = time.monotonic() + BACKUP_TIMEOUT
+    while not taken():
+        assert time.monotonic() < deadline, "no backup after the write"
+        time.sleep(1)
+
+
+def hide_revision_dates(page: "Page") -> None:
+    """A grid shot shows revisionDate too, the date of the last seeding, which changes the image."""
+    page.locator(".ag-row .ag-cell[col-id='revisionDate']").evaluate_all(
+        "cells => cells.forEach(cell => cell.setAttribute('data-shot-hide', ''))"
+    )

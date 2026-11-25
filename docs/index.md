@@ -53,6 +53,9 @@ How each part works is under [Explanation](#explanation).
 
 - [Your first cleanup](tutorial/first-cleanup.md): log in, fix a name and a
   field, commit, and find the write and its backup in the Change log.
+- [Your first template](tutorial/template.md): make a datatype and a
+  template, see the fill scores and format marks in the grid, and turn notes
+  into logins with the template.
 
 ## How-to guides
 
