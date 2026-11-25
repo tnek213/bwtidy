@@ -39,6 +39,23 @@ COPY docs/ docs/
 RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
     scripts/docs-site build /site
 
+## the backend's venv, built at the path the app stage runs it from (its scripts name that path),
+## so uv's cache and the sources stay out of the image
+FROM python AS backend
+## use the image's Python, never a uv managed download
+ENV UV_PYTHON=/usr/local/bin/python3 \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+WORKDIR /app/backend
+COPY backend/pyproject.toml backend/uv.lock ./
+## dependencies first, so a source change does not reinstall them
+RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
+    uv sync --locked --no-dev --no-install-project
+COPY backend/src ./src
+RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
+    uv sync --locked --no-dev --no-editable
+
 FROM python AS app
 
 COPY --from=bitwarden-cli /usr/local/bin/node /usr/local/bin/node
@@ -58,21 +75,7 @@ RUN chmod 644 /usr/local/lib/bwtidy/unref-share-timers.js \
 ## the gateway makes one directory per account in here, owned by the account's uid
 RUN mkdir -p /data/accounts
 
-## use the image's Python, never a uv managed download
-ENV UV_PYTHON=/usr/local/bin/python3 \
-    UV_PYTHON_DOWNLOADS=never \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
-
-WORKDIR /app/backend
-COPY backend/pyproject.toml backend/uv.lock ./
-## dependencies first, so a source change does not reinstall them
-RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
-    uv sync --locked --no-dev --no-install-project
-COPY backend/src ./src
-RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
-    uv sync --locked --no-dev --no-editable
-
+COPY --from=backend /app/backend/.venv /app/backend/.venv
 COPY --from=frontend /src/frontend/dist /app/static
 ## every backup holds it as RESTORE.md (collect.RESTORE_DOC)
 COPY docs/restore.md /app/docs/restore.md
@@ -100,6 +103,11 @@ CMD ["/app/backend/.venv/bin/bwtidy-gateway"]
 ## gateway as root (scripts/dev-vault exec --root).
 FROM app AS dev
 COPY --from=uv /uv /uvx /usr/local/bin/
+## use the image's Python, never a uv managed download
+ENV UV_PYTHON=/usr/local/bin/python3 \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 RUN groupadd --gid 1000 app \
     && useradd --uid 1000 --gid 1000 --home-dir /home/app --shell /bin/sh app \
     && mkdir -p /data/app /data/bw /home/app \
