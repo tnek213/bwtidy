@@ -25,6 +25,8 @@ on:
       - .github/workflows/docs.yml
       - .github/workflows/docker-readme.yml
       - .github/workflows/image-scan.yml
+      - .github/workflows/prune-tags.yml
+      - scripts/prune-tags
   release:
     types: [published]
   workflow_dispatch:
