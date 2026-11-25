@@ -11,6 +11,7 @@
   health    /api/health: healthy, health_text, health_version, wait_healthy
   suites    the options and test paths of scripts/e2e and scripts/integration, the sleep lock
   git       git, the commit a build shows, check_checkout
+  prepush   what the pre-push hook checks: the refs pushed, their new commits, the UI they touch
   venv      in_backend_venv and the start of a script in the backend venv
 
 The modules run nothing when imported. The scripts import the package from their own

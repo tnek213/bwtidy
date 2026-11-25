@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+"""pre-push: what the pre-push hook runs, scripts/ci on what is pushed, then the docs screenshots.
+
+  scripts/pre-push REMOTE [URL] < REFS
+
+git runs it through scripts/hooks/pre-push (scripts/install-hooks installs that) with the refs
+being pushed on stdin, one `LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA` per line. A delete, and a
+ref whose commit the remote already has (a tag on a pushed commit), check nothing. A push with no
+new commit runs nothing at all. Any failure exits 1, so git stops the push.
+
+1. scripts/ci on the commit of each ref with new commits. When that commit is the checked-out
+   HEAD and the checkout has no changes (nor untracked files), ci runs here. Otherwise it runs in
+   a temporary worktree of the commit (git worktree add --detach, removed again), whose
+   dependencies ci installs first, so what is tested is always the pushed commit.
+2. When a ref's new commits touch the UI (a file under frontend/src/ or
+   backend/tests/e2e/docs/ differs from the remote's commit, or for a new branch from the merge
+   base with the remote's main), scripts/docs-shots takes every docs screenshot again, which
+   takes about 3 minutes with the dev stack's snapshot at hand. That needs the pushed commit
+   checked out here without changes. When docs/images changed, it commits exactly those files
+   as "Take the docs screenshots again" and stops the push: push again, and that push finds
+   the screenshots current.
+
+A step that passed on a tree (the same files, whatever the commit) is noted in the git
+directory (bwtidy-pre-push) and skipped on the next push of that tree.
+"""
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+from devlib import prepush
+from devlib.git import git, output
+from devlib.paths import ROOT, SCRIPTS
+
+NAME = "pre-push"
+IMAGES = "docs/images"
+MESSAGE = "Take the docs screenshots again"
+## git sets some of these for a hook, a child in another worktree must find its own repo
+GIT_REPO_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_PREFIX",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+)
+
+
+def say(text: str) -> None:
+    print(f"{NAME}: {text}", flush=True)
+
+
+def short(sha: str) -> str:
+    return sha[:10]
+
+
+def tree(commit: str) -> str:
+    return output("rev-parse", f"{commit}^{{tree}}", name=NAME, repo=ROOT)
+
+
+def head() -> str:
+    return output("rev-parse", "HEAD", name=NAME, repo=ROOT)
+
+
+def clean() -> bool:
+    return not output("status", "--porcelain", name=NAME, repo=ROOT)
+
+
+def run(argv: list[str], cwd: Path) -> tuple[bool, float]:
+    """Run argv with the terminal's output, whether it passed and how long it took."""
+    started = time.monotonic()
+    code = subprocess.run(argv, cwd=cwd, stdin=subprocess.DEVNULL).returncode
+    return code == 0, time.monotonic() - started
+
+
+def ci_in_worktree(commit: str) -> tuple[bool, float]:
+    """scripts/ci of COMMIT in a temporary worktree of it, removed again."""
+    place = Path(tempfile.mkdtemp(prefix="bwtidy-pre-push-"))
+    worktree = place / "checkout"
+    git("worktree", "add", "--detach", "--quiet", str(worktree), commit, repo=ROOT)
+    try:
+        return run([str(worktree / "scripts" / "ci")], worktree)
+    finally:
+        git("worktree", "remove", "--force", str(worktree), repo=ROOT, check=False)
+        shutil.rmtree(place, ignore_errors=True)
+
+
+def ci_step(updates: list[prepush.RefUpdate]) -> bool:
+    """scripts/ci on every commit pushed, once per commit, False at the first that fails."""
+    commits: dict[str, list[str]] = {}
+    for update in updates:
+        commit = prepush.tip(update, ROOT)
+        assert commit is not None
+        commits.setdefault(commit, []).append(update.name)
+    for commit, names in commits.items():
+        what = f"{short(commit)} ({', '.join(names)})"
+        if prepush.passed("ci", tree(commit), ROOT):
+            say(f"scripts/ci passed on the files of {what} before, skipped")
+            continue
+        if commit == head() and clean():
+            say(f"scripts/ci on {what}, the checked-out HEAD")
+            ok, took = run([str(SCRIPTS / "ci")], ROOT)
+        else:
+            say(f"scripts/ci on {what} in a temporary worktree (it is not the clean HEAD here)")
+            ok, took = ci_in_worktree(commit)
+        if not ok:
+            say(f"scripts/ci failed on {what} after {took:.0f} s, push stopped")
+            return False
+        prepush.record("ci", tree(commit), ROOT)
+        say(f"scripts/ci passed on {what} in {took:.0f} s")
+    return True
+
+
+def images_changed() -> list[str]:
+    return output("status", "--porcelain", "--", IMAGES, name=NAME, repo=ROOT).splitlines()
+
+
+def shots_step(updates: list[prepush.RefUpdate]) -> bool:
+    """Take the docs screenshots on HEAD, False when they fail or have to be committed first."""
+    pending = []
+    for update in updates:
+        commit = prepush.tip(update, ROOT)
+        assert commit is not None
+        if prepush.passed("docs-shots", tree(commit), ROOT):
+            say(f"the docs screenshots of the files of {short(commit)} are current, skipped")
+        else:
+            pending.append(update)
+    if not pending:
+        return True
+    names = ", ".join(update.name for update in pending)
+    current = head()
+    elsewhere = [u.name for u in pending if prepush.tip(u, ROOT) != current]
+    if elsewhere:
+        say(
+            f"{', '.join(elsewhere)} changes the UI but is not checked out here, so its docs "
+            "screenshots cannot be taken: check it out and push it from there"
+        )
+        return False
+    if not clean():
+        say(
+            "this checkout has uncommitted changes, and the screenshots would show them: "
+            "commit or stash them, then push again"
+        )
+        return False
+    say(f"{names} changes the UI: scripts/docs-shots takes the docs screenshots (about 3 minutes)")
+    ok, took = run([str(SCRIPTS / "docs-shots")], ROOT)
+    if not ok:
+        say(f"scripts/docs-shots failed after {took:.0f} s, push stopped")
+        return False
+    say(f"scripts/docs-shots passed in {took:.0f} s (scripts/dev-vault down stops the dev stack)")
+    changed = images_changed()
+    if not changed:
+        prepush.record("docs-shots", tree(current), ROOT)
+        say("the docs screenshots are current")
+        return True
+    output("add", "--all", "--", IMAGES, name=NAME, repo=ROOT)
+    output("commit", "--quiet", "--message", MESSAGE, "--", IMAGES, name=NAME, repo=ROOT)
+    committed = head()
+    prepush.record("docs-shots", tree(committed), ROOT)
+    listed = "\n".join(f"  {line}" for line in changed)
+    say(
+        f'committed the changed screenshots as {short(committed)} "{MESSAGE}":\n{listed}\n'
+        f"{NAME}: push stopped, push again to send that commit too"
+    )
+    return False
+
+
+def main(args: list[str], stdin: str) -> int:
+    if args[:1] in (["-h"], ["--help"]):
+        print(__doc__)
+        return 0
+    if not args:
+        print(f"usage: {NAME} REMOTE [URL] < REFS", file=sys.stderr)
+        return 2
+    remote = args[0]
+    try:
+        updates = prepush.parse_updates(stdin)
+    except ValueError as error:
+        say(str(error))
+        return 1
+    push = prepush.plan(updates, remote, ROOT)
+    if not push.checked:
+        say("no new commits in this push, nothing to check")
+        return 0
+    started = time.monotonic()
+    say("step 1 of 2: the tests (scripts/ci)")
+    if not ci_step(push.checked):
+        return 1
+    say("step 2 of 2: the docs screenshots")
+    if not push.ui:
+        say("no UI change in this push, the screenshots stay as they are")
+    elif not shots_step(push.ui):
+        return 1
+    say(f"all checks passed in {time.monotonic() - started:.0f} s, pushing")
+    return 0
+
+
+if __name__ == "__main__":
+    for var in GIT_REPO_VARS:
+        os.environ.pop(var, None)
+    os.chdir(ROOT)
+    sys.exit(main(sys.argv[1:], sys.stdin.read()))
