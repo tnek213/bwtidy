@@ -5,6 +5,9 @@ behavior move between versions. It has one maintainer for now and is meant to
 grow in the open, so issues, ideas and changes are welcome. There is no
 promise of a review time or of a change going in.
 
+Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). Report
+behavior that breaks it to tnek213.recollect098@slmail.me.
+
 ## Before you start on a feature
 
 Discuss a new feature first, in a "Feature request" issue or under Ideas in

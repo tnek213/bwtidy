@@ -91,6 +91,8 @@ without a login.
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): where to start, and how to report a bug or
   ask for a feature
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): how everyone taking part behaves, and
+  where to report what breaks it
 - [SECURITY.md](SECURITY.md): how to report a security issue, privately
 - [The developer guide](dev/README.md): set up, the dev vault, the tests, releasing
 - [AGENTS.md](AGENTS.md): the rules every change follows and the checks it
