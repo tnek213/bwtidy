@@ -303,6 +303,10 @@ def test_a_create_that_fails_after_generating_leaves_no_value(
     assert not leaked
 
 
+## the notes of a tool note that kept the name Pass
+KEPT_NAME_NOTES = '{"version": 1, "note": {"name": "Pass"}}'
+
+
 @pytest.mark.parametrize(
     ("operation", "expected"),
     [
@@ -380,6 +384,10 @@ def test_a_create_that_fails_after_generating_leaves_no_value(
         (create(type=1, name="x", values={"folder": "Work"}), "folder is not a leaf"),
         (create(type=1, name="x", values={"name": "y"}), "given as name"),
         (create(type=2, name="bwtidy"), "would be taken for bwtidy's own note"),
+        (
+            create(type=2, name="Pass", values={"notes": KEPT_NAME_NOTES}),
+            "whose notes give its own name as the name of bwtidy's note",
+        ),
     ],
 )
 def test_create_item_refusals_write_nothing(env: AppEnv, operation: dict[str, Any], expected: str):

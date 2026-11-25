@@ -8,14 +8,16 @@ from fastapi import APIRouter, HTTPException, Request
 from bwtidy.api.app_state import app_state
 from bwtidy.api.deps import Session, require_tool_note
 from bwtidy.api.sections import body_changes, current_datatypes, current_templates, queue_changes
-from bwtidy.operations import SetLeaf
+from bwtidy.operations import SetLeaf, SetToolNoteSection
 from bwtidy.queue.view import TEMPLATES_SUMMARY
 from bwtidy.sections.matching import datatype_warnings, duplicate_warnings
+from bwtidy.sections.note import SetName, expected_name
 from bwtidy.sections.templates import (
     InvalidTemplates,
     template_list,
 )
-from bwtidy.vault import TOOL_NOTE_NAME, find_tool_note, stored_templates, template_matches
+from bwtidy.session import SessionManager
+from bwtidy.vault import find_tool_note, stored_templates, template_matches
 
 log = logging.getLogger(__name__)
 
@@ -30,8 +32,10 @@ async def get_templates(request: Request, session: Session) -> dict[str, Any]:
     else the stored ones with "saving" false. Notes that hold no valid templates (edited by
     hand) give an empty list and the problem in "error", so the page can still add templates
     (they start the section over). toolNoteId and toolNoteName name the note, so the grid can
-    protect its row and warn about a rename. "warnings" names a datatype that is unknown or
-    broken and a template that scores like one listed before it, only when there is one.
+    protect its row, and toolNoteExpectedName is the name it should have (bwtidy unless the
+    user kept another), so the grid warns while the two differ. "warnings" names a datatype
+    that is unknown or broken and a template that scores like one listed before it, only when
+    there is one.
     """
     note = require_tool_note(session)
     templates, saving, error = current_templates(request, session)
@@ -40,6 +44,7 @@ async def get_templates(request: Request, session: Session) -> dict[str, Any]:
         "revisionDate": note.get("revisionDate"),
         "toolNoteId": note.get("id"),
         "toolNoteName": note.get("name"),
+        "toolNoteExpectedName": expected_name(note.get("notes")),
         "saving": saving,
     }
     if error:
@@ -74,7 +79,8 @@ async def put_templates(request: Request, body: dict[str, Any], session: Session
 async def rename_tool_note_back(
     request: Request, body: dict[str, Any], session: Session
 ) -> dict[str, Any]:
-    """Give the tool note its name bwtidy again, straight to the write path, without the queue."""
+    """Give the tool note its expected name again, straight to the write path, without the
+    queue."""
     revision_date = body.get("revisionDate")
     if not isinstance(revision_date, str) or not revision_date:
         raise HTTPException(status_code=422, detail="revisionDate of the bwtidy note is missing")
@@ -84,14 +90,43 @@ async def rename_tool_note_back(
         itemId=note["id"],
         revisionDate=revision_date,
         column="name",
-        value=TOOL_NOTE_NAME,
+        value=expected_name(note.get("notes")),
     )
     result = await app_state(request).writes.apply([op], "ui", edits_tool_note=True)
+    return _written(session, note, result.backup)
+
+
+@router.post("/tool-note/keep-name")
+async def keep_tool_note_name(
+    request: Request, body: dict[str, Any], session: Session
+) -> dict[str, Any]:
+    """Make the name the warning showed the tool note's expected name (its note section),
+    straight to the write path, without the queue, like the rename back.
+
+    409 when the note has another name by now, so the name kept is always one the user saw.
+    """
+    name = body.get("name")
+    if not isinstance(name, str) or not name:
+        raise HTTPException(status_code=422, detail="name of the bwtidy note is missing")
+    note = require_tool_note(session)
+    if note.get("name") != name:
+        raise HTTPException(status_code=409, detail="the bwtidy note was renamed again, reload")
+    op = SetToolNoteSection(
+        kind="setToolNoteSection", section="note", changes=[SetName(op="setName", name=name)]
+    )
+    result = await app_state(request).writes.apply([op], "ui", edits_tool_note=True)
+    return _written(session, note, result.backup)
+
+
+def _written(session: SessionManager, note: dict[str, Any], backup: str) -> dict[str, Any]:
+    """The answer of a write of the tool note: its name, expected name and revisionDate as
+    the write left them, and the backup."""
     saved = find_tool_note(session.cache, session.tool_note_id) or note
     return {
         "toolNoteName": saved.get("name"),
+        "toolNoteExpectedName": expected_name(saved.get("notes")),
         "revisionDate": saved.get("revisionDate"),
-        "backup": result.backup,
+        "backup": backup,
     }
 
 

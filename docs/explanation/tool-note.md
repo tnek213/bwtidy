@@ -1,9 +1,10 @@
 # The bwtidy note
 
-bwtidy keeps its own settings in your vault, in one secure note named
-`bwtidy` in your personal vault (never in an organization, where others would
-see it). So they travel with the vault: another bwtidy, or this one after a
-reinstall, finds your templates there, and every backup holds them.
+bwtidy keeps its own settings in your vault, in one secure note in your
+personal vault (never in an organization, where others would see it), named
+`bwtidy` unless you give it another name. So they travel with the vault:
+another bwtidy, or this one after a reinstall, finds your templates there,
+and every backup holds them.
 
 ## What it holds
 
@@ -16,6 +17,9 @@ The note's text is one JSON object with a section per feature:
 - `toFill`: the To fill in list, the secret fields left empty for you to
   fill in (those a new item or a template left empty, and those you mark),
   with the day each item was added.
+- `note`: the name the note should have, `{"name": "..."}`. Without it the
+  name is `bwtidy`, so a note from an earlier bwtidy works as it is. See
+  [Renaming the note](#renaming-the-note).
 
 Two hidden fields hold the master passwords the backups are encrypted with:
 `backup-password` the current one, and `older-backup-passwords` the ones
@@ -42,15 +46,31 @@ changed your master password can still open the old backups (see
 
 - In the grid its row is grey and read-only, and bwtidy refuses every other
   edit or restore of the note. Templates are edited on the Types page.
-- bwtidy remembers the note by its id. If you rename it, it still finds it,
-  and the grid offers Rename it back, which writes at once (with a backup).
-  Settings, Display can hide its row.
+- bwtidy remembers the note by its id, so a rename loses nothing (see
+  [Renaming the note](#renaming-the-note)). Settings, Display can hide its
+  row.
 - An agent never sees it, not even in a list.
 - bwtidy writes the two password fields as hidden fields, whatever type you
   gave them, and the next login makes one you turned into a text field
   hidden again. If you move the note into an organization, the next login
   that has to write them fails and asks you to move it back to your
   personal vault, so your master password never lands in a shared item.
+
+## Renaming the note
+
+You can rename the note in any Bitwarden app. bwtidy still finds it by its
+id, so the templates and the other settings stay. The grid then warns that
+bwtidy's note is named "NAME" now, with two buttons:
+
+- Rename it back gives the note the name it should have again (`bwtidy`, or
+  the name you kept).
+- Keep this name makes the new name the one it should have, stored in the
+  `note` section, and the warning goes away. It shows again only when the
+  note gets yet another name.
+
+Either one writes the note at once, with a backup first, like every write.
+A note that kept a new name is also found by a new bwtidy that does not know
+its id yet (after a reinstall, say), as its `note` section names it.
 
 ## For developers
 

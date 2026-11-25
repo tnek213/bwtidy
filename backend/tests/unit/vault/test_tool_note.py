@@ -111,6 +111,41 @@ def test_a_remembered_id_that_is_gone_falls_back_to_the_name():
     assert remembered.last_found == "new"
 
 
+KEPT_NOTES = json.dumps({"version": 1, "templates": [], "note": {"name": "Pass"}})
+
+
+def test_a_note_that_kept_its_new_name_is_found_without_its_id():
+    """After a reinstall bwtidy knows no id: a note whose note section holds its own name is
+    the tool note, one whose section holds another name is not."""
+    other = {"id": "other", "type": 2, "name": "Diary", "organizationId": None, "notes": KEPT_NOTES}
+    in_org = {"id": "org", "type": 2, "name": "Pass", "organizationId": "org1", "notes": KEPT_NOTES}
+    kept = {"id": "tool", "type": 2, "name": "Pass", "organizationId": None, "notes": KEPT_NOTES}
+    bw = FakeBwServe([other, in_org, kept])
+    remembered = ToolNoteId()
+    note, _ = bootstrap(bw, remembered)
+    assert note["id"] == "tool"
+    assert remembered.last_found == "tool"
+    assert bw.created == []
+
+
+def test_a_note_named_bwtidy_comes_before_one_that_kept_its_name():
+    kept = {"id": "kept", "type": 2, "name": "Pass", "organizationId": None, "notes": KEPT_NOTES}
+    named = {"id": "named", "type": 2, "name": "bwtidy", "organizationId": None}
+    cache = VaultCache(BwClient(FakeBwServe([kept, named]).http()), on_load=nothing)
+    cache.items = [kept, named]
+    found = find_tool_note(cache, ToolNoteId())
+    assert found is not None
+    assert found["id"] == "named"
+
+
+def test_a_note_whose_section_holds_another_name_is_no_tool_note():
+    stray = {"id": "stray", "type": 2, "name": "Diary", "organizationId": None, "notes": KEPT_NOTES}
+    bw = FakeBwServe([stray])
+    note, _ = bootstrap(bw)
+    assert note["id"] != "stray"
+    assert len(bw.created) == 1
+
+
 def test_a_remembered_id_in_an_organization_is_not_the_tool_note():
     moved = {"id": "tool", "type": 2, "name": "bwtidy", "organizationId": "org1"}
     cache = VaultCache(BwClient(FakeBwServe([moved]).http()), on_load=nothing)

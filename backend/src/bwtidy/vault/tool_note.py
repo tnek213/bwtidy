@@ -8,6 +8,7 @@ from typing import Any
 from bwtidy.bw import BwClient
 from bwtidy.db import TOOL_NOTE_ID, Database
 from bwtidy.sections import SECTIONS_VERSION, dump_sections
+from bwtidy.sections.note import expected_name
 from bwtidy.vault.cache import VaultCache
 
 log = logging.getLogger(__name__)
@@ -77,9 +78,10 @@ class ToolNoteId:
 def find_tool_note(cache: VaultCache, remembered: ToolNoteId) -> dict[str, Any] | None:
     """The tool note among the cached items, None when there is none.
 
-    The remembered id comes first, whatever the note is named now, then the name. The id of
-    the note found is remembered (last_found, and across sessions in the settings table), so a
-    later rename (in Bitwarden or elsewhere) cannot lose it.
+    The remembered id comes first, whatever the note is named now, then the name bwtidy, then
+    a note that names itself (see claims_own_name). The id of the note found is remembered
+    (last_found, and across sessions in the settings table), so a later rename (in Bitwarden or
+    elsewhere) cannot lose it.
     """
     note = None
     last = remembered.last_found
@@ -90,9 +92,18 @@ def find_tool_note(cache: VaultCache, remembered: ToolNoteId) -> dict[str, Any] 
             (i for i in cache.items if i.get("name") == TOOL_NOTE_NAME and _personal_note(i)),
             None,
         )
+    if note is None:
+        note = next((i for i in cache.items if _personal_note(i) and claims_own_name(i)), None)
     if note is not None and note.get("id"):
         remembered.last_found = note["id"]
     return note
+
+
+def claims_own_name(item: dict[str, Any]) -> bool:
+    """Whether the item's notes give its own name as the tool note's expected name: a tool
+    note that kept a new name (docs/spec.md, The tool note, Found by id)."""
+    name = item.get("name")
+    return bool(name) and name != TOOL_NOTE_NAME and expected_name(item.get("notes")) == name
 
 
 def tool_note_id(cache: VaultCache, remembered: ToolNoteId) -> str | None:

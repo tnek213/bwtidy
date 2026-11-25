@@ -581,6 +581,23 @@ SET_NAME = (
     "print(base64.b64encode(json.dumps(item).encode()).decode())"
 )
 GET_NAME = "import json, sys; print(json.load(sys.stdin)['name'])"
+## the note named bwtidy and without a note section (the name Keep this name kept), as seeded,
+## printed only when that changes it
+RESET = """
+import base64, json, sys
+item = json.load(sys.stdin)
+before = json.dumps(item)
+item["name"] = "bwtidy"
+try:
+    sections = json.loads(item.get("notes") or "")
+except ValueError:
+    sections = None
+if isinstance(sections, dict) and "note" in sections:
+    del sections["note"]
+    item["notes"] = json.dumps(sections, indent=2, ensure_ascii=False)
+if json.dumps(item) != before:
+    print(base64.b64encode(json.dumps(item).encode()).decode())
+"""
 
 
 def name_elsewhere(item_id: str) -> str:
@@ -609,8 +626,12 @@ def renamed(templated: Page, api: Api) -> Iterator[Page]:
     unlock(page)
     grid(page)
     yield page
-    if name_elsewhere(note) != "bwtidy":
-        rename_elsewhere(note, "bwtidy")
+    elsewhere(
+        'reset=$(bw get item "$1" | python3 -c "$2"); '
+        '[ -z "$reset" ] || echo "$reset" | bw edit item "$1" >/dev/null',
+        note,
+        RESET,
+    )
 
 
 def test_a_renamed_note_keeps_the_templates(renamed: Page, api: Api):
@@ -628,15 +649,34 @@ def test_a_renamed_note_shows_a_warning(renamed: Page):
     )
     expect(warning).to_be_visible()
     expect(warning.get_by_role("button", name="Rename it back")).to_be_visible()
+    expect(warning.get_by_role("button", name="Keep this name")).to_be_visible()
 
 
 def test_rename_it_back(renamed: Page, api: Api):
-    ## the quoted name, so the success snackbar ("is named bwtidy again") does not match too
+    ## the quoted name, so the success snackbar ('is named "bwtidy" again') does not match too
     warning = renamed.get_by_role("alert").filter(has_text=f'is named "{RENAMED}" now.')
     warning.get_by_role("button", name="Rename it back").click()
-    done = renamed.get_by_role("alert").filter(has_text="bwtidy's note is named bwtidy again.")
+    done = renamed.get_by_role("alert").filter(has_text='bwtidy\'s note is named "bwtidy" again.')
     expect(done).to_be_visible(timeout=COMMIT_TIMEOUT * 1000)
     expect(warning).to_be_hidden()
     doc = api.get("/api/templates")
     assert doc["toolNoteName"] == "bwtidy"
     assert name_elsewhere(doc["toolNoteId"]) == "bwtidy"
+
+
+def test_keep_this_name(renamed: Page, api: Api):
+    warning = renamed.get_by_role("alert").filter(has_text=f'is named "{RENAMED}" now.')
+    warning.get_by_role("button", name="Keep this name").click()
+    done = renamed.get_by_role("alert").filter(
+        has_text=f'bwtidy\'s note keeps the name "{RENAMED}".'
+    )
+    expect(done).to_be_visible(timeout=COMMIT_TIMEOUT * 1000)
+    expect(warning).to_be_hidden()
+    doc = api.get("/api/templates")
+    assert (doc["toolNoteName"], doc["toolNoteExpectedName"]) == (RENAMED, RENAMED)
+    assert doc["templates"] == TEMPLATES
+    assert name_elsewhere(doc["toolNoteId"]) == RENAMED
+    ## the name is kept in the note, so a reload shows no warning either
+    renamed.reload()
+    grid(renamed)
+    expect(renamed.get_by_text(f'bwtidy\'s note is named "{RENAMED}" now.')).to_have_count(0)

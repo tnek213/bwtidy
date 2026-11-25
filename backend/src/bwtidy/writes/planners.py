@@ -38,7 +38,13 @@ from bwtidy.operations import (
     touched,
 )
 from bwtidy.sections.templates import Template
-from bwtidy.vault import TOOL_NOTE_NAME, ToolNoteId, VaultCache, template_named
+from bwtidy.vault import (
+    TOOL_NOTE_NAME,
+    ToolNoteId,
+    VaultCache,
+    claims_own_name,
+    template_named,
+)
 from bwtidy.writes.restore_plan import plan_copy
 from bwtidy.writes.rules import plain_matches_secret
 
@@ -384,6 +390,11 @@ def plan_create(op: CreateItem, cache: VaultCache, remembered: ToolNoteId) -> di
                 f"{coordinate} is secret: a new item never takes a secret value, fill it in "
                 "the grid after it is created"
             )
+    if item_type == SECURE_NOTE and organization_id is None and claims_own_name(new):
+        raise ValueError(
+            "a personal secure note whose notes give its own name as the name of bwtidy's note "
+            "would be taken for bwtidy's own note"
+        )
     _check_generate_columns(new, generate_columns)
     _set_secret_values(new, op)
     plain_matches_secret(new, None, cache.lookups(), folder=op.folderName)
