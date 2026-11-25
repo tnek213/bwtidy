@@ -15,15 +15,17 @@ The beta becomes a release candidate when all of these hold:
 - At least 10 "Works for me" reports from different people in the
   [Works for me discussion](https://github.com/tnek213/bwtidy/discussions/16),
   with Bitwarden and Vaultwarden each at least once.
-- 8 weeks in beta with no bug that lost or damaged vault data, and no open
-  security report.
+- 8 weeks of real use with no bug that lost or damaged vault data, and no
+  open security report. The 8 weeks count from the first "Works for me"
+  report by someone other than the author, not from the release, so they
+  measure use rather than time.
 - No serious bug open.
 - An upgrade from one beta to the next done with a migration, and tested.
 - Docker Hub pulls of at least 0.01% of the pulls of `vaultwarden/server`,
   measured on the day of the decision.
 
 The release candidate becomes 1.0.0 after another 8 weeks with no serious
-bug. Patch releases (1.0.0-beta.2, 1.0.0-beta.3 and so on) come whenever
+bug, counted from the release candidate. Patch releases (1.0.0-beta.2, 1.0.0-beta.3 and so on) come whenever
 something is fixed or the Bitwarden CLI has a new release.
 
 ## 0.1.0-alpha.1
