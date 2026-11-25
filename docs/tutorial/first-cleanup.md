@@ -13,14 +13,14 @@ where this page names an item, pick a similar one of your own.
 
 1. Enter your Bitwarden server and email, then click Continue.
 
-   ![The account form with the server and email filled in and Continue outlined](../images/tutorial-account-form.png)
+    ![The account form with the server and email filled in and Continue outlined](../images/tutorial-account-form.png)
 
-   The first time, bwtidy offers to create the account and runs a Bitwarden
-   login, see [Log in the first time](../how-to/run.md#log-in-the-first-time).
+    The first time, bwtidy offers to create the account and runs a Bitwarden
+    login, see [Log in the first time](../how-to/run.md#log-in-the-first-time).
 
 2. Type your master password and click Unlock.
 
-   ![The unlock form with the master password typed and Unlock outlined](../images/tutorial-unlock-form.png)
+    ![The unlock form with the master password typed and Unlock outlined](../images/tutorial-unlock-form.png)
 
 After a few seconds your vault shows.
 
@@ -63,13 +63,13 @@ Five notes call their password field `Password`, a few others call it
 2. Click the three dots in the header of `Password` and pick Rename field…
    in its menu.
 
-   ![The header menu of the Password column with Rename field outlined](../images/tutorial-header-menu.png)
+    ![The header menu of the Password column with Rename field outlined](../images/tutorial-header-menu.png)
 
 3. Type `password` as the new name. A field of that name exists already, so
    bwtidy merges the two columns. If an item had a value in both, you would
    pick the one to keep next. Click Merge.
 
-   ![The dialog Rename field Password with password typed, the note about the merge and Merge outlined](../images/tutorial-rename-field.png)
+    ![The dialog Rename field Password with password typed, the note about the merge and Merge outlined](../images/tutorial-rename-field.png)
 
 Switch Hide empty columns off and clear Search to see the whole vault again.
 

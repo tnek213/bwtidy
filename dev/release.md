@@ -59,7 +59,10 @@ running bwtidy serves the site offline: nothing comes from a CDN. Zensical's
 own lightbox (its glightbox extension) loads GLightbox from unpkg.com, so it
 stays off. After the build, `scripts/docs-site build` checks
 that every built HTML page has the banner (the attribute `data-disclaimer`)
-and fails naming those without it.
+and fails naming those without it. It also fails on a numbered list that
+starts at 1 again right after another one with only a picture or code block
+between them, naming the page and the line of its HTML: a step's picture, code
+block or paragraph is indented by 4 spaces under it, or the list ends there.
 
 `scripts/ci` runs `scripts/docs-site build` after the MCP reference check.
 It fails on a page of `docs/` that the nav of `zensical.toml` leaves out,
