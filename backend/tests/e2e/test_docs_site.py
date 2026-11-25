@@ -102,6 +102,24 @@ def test_the_disclaimer_banner_is_one_slim_line(page: Page):
     assert page.locator(".md-banner").evaluate("b => b.getBoundingClientRect().height") < 30
 
 
+def test_the_disclaimer_banner_text_is_centered(page: Page):
+    page.set_viewport_size({"width": 1600, "height": 900})
+    page.goto("/docs/reference/configuration/")
+    text = page.locator("[data-disclaimer]")
+    expect(text).to_have_css("text-align", "center")
+    ## the middle of the text itself (a range over its lines), not of the paragraph that holds it
+    offset = text.evaluate(
+        """p => {
+            const range = document.createRange()
+            range.selectNodeContents(p)
+            const box = range.getBoundingClientRect()
+            const banner = p.closest(".md-banner").getBoundingClientRect()
+            return (box.left + box.right) / 2 - (banner.left + banner.right) / 2
+        }"""
+    )
+    assert abs(offset) < 5
+
+
 def test_a_picture_shown_smaller_opens_larger_from_the_site_itself(page: Page):
     ## a running bwtidy serves the site offline, so its scripts, styles and pictures are its own
     hosts: set[str] = set()

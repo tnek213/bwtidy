@@ -46,8 +46,8 @@ the checkout's last commit. The page in the checkout keeps `COMMIT`.
 
 The theme overrides are in `overrides/` (outside `docs/`, so they are not
 built as pages). Its `main.html` fills the theme's `announce` block with the
-alpha disclaimer banner on every page, which links to the disclaimer at the
-top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
+alpha disclaimer banner on every page, one slim line with its text centered,
+which links to the disclaimer at the top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
 the theme's 61rem leaves tables little room), keeps paragraphs, list items,
 quotes and admonitions at most 80 characters wide unless they hold a picture,
 table or code block, keeps inline code on one line (in text and tables, except
