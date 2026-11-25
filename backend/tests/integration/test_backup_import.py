@@ -4,9 +4,11 @@ docs/restore.md (RESTORE.md in every backup) says how to bring a lost vault back
 backup: import the personal export and every organization export (each into the organization
 of the same name), then find each backup item's imported item by its content and upload its
 attachments. This test does those steps with the CLI as restore@bwtidy.test (a CLI state of
-its own, so the app's login stays as it is), the matching in Python the way the document's jq
-program does it, and compares what arrives with the backup's raw/items.json. The restore
-account is emptied again before and after, so the test runs again on the same stack.
+its own, so the app's login stays as it is): the imports itself, the attachments by running
+the document's program attach.py as it stands in the worktree (/app/docs/restore.md). Then it
+finds each backup item's imported item with a matching of its own and compares what arrived
+with the backup's raw/items.json. The restore account is emptied again before and after, so
+the test runs again on the same stack.
 
 Two personal notes named Twin, each with an attachment same.txt of other bytes, two notes
 named Org twin equal in every compared leaf, one in Family's collection Shared and one in
@@ -18,7 +20,9 @@ Nothing here prints an item or a value: a mismatch names items and keys only.
 
 import io
 import json
+import os
 import shutil
+import subprocess
 import tempfile
 import zipfile
 from collections import defaultdict
@@ -29,10 +33,11 @@ from typing import Any
 
 import pytest
 from support.app import App, Elsewhere
-from support.cli import PASSWORD, BwCli
+from support.cli import BW_TIMEOUT, PASSWORD, BwCli
 
-from bwtidy.backups.collect import attachment_members
+from bwtidy.backups.collect import RESTORE_DOC, attachment_members
 from bwtidy.backups.crypto import decrypt_backup
+from tests.support.restore_doc import attach_program
 
 pytestmark = pytest.mark.integration
 
@@ -49,7 +54,7 @@ MADE = 4
 
 Item = dict[str, Any]
 
-## what an import makes anew or what the key compares by name instead (docs/restore.md, pair.jq)
+## what an import makes anew or what the key compares by name instead (docs/restore.md, attach.py)
 NOT_COMPARED = {
     "id",
     "revisionDate",
@@ -62,6 +67,9 @@ NOT_COMPARED = {
 }
 ## docs/restore.md, the trash: what bw import refuses or would take over from a trashed item
 TRASH_DROPPED = ("id", "deletedDate", "folderId", "organizationId", "collectionIds")
+## what attach.py prints for an attachment it uploaded, and for one it could not
+UPLOADED = " is on item "
+NOT_UPLOADED = " is not uploaded"
 
 
 def leaves(value: Any, path: str = "") -> dict[str, Any]:
@@ -310,37 +318,37 @@ def match_backup(backup: Backup, restore: Restore, trash: bool = False) -> Match
     return match(old, restore.json("list", "items"), old_names, new_names)
 
 
-def upload_attachments(backup: Backup, restore: Restore, matching: Matching, ids: set[str]) -> int:
-    """The attachments of the backup items of ids on their imported items, each copied to its
-    file name first as docs/restore.md does it. Returns how many went up."""
-    staging = backup.root / "upload"
-    count = 0
-    for item_id in sorted(ids):
-        item = next(
-            i
-            for i in backup.json("raw/items.json") + backup.json("raw/trash.json")
-            if i["id"] == item_id
-        )
-        for attachment, member in attachment_members(item):
-            path = staging / attachment["id"] / attachment["fileName"]
-            path.parent.mkdir(parents=True)
-            shutil.copyfile(backup.root / member, path)
-            restore.run(
-                "create",
-                "attachment",
-                "--file",
-                str(path),
-                "--itemid",
-                matching.pairs[item_id]["id"],
-            )
-            count += 1
-    shutil.rmtree(staging, ignore_errors=True)
-    return count
+def attach(backup: Backup, restore: Restore, items: str) -> list[str]:
+    """Run docs/restore.md's attach.py on the backup items of the file items, as the document
+    does it in the unpacked backup. Returns the lines it printed, which name only ids."""
+    program = backup.root / "attach.py"
+    program.write_text(attach_program(RESTORE_DOC.read_text()))
+    assert restore.cli.appdata is not None
+    env = {
+        **os.environ,
+        "BW_SESSION": restore.key,
+        "BITWARDENCLI_APPDATA_DIR": restore.cli.appdata,
+    }
+    result = subprocess.run(
+        ["python3", "attach.py", items],
+        cwd=backup.root,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=BW_TIMEOUT * 4,
+    )
+    ## stderr only holds bw's errors and a traceback, never an item
+    assert result.returncode == 0, result.stderr
+    assert not (backup.root / "upload").exists()
+    return result.stdout.splitlines()
 
 
 @pytest.fixture(scope="module")
 def uploaded(backup: Backup, restore: Restore) -> int:
-    """The steps of docs/restore.md: the imports, then the attachments."""
+    """The steps of docs/restore.md: the imports, then the attachments by its attach.py.
+
+    Returns how many attachments it uploaded."""
     restore.run("import", "bitwardenjson", str(backup.root / "data.json"))
     org_ids = restore.org_ids()
     for org in backup.json("raw/organizations.json"):
@@ -348,10 +356,9 @@ def uploaded(backup: Backup, restore: Restore) -> int:
         restore.run(
             "import", "bitwardenjson", str(export), "--organizationid", org_ids[org["name"]]
         )
-    matching = match_backup(backup, restore)
-    assert not matching.unmatched, f"backup items no imported item fits: {matching.unmatched}"
-    with_files = {i["id"] for i in backup.json("raw/items.json") if i.get("attachments")}
-    return upload_attachments(backup, restore, matching, with_files)
+    lines = attach(backup, restore, "raw/items.json")
+    assert not [line for line in lines if NOT_UPLOADED in line], lines
+    return sum(UPLOADED in line for line in lines)
 
 
 @pytest.fixture(scope="module")
@@ -536,6 +543,11 @@ def test_each_org_twin_gets_its_own_organizations_file(
         assert same, f"{org}: not its own codes.txt"
 
 
+def test_a_second_run_of_attach_uploads_nothing(backup: Backup, restore: Restore, imported):
+    """docs/restore.md: run it again after a failure, it only adds what is missing."""
+    assert attach(backup, restore, "raw/items.json") == []
+
+
 def test_the_trash_imports_as_docs_restore_says(backup: Backup, restore: Restore, imported):
     """Runs last: it adds the trash items to the restore account, then their attachments."""
     trash = backup.json("raw/trash.json")
@@ -544,10 +556,12 @@ def test_the_trash_imports_as_docs_restore_says(backup: Backup, restore: Restore
     path = backup.root / "trash-import.json"
     path.write_text(json.dumps({"encrypted": False, "items": items}))
     restore.run("import", "bitwardenjson", str(path))
-    matching = match_backup(backup, restore, trash=True)
-    assert not matching.unmatched
-    with_files = {i["id"] for i in trash if i.get("attachments")}
-    assert upload_attachments(backup, restore, matching, with_files) == 1
+    ## with-trash.json of step 6: the trashed items keep their ids, so attach.py finds their files
+    moved = [{k: v for k, v in i.items() if k == "id" or k not in TRASH_DROPPED} for i in trash]
+    (backup.root / "with-trash.json").write_text(json.dumps(backup.json("raw/items.json") + moved))
+    lines = attach(backup, restore, "with-trash.json")
+    assert sum(UPLOADED in line for line in lines) == 1
+    assert len(lines) == 1, lines
     matching = match_backup(backup, restore, trash=True)
     assert not matching.unmatched
     out = backup.root.parent / "trash"

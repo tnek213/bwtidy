@@ -1840,19 +1840,21 @@ were taken inside the write.
   below, which puts the items of one change log row back as the row's backup
   holds them. The disaster restore imports the exports into an empty account
   by hand, steps in `RESTORE.md` of every backup (its source is
-  [restore.md](restore.md)). It needs only age, unzip, jq and the official
-  Bitwarden CLI, nothing of bwtidy. The
-  import gives every item a new id, so a jq program in it pairs each backup
+  [restore.md](restore.md)). It needs only age, a stock `python3` (3.8 or
+  later, the standard library alone) and the official Bitwarden CLI, nothing
+  of bwtidy. Reason: whoever restores a lost vault has a plain Linux or macOS
+  machine, and Python reads more easily than a jq program. The
+  import gives every item a new id, so a Python program in it pairs each backup
   item with its new item by its content (every leaf but ids and dates, folder
-  and collections by name, its organization by name or personal), and a shell
-  function uploads each attachment from `item-attachments` to it. An
+  and collections by name, its organization by name or personal) and uploads
+  each attachment from `item-attachments` to it. An
   attachment the new item already has (by file name) is skipped, so a second
   run adds only what is missing. An attachment without a file of its own
   there (a damaged zip) is not uploaded but printed by attachment id and
   backup item id, the other attachments still go up.
 - Each organization export of a disaster restore goes into the organization
   of the same name, so the new account needs the old organization names.
-  When the backup or the account has two organizations of one name the jq
+  When the backup or the account has two organizations of one name the
   program stops before anything is uploaded. Reason: matching only by whether
   an item is in an organization would let twins in two organizations get
   each other's attachments.

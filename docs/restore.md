@@ -9,8 +9,9 @@ item comes back, but as a new item with a new id (see What does not come
 back). When only a bwtidy change went wrong and the vault is otherwise fine,
 use Restore on that change's row in bwtidy's Change log instead.
 
-Every step is here, nothing of bwtidy is needed: only `age` (or `rage`),
-`unzip` and `jq` from any distribution and the official Bitwarden CLI. Every
+Every step is here, nothing of bwtidy is needed: only `age` (or `rage`) from
+any distribution, Python 3 (the `python3` of any Linux or macOS, 3.8 or later,
+with nothing but its standard library) and the official Bitwarden CLI. Every
 backup holds this file as `RESTORE.md`, the repository has it as
 `docs/restore.md`.
 
@@ -45,18 +46,31 @@ bwtidy last logged in with, since a login with a new master password
 re-encrypts every backup. A copy made before a master password change, or a
 re-encryption that was cut off, takes an earlier one: the secure note named
 `bwtidy` lists them in its hidden fields `backup-password` and `older-backup-passwords`,
-also in any backup that opens
-(`jq '.[] | select(.name == "bwtidy") | .fields' raw/items.json`).
+also in any backup that opens (the block after the next prints them).
 
 ```sh
 D=$(mktemp -d -p /dev/shm bwtidy-restore.XXXXXX)
 cd "$D"
 cp /path/to/FILE.zip.age .
 age -d -o backup.zip FILE.zip.age && rm FILE.zip.age
-unzip -q backup.zip && rm backup.zip
-unzip -q personal-export.zip data.json
-jq length raw/items.json raw/trash.json
-jq -r '.[] | "\(.id) \(.name)"' raw/organizations.json
+python3 -m zipfile -e backup.zip . && rm backup.zip
+python3 -c 'import zipfile; zipfile.ZipFile("personal-export.zip").extract("data.json")'
+python3 -c '
+import json
+for name in "raw/items.json", "raw/trash.json":
+    print(len(json.load(open(name))), "items in", name)
+for org in json.load(open("raw/organizations.json")):
+    print("organization", org["id"], org["name"])'
+```
+
+The fields of the `bwtidy` note, with the passphrases of older backups:
+
+```sh
+python3 -c '
+import json
+for item in json.load(open("raw/items.json")):
+    if item["name"] == "bwtidy":
+        print(json.dumps(item.get("fields"), indent=2))'
 ```
 
 ## 2. The account to import into
@@ -113,7 +127,10 @@ printed the old ids (OLDID) with their names, this prints the new ones
 (NEWID). Run the import once per organization:
 
 ```sh
-bw list organizations | jq -r '.[] | "\(.id) \(.name)"'
+bw list organizations | python3 -c '
+import json, sys
+for org in json.load(sys.stdin):
+    print(org["id"], org["name"])'
 bw import bitwardenjson org-OLDID-export.json --organizationid NEWID
 ```
 
@@ -130,129 +147,180 @@ are taken in order: whichever gets which file, the vault is the same. A
 backup item that matches nothing gets the one imported item of its type,
 name and organization, if there is exactly one.
 
-First write the program that pairs the items:
+First write the program that pairs the items and uploads the attachments. bw
+names an attachment after its file, so the program copies each file to its
+real file name under `upload/` first:
 
 ```sh
-cat > pair.jq <<'EOF'
-def names: map(select(.id) | {key: .id, value: .name}) | from_entries;
-def distinct($where):
-  if (map(.name) | unique | length) == length then .
-  else error("\($where) has organizations of the same name, give each a name of its own")
-  end;
-def place($n): [.type, .name, (.organizationId | if . then $n.o[.] // "id \(.)" else null end)];
-def key($n):
-  place($n) + [
-    (.folderId | if . then $n.f[.] else null end),
-    ([.collectionIds[]? | $n.c[.]] | sort),
-    (del(.id, .revisionDate, .creationDate, .deletedDate, .organizationId, .collectionIds,
-         .folderId, .attachments)
-     | [paths(type != "object" and type != "array") as $p | [$p, getpath($p)]
-        | select(.[1] != null)] | sort)]
-  | tojson;
-def members:
-  reduce (.attachments // [])[] as $a ({used: {}, out: []};
-    .used as $u
-    | ($a.fileName | until($u[.] | not; "\($a.id)-\(.)")) as $m
-    | .used[$m] = true
-    | .out += [{id: $a.id, file: $a.fileName, member: $m}])
-  | .out;
+cat > attach.py <<'EOF'
+import json
+import os
+import shutil
+import subprocess
+import sys
 
-[inputs] as [$old, $of, $oc, $oo, $new, $nf, $nc, $no]
-| {f: ($of | names), c: ($oc | names), o: ($oo | distinct("the backup") | names)} as $on
-| {f: ($nf | names), c: ($nc | names), o: ($no | distinct("the account") | names)} as $nn
-| ($new | map({key: .id, value: .}) | from_entries) as $byid
-| ($new | map({id, place: place($nn)})) as $places
+# what an import makes anew, and what the key compares by name instead
+LEFT_OUT = {"id", "revisionDate", "creationDate", "deletedDate", "organizationId",
+            "collectionIds", "folderId", "attachments"}
+
+
+def bw(*args):
+    return json.loads(subprocess.run(["bw", *args], check=True, stdout=subprocess.PIPE).stdout)
+
+
+def load(path):
+    with open(path, encoding="utf-8") as file:
+        return json.load(file)
+
+
+def names(listing):
+    return {entry["id"]: entry["name"] for entry in listing if entry.get("id")}
+
+
+def leaves(value, path=()):
+    """Every value below value that is neither an object nor an array, with its path."""
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield from leaves(child, path + (key,))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from leaves(child, path + (index,))
+    elif value is not None:
+        yield [path, value]
+
+
+class Names:
+    """Folder, collection and organization names by id, of the backup or of the account."""
+
+    def __init__(self, where, folders, collections, organizations):
+        org_names = [org["name"] for org in organizations]
+        if len(set(org_names)) != len(org_names):
+            sys.exit(f"{where} has organizations of the same name, give each a name of its own")
+        self.folders = names(folders)
+        self.collections = names(collections)
+        self.organizations = names(organizations)
+
+    def place(self, item):
+        org = item.get("organizationId")
+        return [item.get("type"), item.get("name"),
+                (self.organizations.get(org) or f"id {org}") if org else None]
+
+    def key(self, item):
+        folder = item.get("folderId")
+        content = {k: v for k, v in item.items() if k not in LEFT_OUT}
+        return json.dumps(self.place(item) + [
+            self.folders.get(folder) if folder else None,
+            sorted(json.dumps(self.collections.get(c)) for c in item.get("collectionIds") or []),
+            sorted(json.dumps(leaf) for leaf in leaves(content)),
+        ])
+
+
+def members(item):
+    """Each attachment's id, file name and file in item-attachments/<item id>/."""
+    used = set()
+    for attachment in item.get("attachments") or []:
+        member = attachment["fileName"]
+        while member in used:
+            member = f"{attachment['id']}-{member}"
+        used.add(member)
+        yield attachment["id"], attachment["fileName"], member
+
+
+old = load(sys.argv[1])
+old_names = Names("the backup", load("raw/folders.json"), load("raw/collections.json"),
+                  load("raw/organizations.json"))
+subprocess.run(["bw", "sync"], check=True, stdout=subprocess.DEVNULL)
+new = bw("list", "items")
+new_names = Names("the account", bw("list", "folders"), bw("list", "collections"),
+                  bw("list", "organizations"))
+
 # the same content: the first unused imported item with the same key
-| reduce $old[] as $i ({pool: (reduce $new[] as $n ({}; .[$n | key($nn)] += [$n.id])),
-                         used: {}, pairs: {}};
-    ($i | key($on)) as $k
-    | if (.pool[$k] // []) == [] then .
-      else .pairs[$i.id] = .pool[$k][0] | .used[.pool[$k][0]] = true | .pool[$k] |= .[1:]
-      end)
+pool = {}
+for item in new:
+    pool.setdefault(new_names.key(item), []).append(item)
+pairs = {}
+used = set()
+for item in old:
+    same = pool.get(old_names.key(item))
+    if same:
+        pairs[item["id"]] = same.pop(0)
+        used.add(pairs[item["id"]]["id"])
 # else the one unused imported item of its type, name and organization
-| reduce $old[] as $i (.;
-    . as $s
-    | ($i | place($on)) as $p
-    | [$places[] | select(($s.used[.id] | not) and .place == $p) | .id] as $ids
-    | if $s.pairs[$i.id] or ($ids | length) != 1 then .
-      else .pairs[$i.id] = $ids[0] | .used[$ids[0]] = true
-      end)
-| .pairs as $pairs
-| $old[]
-| select(.attachments)
-| .id as $old_id
-| ($pairs[$old_id] // "-") as $new_id
-| reduce members[] as $m ({left: [$byid[$new_id].attachments[]?.fileName], out: []};
-    (.left | index($m.file)) as $x
-    | [$old_id, $m.id, $m.file, $m.member, $new_id] as $line
-    | if $new_id == "-" then .out += [["lost"] + $line]
-      elif $x != null then .left |= del(.[$x]) | .out += [["there"] + $line]
-      else .out += [["new"] + $line]
-      end)
-| .out[]
-| @sh "upload \(.)"
+for item in old:
+    if item["id"] not in pairs:
+        place = old_names.place(item)
+        fits = [n for n in new if n["id"] not in used and new_names.place(n) == place]
+        if len(fits) == 1:
+            pairs[item["id"]] = fits[0]
+            used.add(fits[0]["id"])
+
+for item in old:
+    target = pairs.get(item["id"])
+    there = [a["fileName"] for a in (target or {}).get("attachments") or []]
+    for attachment, file_name, member in members(item):
+        said = f"attachment {attachment} of backup item {item['id']}"
+        source = os.path.join("item-attachments", item["id"], member)
+        if target is None:
+            print(f"no imported item fits backup item {item['id']}, "
+                  f"attachment {attachment} is not uploaded", flush=True)
+        elif file_name in there:
+            there.remove(file_name)
+        elif not os.path.isfile(source):
+            print(f"{said} has no file in the backup, it is not uploaded", flush=True)
+        else:
+            os.makedirs(os.path.join("upload", attachment), exist_ok=True)
+            upload = os.path.join("upload", attachment, file_name)
+            shutil.copyfile(source, upload)
+            done = subprocess.run(["bw", "create", "attachment", "--file", upload,
+                                   "--itemid", target["id"]], stdout=subprocess.DEVNULL)
+            if done.returncode == 0:
+                print(f"{said} is on item {target['id']}", flush=True)
+shutil.rmtree("upload", ignore_errors=True)
 EOF
 ```
 
-It writes one line per attachment,
-`upload STATE OLDITEM ATTACHMENT FILENAME MEMBER NEWITEM`, with the state
-`new` (to upload), `there` (the new item has an attachment of that file name
-already) or `lost` (no imported item fits). This is what runs such a line. bw
-names an attachment after its file, so each one is copied to its real file
-name first:
+Then run it on the backup items of `raw/items.json`. It syncs bw, lists what
+the account has now and prints a line for each attachment it uploads or
+cannot upload:
 
 ```sh
-upload() {
-  case "$1" in
-    there) return ;;
-    lost) echo "no imported item fits backup item $2, attachment $3 is not uploaded"; return ;;
-  esac
-  if [ ! -f "item-attachments/$2/$5" ]; then
-    echo "attachment $3 of backup item $2 has no file in the backup, it is not uploaded"
-    return
-  fi
-  mkdir -p "upload/$3" && cp "item-attachments/$2/$5" "upload/$3/$4" &&
-    bw create attachment --file "upload/$3/$4" --itemid "$6" > /dev/null &&
-    echo "attachment $3 of backup item $2 is on item $6"
-}
-OLD=raw/items.json
+python3 attach.py raw/items.json
 ```
 
-Then list what the account has now, pair it with the backup items of `$OLD`
-into `upload.sh` and run that:
+A failed upload prints bw's error. Run the program again: the attachments
+already there (an attachment of that file name on the item) are skipped, so
+it only adds what is missing.
 
-```sh
-bw sync
-for o in items folders collections organizations; do bw list "$o" > "new-$o.json"; done
-jq -n -r -f pair.jq "$OLD" raw/folders.json raw/collections.json raw/organizations.json \
-  new-items.json new-folders.json new-collections.json new-organizations.json > upload.sh &&
-  . ./upload.sh
-rm -rf upload
-```
-
-A failed upload prints bw's error. Run the last block again: the attachments
-already there are skipped, so it only adds what is missing.
-
-`jq` stops at once with "has organizations of the same name" when two
+The program stops at once with "has organizations of the same name" when two
 organizations share a name in the backup or the account (`raw/organizations.json`
-or `new-organizations.json`): give each a name of its own in the account,
+or `bw list organizations`): give each a name of its own in the account,
 and for the backup put the new name into `raw/organizations.json` for that
-id too. Then run the last block again.
+id too. Then run it again.
 
 Each "no imported item fits" line is a backup item whose content no imported
 item has and whose type, name and organization do not tell one. When every
 item of an organization is printed so, check that the organization has the
-name it had in the backup (step 2). Otherwise upload by hand: the old item is
-`jq '.[] | select(.id == "OLDID")' "$OLD"`, its files are under
-`item-attachments/OLDID/` (the attachment ids and file names are in the old
-item), `bw list items --search NAME` lists the new candidates (also those
-whose name only contains NAME), compare their values, and
-`bw create attachment --file FILE --itemid NEWID` with the file copied to its
-real name first.
+name it had in the backup (step 2). Otherwise upload by hand. This prints the
+old item (OLDID), from `with-trash.json` instead for an item of the trash
+(step 6):
+
+```sh
+python3 -c '
+import json, sys
+for item in json.load(open(sys.argv[1])):
+    if item["id"] == sys.argv[2]:
+        print(json.dumps(item, indent=2))' raw/items.json OLDID
+```
+
+Its files are under `item-attachments/OLDID/` (the attachment ids and file
+names are in the old item), `bw list items --search NAME` lists the new
+candidates (also those whose name only contains NAME), compare their values,
+and `bw create attachment --file FILE --itemid NEWID` with the file copied to
+its real name first.
 
 Each "has no file in the backup" line means the zip is damaged or was
-unpacked only in part: decrypt and unpack it again (step 1) and run the last
-block of this step again.
+unpacked only in part: decrypt and unpack it again (step 1) and run the
+program again.
 
 ## 6. The trash, only if you want it
 
@@ -261,36 +329,43 @@ take over some of its keys, so drop them first and import the rest into the
 personal vault:
 
 ```sh
-jq '{encrypted: false, items: [.[] | del(.id, .deletedDate, .folderId, .organizationId, .collectionIds)]}' \
-  raw/trash.json > trash-import.json
+python3 -c '
+import json
+trash = json.load(open("raw/trash.json"))
+dropped = ("deletedDate", "folderId", "organizationId", "collectionIds")
+moved = [{k: v for k, v in item.items() if k not in dropped} for item in trash]
+with open("trash-import.json", "w") as file:
+    items = [{k: v for k, v in item.items() if k != "id"} for item in moved]
+    json.dump({"encrypted": False, "items": items}, file)
+with open("with-trash.json", "w") as file:
+    json.dump(json.load(open("raw/items.json")) + moved, file)'
 bw import bitwardenjson trash-import.json
-jq -s '.[0] + (.[1] | map(del(.deletedDate, .folderId, .organizationId, .collectionIds)))' \
-  raw/items.json raw/trash.json > with-trash.json
+python3 attach.py with-trash.json
 ```
 
-Then set `OLD=with-trash.json` and run the last block of step 5 again (in a
-new shell, define `upload` of step 5 first). The attachments of the active
-items are already there, so it only uploads those of the trashed items. They
-come back as active personal items in no folder. Move them to the trash in
-the web vault if that is where they belong.
+`with-trash.json` is the active items and the trashed ones (with their old
+ids), so the program of step 5 finds the trashed items as well. The
+attachments of the active items are already there, so it only uploads those
+of the trashed items. They come back as active personal items in no folder.
+Move them to the trash in the web vault if that is where they belong.
 
 ## 7. Check and clean up
 
-The account must have as many items and attachments as the backup. The
-first number below is the account's items, which must equal the count of
-`raw/items.json` that step 1 printed. The next two are the account's
-attachments and the backup's, which must be equal. Each "not uploaded" line
-of step 5 is one attachment missing. With the trash imported (step 6), the
-item count is that of both files of step 1, and `with-trash.json` takes the
-place of `raw/items.json`: set `ITEMS=with-trash.json` instead of the first
-line below.
+The account must have as many items and attachments as the backup: the two
+lines the block below prints must have the same numbers. Each "not uploaded"
+line of step 5 is one attachment missing. With the trash imported (step 6),
+`with-trash.json` takes the place of `raw/items.json`: set
+`ITEMS=with-trash.json` instead of the first line below.
 
 ```sh
 ITEMS=raw/items.json
 bw sync
-bw list items | jq length
-bw list items | jq '[.[] | (.attachments // []) | length] | add'
-jq '[.[] | (.attachments // []) | length] | add' "$ITEMS"
+bw list items | python3 -c '
+import json, sys
+def count(items):
+    return len(items), sum(len(item.get("attachments") or []) for item in items)
+print("the account: %d items, %d attachments" % count(json.load(sys.stdin)))
+print("the backup:  %d items, %d attachments" % count(json.load(open(sys.argv[1]))))' "$ITEMS"
 bw logout
 cd ~ && rm -rf "$D" ${CLI:+"$CLI"}
 unset BW_SESSION BITWARDENCLI_APPDATA_DIR
