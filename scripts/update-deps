@@ -310,7 +310,7 @@ def uv_outdated(output: str) -> list[tuple[str, str, str]]:
     """The direct dependencies `uv tree --outdated --depth 1` marks: (name, locked, latest)."""
     found = []
     for line in output.splitlines():
-        match = re.search(r"(\S+) v(\S+)(?: \(.*?\))*? \(latest: v(\S+)\)", line)
+        match = re.search(r"(\S+) v(\S+)(?: \([^)]*\))*? \(latest: v(\S+)\)", line)
         if match:
             found.append((match[1], match[2], match[3]))
     return found

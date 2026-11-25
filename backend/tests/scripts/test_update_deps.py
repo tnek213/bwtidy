@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 
 import pytest
 
@@ -179,6 +182,18 @@ Add newdep v1.0.0
         ("fastapi", "0.162.0", "0.165.0"),
         ("ty", "0.0.92", "0.0.109"),
     ]
+
+
+def test_uv_outdated_reads_a_line_of_many_groups_without_latest_at_once():
+    ## in a child process: a regex that backtracks holds the GIL, so only a kill stops it
+    code = (
+        "from devlib import load_script\n"
+        "line = 'x v1' + ' (a) (' * 40\n"
+        "assert load_script('update-deps').uv_outdated(line) == []\n"
+    )
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)}
+    done = subprocess.run([sys.executable, "-c", code], env=env, timeout=10, check=False)
+    assert done.returncode == 0
 
 
 def test_npm_outside_lists_a_latest_beyond_the_range(deps):
