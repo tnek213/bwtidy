@@ -41,6 +41,9 @@ allows it.
 
 Work only against the dev stack, never against a real vault.
 
+The pull request template (`.github/pull_request_template.md`) holds the
+checklist for a pull request.
+
 Dependencies change only through the lock files (`backend/uv.lock`,
 `frontend/package-lock.json`, `docker/bitwarden-cli/package-lock.json`):
 `uv lock` or `uv add` in `backend/`, `npm install` in the npm folder, and the
