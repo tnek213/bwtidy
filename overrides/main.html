@@ -60,6 +60,14 @@ CDN, as a running bwtidy serves the site offline. -#}
         overflow-wrap: anywhere;
       }
     }
+    /* a screenshot of a white UI on a white page needs an edge */
+    .md-typeset img:not(.twemoji):not(.emojione):not(.gemoji) {
+      border: 1px solid var(--md-default-fg-color--lighter);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .15);
+    }
+    [data-md-color-scheme="slate"] .md-typeset img:not(.twemoji):not(.emojione):not(.gemoji) {
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+    }
     .md-typeset img[data-zoom] {
       cursor: zoom-in;
     }
@@ -78,6 +86,7 @@ CDN, as a running bwtidy serves the site offline. -#}
       display: block;
       max-width: calc(100vw - 2rem);
       max-height: calc(100vh - 2rem);
+      box-shadow: none;
     }
   </style>
 {% endblock %}

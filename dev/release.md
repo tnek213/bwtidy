@@ -50,9 +50,11 @@ alpha disclaimer banner on every page, which links to the disclaimer at the
 top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
 the theme's 61rem leaves tables little room), keeps paragraphs, list items,
 quotes and admonitions at most 80 characters wide unless they hold a picture,
-table or code block, and keeps inline code on one line (in text and tables, except on a narrow
-screen where it would not fit), and its inline script makes a picture shown smaller than it
-is open larger in a dialog on a click (`data-zoom`). Both stay inline, as a
+table or code block, keeps inline code on one line (in text and tables, except
+on a narrow screen where it would not fit) and frames the pictures in the
+content (a 1 px border and a small shadow, so a white screenshot shows on a
+white page), and its inline script makes a picture shown smaller than it is
+open larger in a dialog on a click (`data-zoom`). Both stay inline, as a
 running bwtidy serves the site offline: nothing comes from a CDN. Zensical's
 own lightbox (its glightbox extension) loads GLightbox from unpkg.com, so it
 stays off. After the build, `scripts/docs-site build` checks

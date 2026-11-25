@@ -128,3 +128,22 @@ def test_a_picture_shown_smaller_opens_larger_from_the_site_itself(page: Page):
     large.click()
     expect(dialog).to_be_hidden()
     assert hosts == {urlsplit(page.url).netloc}
+
+
+def test_a_screenshot_has_a_border_and_a_shadow(page: Page):
+    page.emulate_media(color_scheme="light")
+    page.goto("/docs/tutorial/first-cleanup/")
+    picture = page.locator("article img[data-zoom]").first
+    style = picture.evaluate(
+        "i => { const s = getComputedStyle(i);"
+        " return [s.borderTopWidth, s.borderTopStyle, s.boxShadow] }"
+    )
+    assert style[0] == "1px"
+    assert style[1] == "solid"
+    assert style[2] != "none"
+    page.emulate_media(color_scheme="dark")
+    page.goto("/docs/tutorial/first-cleanup/")
+    picture = page.locator("article img[data-zoom]").first
+    border = picture.evaluate("i => getComputedStyle(i).borderTopColor")
+    assert border != TRANSPARENT
+    assert picture.evaluate("i => getComputedStyle(i).borderTopWidth") == "1px"
