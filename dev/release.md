@@ -49,9 +49,10 @@ built as pages). Its `main.html` fills the theme's `announce` block with the
 alpha disclaimer banner on every page, which links to the disclaimer at the
 top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
 the theme's 61rem leaves tables little room) and keeps a code span in a table
-cell on one line, and its inline script makes a picture shown smaller than it
-is open larger in a dialog on a click (`data-zoom`). Both stay inline, as a
-running bwtidy serves the site offline: nothing comes from a CDN. Zensical's
+cell on one line and frames the pictures in the content (a 1 px border and a
+small shadow, so a white screenshot shows on a white page), and its inline
+script makes a picture shown smaller than it is open larger in a dialog on a
+click (`data-zoom`). Both stay inline, as a running bwtidy serves the site offline: nothing comes from a CDN. Zensical's
 own lightbox (its glightbox extension) loads GLightbox from unpkg.com, so it
 stays off. After the build, `scripts/docs-site build` checks
 that every built HTML page has the banner (the attribute `data-disclaimer`)
