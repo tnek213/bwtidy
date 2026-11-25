@@ -10,10 +10,72 @@ back). When only a bwtidy change went wrong and the vault is otherwise fine,
 use Restore on that change's row in bwtidy's Change log instead.
 
 Every step is here, nothing of bwtidy is needed: only `age` (or `rage`) from
-any distribution, Python 3 (the `python3` of any Linux or macOS, 3.8 or later,
-with nothing but its standard library) and the official Bitwarden CLI. Every
+any distribution, Python 3 (3.8 or later, with nothing but its standard
+library), the official Bitwarden CLI and a bash to run the commands in. Every
 backup holds this file as `RESTORE.md`, the repository has it as
 `docs/restore.md`.
+
+## What you need on your system
+
+The commands are written for bash and work the same on every system once
+these four are installed. Check them with `age --version`, `python3 --version`,
+`bw --version` and `bash --version`.
+
+Linux:
+
+- `age` from your distribution (`apt install age`, `dnf install age`,
+  `pacman -S age` and so on, the
+  [age page](https://github.com/FiloSottile/age#installation) lists them) or a
+  release binary.
+- `python3`, usually there already.
+- The Bitwarden CLI: step 3 installs it from npm, or take the
+  [standalone build](https://bitwarden.com/download/).
+- bash, there already.
+
+macOS:
+
+- `age`: `brew install age` or a release binary from the
+  [age page](https://github.com/FiloSottile/age#installation).
+- `python3`: the one that comes with the Xcode command line tools
+  (`xcode-select --install`), or one from [python.org](https://www.python.org/downloads/)
+  or Homebrew.
+- The Bitwarden CLI: step 3 installs it from npm (Node.js from
+  [nodejs.org](https://nodejs.org/) or Homebrew), or take the
+  [standalone build](https://bitwarden.com/download/). Homebrew's
+  `bitwarden-cli` also works, it is not Bitwarden's own package.
+- bash: the system's bash 3.2 is enough, no command here needs bash 4.
+  Terminal's default shell is zsh, so run `bash` first, or paste the
+  commands into zsh, which takes them as they are.
+
+Windows:
+
+- bash: either Git Bash, which comes with
+  [Git for Windows](https://git-scm.com/download/win), or WSL. In WSL
+  everything is as on Linux, install the four there and skip the rest of this
+  list.
+- Python from [python.org](https://www.python.org/downloads/windows/) or the
+  Microsoft Store. There the command is `python` or `py`, not `python3`: put
+  `alias python3=python` before the first command in Git Bash (a shell
+  alias, only for this window), or replace `python3` in the commands.
+- `age`: `winget install --id FiloSottile.age`,
+  `scoop bucket add extras && scoop install age`, or the Windows release
+  binary from the [age page](https://github.com/FiloSottile/age#installation)
+  (put `age.exe` on the `PATH`).
+- The Bitwarden CLI: the standalone `bw.exe` from the
+  [download page](https://bitwarden.com/download/),
+  `choco install bitwarden-cli` or `npm install -g @bitwarden/cli`, as the
+  [CLI documentation](https://bitwarden.com/help/cli/) says. Step 3 installs
+  it from npm as well, in Git Bash that works too.
+- Step 1 sets `PYTHONUTF8=1` so that Python reads and writes UTF-8, as
+  it does on Linux, and not the Windows code page.
+- `age` asks for the passphrase on the terminal. Git Bash's default
+  terminal (mintty) is not a Windows console, and a program that reads the
+  console directly may not see it: if `age -d` fails to ask or fails right
+  away, start it as `winpty age -d ...` or run the command in Windows
+  Terminal or PowerShell.
+- Tmpfs: Windows and macOS have no `/dev/shm`. Step 1 then uses the
+  temporary folder, which is on the disk, so the decrypted files are written
+  there until step 7 deletes them.
 
 ## What a backup holds
 
@@ -33,7 +95,8 @@ the same item is stored as `<attachmentId>-<fileName>`.
 ## 1. Decrypt the backup on a tmpfs
 
 The decrypted files hold every secret in plain text, so they stay in RAM
-(`/dev/shm`) and are deleted at the end (step 7). Pick the newest backup from
+(`/dev/shm`, where the system has it) and are deleted at the end (step 7).
+Pick the newest backup from
 before the loss. bwtidy keeps them as `HOST/EMAIL/<UTC timestamp>.zip.age`
 under its backups mount (`/backups` in the container: the volume
 `bwtidy-backups` or the host directory `BWTIDY_BACKUPS` names), where
@@ -49,7 +112,10 @@ re-encryption that was cut off, takes an earlier one: the secure note named
 also in any backup that opens (the block after the next prints them).
 
 ```sh
-D=$(mktemp -d -p /dev/shm bwtidy-restore.XXXXXX)
+export PYTHONUTF8=1
+TMPFS=/dev/shm
+[ -d "$TMPFS" ] || TMPFS=${TMPDIR:-/tmp}
+D=$(mktemp -d "$TMPFS/bwtidy-restore.XXXXXX")
 cd "$D"
 cp /path/to/FILE.zip.age .
 age -d -o backup.zip FILE.zip.age && rm FILE.zip.age
@@ -164,8 +230,12 @@ LEFT_OUT = {"id", "revisionDate", "creationDate", "deletedDate", "organizationId
             "collectionIds", "folderId", "attachments"}
 
 
+# the full path finds bw.cmd of an npm install on Windows too
+BW = shutil.which("bw") or "bw"
+
+
 def bw(*args):
-    return json.loads(subprocess.run(["bw", *args], check=True, stdout=subprocess.PIPE).stdout)
+    return json.loads(subprocess.run([BW, *args], check=True, stdout=subprocess.PIPE).stdout)
 
 
 def load(path):
@@ -229,7 +299,7 @@ def members(item):
 old = load(sys.argv[1])
 old_names = Names("the backup", load("raw/folders.json"), load("raw/collections.json"),
                   load("raw/organizations.json"))
-subprocess.run(["bw", "sync"], check=True, stdout=subprocess.DEVNULL)
+subprocess.run([BW, "sync"], check=True, stdout=subprocess.DEVNULL)
 new = bw("list", "items")
 new_names = Names("the account", bw("list", "folders"), bw("list", "collections"),
                   bw("list", "organizations"))
@@ -271,7 +341,7 @@ for item in old:
             os.makedirs(os.path.join("upload", attachment), exist_ok=True)
             upload = os.path.join("upload", attachment, file_name)
             shutil.copyfile(source, upload)
-            done = subprocess.run(["bw", "create", "attachment", "--file", upload,
+            done = subprocess.run([BW, "create", "attachment", "--file", upload,
                                    "--itemid", target["id"]], stdout=subprocess.DEVNULL)
             if done.returncode == 0:
                 print(f"{said} is on item {target['id']}", flush=True)

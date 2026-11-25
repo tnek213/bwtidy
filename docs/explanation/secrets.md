@@ -49,8 +49,8 @@ passphrase. `age -d` opens it at a terminal. It holds:
 - every attachment of every item, active and in the trash,
 - the raw listings of the items, the trash, folders, collections and
   organizations, as bwtidy reads them,
-- `RESTORE.md`, the steps to bring a lost vault back with only age, Python 3
-  and the Bitwarden CLI (the same as [Restore a vault from a
+- `RESTORE.md`, the steps to bring a lost vault back with only age, Python 3,
+  bash and the Bitwarden CLI, on Linux, macOS or Windows (the same as [Restore a vault from a
   backup](../restore.md)).
 
 The exports go from the CLI into memory and the zip is built there, so no
