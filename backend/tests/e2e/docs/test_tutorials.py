@@ -2,8 +2,8 @@
 
 A reader takes the tutorials one after the other, so each test continues from the vault the one
 before left: Your first template finds the field Password renamed to password by Your first
-cleanup, and Clean up with an AI agent finds the two logins that Your first template made in no
-folder. The vault is put back once, after the last test (one_vault), together with the
+cleanup, and Your first MCP-assisted cleanup finds the two logins that Your first template made
+in no folder. The vault is put back once, after the last test (one_vault), together with the
 templates and datatypes of the bwtidy note. A test whose predecessor did not pass in this run
 skips, so a run of one later tutorial alone takes no image (-k test_tutorials runs them all).
 Each test carries the marker tutorial with its docs page, and tests/repo/test_tutorial_order.py
@@ -546,9 +546,9 @@ def convert_and_fill(page: Page, api: Api) -> None:
     )
 
 
-## Clean up with an AI agent (docs/tutorial/mcp.md): an MCP token made in the app, MCP switched
-## on, an agent's proposals in the Queue, Approve selected, and the write with its backup in the
-## Change log.
+## Your first MCP-assisted cleanup (docs/tutorial/mcp.md): an MCP token made in the app, MCP
+## switched on, an agent's proposals in the Queue, Approve selected, and the write with its backup
+## in the Change log.
 
 ## the logins in no folder that the agent puts in a folder, by folder (dev/dev-vault.md), Old
 ## webshop and School portal as Your first template left them
