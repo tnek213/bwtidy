@@ -12,9 +12,20 @@ CDN, as a running bwtidy serves the site offline. -#}
     [data-md-color-scheme="slate"] .md-banner {
       background-color: #f0b400;
     }
+    /* one slim line: the colour draws the eye, the size need not */
     .md-banner .md-banner__inner {
-      font-size: .75rem;
+      margin-top: .15rem;
+      margin-bottom: .15rem;
+      font-size: .6rem;
       font-weight: 700;
+    }
+    .md-banner .md-banner__inner p[data-disclaimer] {
+      max-width: none;
+      margin: 0;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .md-banner .md-banner__inner a,
     .md-banner .md-banner__inner a:hover {
