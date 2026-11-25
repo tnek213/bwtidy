@@ -6,10 +6,10 @@ grid then shows which logins fit and which do not. You turn two notes that
 are really logins into logins with the template, give them their address
 while bwtidy checks it, and find the writes in the Change log.
 
-You need bwtidy running and open in your browser, logged in (see
-[Your first cleanup](first-cleanup.md) if this is your first time). The
-pictures show bwtidy's test vault, so where this page names an item, pick a
-similar one of your own.
+This tutorial continues from [Your first cleanup](first-cleanup.md): you
+are logged in, and the custom field `Password` is `password` in every item.
+The pictures show bwtidy's test vault, so where this page names an item,
+pick a similar one of your own.
 
 ## Make a datatype
 
@@ -89,7 +89,8 @@ cannot fill them in. The template turns them into logins.
 2. Right click its name and pick Convert to template…, then pick Web login
    as the Template.
 3. bwtidy pairs the values by name: `fields.username` goes into
-   `login.username` and `fields.Password` into `login.password`. Leave
+   `login.username` and `fields.password` into `login.password` (still
+   `fields.Password` if you did not rename it in the first tutorial). Leave
    `login.uris` empty and click Convert.
 
    ![The dialog Convert Old webshop to a template, with the mapping of its username and password, login.uris left empty and Convert outlined](../images/tutorial-convert-dialog.png)

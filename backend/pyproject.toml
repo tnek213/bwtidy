@@ -59,6 +59,7 @@ markers = [
     "e2e: drives the app in a browser against the dev vault stack, run with scripts/e2e",
     "bw_cli: runs a fake bw executable of its own, so conftest leaves the CLI calls alone",
     "real_scrypt: uses the real scrypt of pyrage, no stand-in",
+    "tutorial(page): the docs test of the tutorial on that docs page, run in the docs order on one vault",
 ]
 
 [tool.importlinter]

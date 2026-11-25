@@ -522,12 +522,20 @@ leaves `docs/images` as it was.
   Nothing depends on which markdown file links which image.
 
 A docs test that writes to the vault puts it back at its end (`put_back`), so
-the tests after it see the seeded vault. Times, backup names and backup sizes
-differ from run to run, and a hidden cell (`data-shot-hide`) keeps its width,
-so the table still sizes its column by the real text. A shot that shows them
+the tests after it see the seeded vault. The tutorials are the exception: a
+reader takes them in order, so `test_tutorials.py` holds one test for each,
+in the order of the docs, each continuing from the vault the one before left.
+Its module-scoped fixture `one_vault` puts the vault back once, after the
+last, and a tutorial whose predecessor did not pass in the run skips
+(`-k test_tutorials` runs them all). Each carries the marker `tutorial`
+with its page, and `tests/repo/test_tutorial_order.py` checks that their
+order is the one of the docs' nav and that only that fixture puts the vault
+back. Times, backup names and backup sizes differ from run to run, and a
+hidden cell (`data-shot-hide`) keeps its width, so the table still sizes its
+column by the real text. A shot that shows them
 routes the API through `FixedValues` (`docs_shots.py`, through `page.route`)
 instead of hiding the cells: it maps them onto fixed ones, times in their
-order. `test_tutorial.py` does so for its Queue and Change log shots,
+order. `test_tutorials.py` does so for its Queue and Change log shots,
 `test_explanation.py` for its Change log row.
 
 The full run deletes every image in `docs/images` first, so an image no test
