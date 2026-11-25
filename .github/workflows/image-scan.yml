@@ -1,0 +1,64 @@
+# Scans the published images on Docker Hub (docker.io/tnek213/bwtidy:latest and :main) with Docker Scout every day,
+# after every image pushed from main and on a pull request that changes this workflow, and reports each vulnerability
+# that an update fixes as a code scanning alert, the same data as the Scout view on Docker Hub.
+# The job skips while the repo is private, as the image is made public together with the repo.
+name: Image scan
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_run:
+    workflows: [Image]
+    types: [completed]
+    branches: [main]
+  pull_request:
+    paths:
+      - .github/workflows/image-scan.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: image-scan-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    # after the workflow Image only when it succeeded, as a failed or skipped run pushed nothing new
+    if: ${{ !github.event.repository.private && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: [latest, main]
+    steps:
+      - name: Check the Docker Hub token
+        env:
+          DOCKERHUB_SCOUT_TOKEN: ${{ secrets.DOCKERHUB_SCOUT_TOKEN }}
+        run: |
+          if [ -z "$DOCKERHUB_SCOUT_TOKEN" ]; then
+            echo "set the repository secret DOCKERHUB_SCOUT_TOKEN (a Docker Hub access token with Public Repo Read-only)" >&2
+            exit 1
+          fi
+      # Scout needs a Docker Hub login even for a public image
+      # v4.8.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550
+        with:
+          username: tnek213
+          password: ${{ secrets.DOCKERHUB_SCOUT_TOKEN }}
+      # v1.30.0
+      - uses: docker/scout-action@b265cd48f8a1451d2680815b3e8dc4ed65ee16e7
+        with:
+          command: cves
+          image: registry://docker.io/tnek213/bwtidy:${{ matrix.tag }}
+          only-fixed: true
+          sarif-file: scout-${{ matrix.tag }}.sarif
+          write-comment: false
+      # a category per tag, so that an upload for one tag never closes the alerts of the other
+      # v4.39.5
+      - uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934
+        with:
+          sarif_file: scout-${{ matrix.tag }}.sarif
+          category: image-${{ matrix.tag }}
