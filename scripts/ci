@@ -3,6 +3,8 @@
 
   scripts/ci                    check everything
   scripts/ci --fix              let ruff fix what it can first, then check
+  scripts/ci --quick            check everything except the two test suites (pytest, npm test)
+  scripts/ci --quick --fix      both
 
 First it checks that frontend/package.json has the version of backend/pyproject.toml (Python's
 0.1.0a1 is 0.1.0-alpha.1 as semver.org spells it, b is beta, rc is rc), the only version that is
@@ -23,6 +25,10 @@ not tests/integration, that is scripts/integration, nor tests/e2e, that is scrip
 Frontend (frontend/, via npm): oxlint, dependency-cruiser (what imports what, cycles), knip (unused
 files, exports and types), tsc + vite build, vitest.
 Only ruff can fix anything. The rest needs a human (or an agent).
+
+--quick skips pytest and npm test, the two test suites and the heaviest steps (a Check has
+quick=False). The pre-push hook uses it for a push to a branch other than main. The CI workflow
+always runs the full checks, so a branch is fully tested before it lands.
 
 pytest runs in parallel (pytest-xdist, --dist worksteal) with one worker per core, half the
 cores when the machine is already busy. PYTEST_WORKERS set by the caller wins. Every test runs,
@@ -63,6 +69,8 @@ class Check(NamedTuple):
     env: Callable[[], dict[str, str]] | None = None
     hint: str = ""
     fixable: bool = False
+    ## False for a step that scripts/ci --quick skips
+    quick: bool = True
 
 
 def uv(*cmd: str) -> list[str]:
@@ -145,12 +153,13 @@ CHECKS = [
             "--dist",
             "worksteal",
         ),
+        quick=False,
     ),
     Check("npm lint", FRONTEND, npm("lint")),
     Check("npm lint:deps", FRONTEND, npm("lint:deps")),
     Check("npm lint:exports", FRONTEND, npm("lint:exports")),
     Check("npm build", FRONTEND, npm("build")),
-    Check("npm test", FRONTEND, npm("test"), env=vitest_env),
+    Check("npm test", FRONTEND, npm("test"), env=vitest_env, quick=False),
 ]
 
 FIXES = [
@@ -179,14 +188,20 @@ def ensure_deps() -> None:
         subprocess.run(["npm", "ci", "--no-fund", "--no-audit"], cwd=FRONTEND, check=True)
 
 
+def quick_checks(quick: bool) -> list[Check]:
+    """The checks to run: all of them, or without the test suites when quick."""
+    return [check for check in CHECKS if check.quick or not quick]
+
+
 def main(args: list[str]) -> int:
-    if args not in ([], ["--fix"]):
-        print("usage: ci [--fix]", file=sys.stderr)
+    if not set(args) <= {"--fix", "--quick"} or len(set(args)) != len(args):
+        print("usage: ci [--fix] [--quick]", file=sys.stderr)
         return 2
 
-    fix = args == ["--fix"]
+    fix = "--fix" in args
+    quick = "--quick" in args
     prepared = False
-    for check in CHECKS:
+    for check in quick_checks(quick):
         if check.cwd != ROOT and not prepared:
             ensure_deps()
             if fix:
@@ -198,7 +213,7 @@ def main(args: list[str]) -> int:
         if failure is not None:
             print(f"FAILED: {failure}", file=sys.stderr)
             return 1
-    print("ci: all green")
+    print("ci: all green (quick: pytest and npm test skipped)" if quick else "ci: all green")
     return 0
 
 

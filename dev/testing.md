@@ -560,7 +560,9 @@ On every push it reads the refs git pushes. A delete, a tag on a commit the
 remote has and a branch on such a commit check nothing, so a push without a
 new commit runs nothing. Otherwise, in two steps that each say what they do:
 
-1. `scripts/ci` on the commit of each ref pushed. When that commit is the
+1. `scripts/ci` on the commit of each ref pushed, in full for a push to `main`
+   or a tag, else `scripts/ci --quick` (everything but pytest and `npm test`,
+   the CI workflow runs those on the pull request). When that commit is the
    checked-out HEAD and the checkout has no changes nor untracked files, ci
    runs in place. Otherwise it runs in a temporary worktree of the commit
    (`git worktree add --detach`, removed after), where ci first installs the
@@ -577,7 +579,10 @@ new commit runs nothing. Otherwise, in two steps that each say what they do:
 
 A step that passed on a tree (the same files, whatever the commit) is noted in
 `bwtidy-pre-push` in the git directory and skipped when that tree is pushed
-again, so the push after the screenshots commit runs only `scripts/ci`.
+again, so the push after the screenshots commit runs only `scripts/ci`. The full
+ci is noted as `ci` and skips both kinds, the quick one as `ci-quick` and
+skips only the quick kind, so a tree that passed only the quick ci is tested
+in full on a push to `main`.
 
 ## Checks on the repo
 

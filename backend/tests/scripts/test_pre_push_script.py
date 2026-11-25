@@ -12,7 +12,7 @@ import pytest
 from tests.support.git_repo import cloned, commit, git
 
 ZERO = "0" * 40
-CI = '#!/bin/sh\necho "ci $PWD" >> "$PRE_PUSH_LOG"\nexit "${CI_EXIT:-0}"\n'
+CI = '#!/bin/sh\necho "ci $* $PWD" >> "$PRE_PUSH_LOG"\nexit "${CI_EXIT:-0}"\n'
 SHOTS = (
     '#!/bin/sh\necho "docs-shots $PWD" >> "$PRE_PUSH_LOG"\n'
     'if [ -n "$SHOT" ]; then printf %s "$SHOT" > docs/images/shot.png; fi\n'
@@ -43,6 +43,11 @@ def pre_push(clone, load_script, monkeypatch):
     monkeypatch.setattr(script, "ROOT", clone)
     monkeypatch.setattr(script, "SCRIPTS", clone / "scripts")
     return script
+
+
+def ci(where: Path, *args: str) -> str:
+    """The stand-in's log line for a run of scripts/ci with ARGS in WHERE."""
+    return f"ci {' '.join(args)} {where}"
 
 
 def log(clone: Path) -> list[str]:
@@ -77,7 +82,7 @@ def test_a_malformed_line_stops_the_push(pre_push, clone):
 def test_the_clean_head_is_tested_here_and_no_ui_change_takes_no_shot(pre_push, clone, capsys):
     head = commit(clone, "backend/app.py")
     assert push(pre_push, clone, line(head, remote(clone))) == 0
-    assert log(clone) == [f"ci {clone}"]
+    assert log(clone) == [ci(clone)]
     out = capsys.readouterr().out
     assert "step 1 of 2" in out
     assert "no UI change" in out
@@ -87,7 +92,7 @@ def test_a_failing_ci_stops_the_push(pre_push, clone, monkeypatch, capsys):
     monkeypatch.setenv("CI_EXIT", "1")
     head = commit(clone, "frontend/src/App.tsx")
     assert push(pre_push, clone, line(head, remote(clone))) == 1
-    assert log(clone) == [f"ci {clone}"]
+    assert log(clone) == [ci(clone)]
     assert "push stopped" in capsys.readouterr().out
 
 
@@ -97,8 +102,8 @@ def test_a_commit_that_is_not_the_clean_head_is_tested_in_its_own_worktree(pre_p
     assert push(pre_push, clone, line(pushed, remote(clone))) == 0
     [entry] = log(clone)
     assert entry.startswith("ci ")
-    assert entry != f"ci {clone}"
-    assert not Path(entry.removeprefix("ci ")).exists()
+    assert entry != ci(clone)
+    assert not Path(entry.split()[-1]).exists()
     assert git(clone, "worktree", "list").count("\n") == 0
 
 
@@ -106,7 +111,7 @@ def test_a_tree_that_passed_ci_before_is_not_tested_again(pre_push, clone, capsy
     head = commit(clone, "backend/app.py")
     assert push(pre_push, clone, line(head, remote(clone))) == 0
     assert push(pre_push, clone, line(head, remote(clone), "feat/x")) == 0
-    assert log(clone) == [f"ci {clone}"]
+    assert log(clone) == [ci(clone)]
     assert "skipped" in capsys.readouterr().out
 
 
@@ -114,7 +119,7 @@ def test_a_ui_change_with_current_shots_pushes(pre_push, clone, monkeypatch):
     monkeypatch.setenv("SHOT", "old")
     head = commit(clone, "frontend/src/App.tsx")
     assert push(pre_push, clone, line(head, remote(clone))) == 0
-    assert log(clone) == [f"ci {clone}", f"docs-shots {clone}"]
+    assert log(clone) == [ci(clone), f"docs-shots {clone}"]
     assert git(clone, "rev-parse", "HEAD") == head
 
 
@@ -132,7 +137,7 @@ def test_changed_shots_are_committed_and_the_next_push_finds_them_current(
 
     again = git(clone, "rev-parse", "HEAD")
     assert push(pre_push, clone, line(again, remote(clone))) == 0
-    assert log(clone) == [f"ci {clone}", f"docs-shots {clone}", f"ci {clone}"]
+    assert log(clone) == [ci(clone), f"docs-shots {clone}", ci(clone)]
 
 
 def test_a_new_branch_with_a_ui_change_takes_the_shots(pre_push, clone, monkeypatch):
@@ -140,7 +145,7 @@ def test_a_new_branch_with_a_ui_change_takes_the_shots(pre_push, clone, monkeypa
     git(clone, "checkout", "--quiet", "-b", "feat/x")
     head = commit(clone, "backend/tests/e2e/docs/test_tutorial.py")
     assert push(pre_push, clone, line(head, ZERO, "feat/x")) == 0
-    assert log(clone) == [f"ci {clone}", f"docs-shots {clone}"]
+    assert log(clone) == [ci(clone, "--quick"), f"docs-shots {clone}"]
 
 
 def test_a_ui_change_that_is_not_checked_out_stops_the_push(pre_push, clone, capsys):
@@ -158,7 +163,7 @@ def test_a_ui_change_elsewhere_whose_shots_were_taken_pushes(pre_push, clone, mo
     assert push(pre_push, clone, line(head, remote(clone))) == 0
     git(clone, "checkout", "--quiet", "-b", "feat/y", "origin/main")
     assert push(pre_push, clone, line(head, ZERO, "feat/x")) == 0
-    assert log(clone) == [f"ci {clone}", f"docs-shots {clone}"]
+    assert log(clone) == [ci(clone), f"docs-shots {clone}"]
 
 
 def test_a_ui_change_in_a_checkout_with_changes_stops_the_push(pre_push, clone, capsys):
@@ -167,6 +172,43 @@ def test_a_ui_change_in_a_checkout_with_changes_stops_the_push(pre_push, clone, 
     assert push(pre_push, clone, line(head, remote(clone))) == 1
     assert "commit or stash" in capsys.readouterr().out
     assert [entry.split()[0] for entry in log(clone)] == ["ci"]
+
+
+def test_a_push_to_main_runs_the_full_ci(pre_push, clone, capsys):
+    head = commit(clone, "backend/app.py")
+    assert push(pre_push, clone, line(head, remote(clone))) == 0
+    assert log(clone) == [ci(clone)]
+    assert "--quick" not in capsys.readouterr().out
+
+
+def test_a_push_of_a_new_feature_branch_runs_the_quick_ci(pre_push, clone, capsys):
+    git(clone, "checkout", "--quiet", "-b", "feat/x")
+    head = commit(clone, "backend/app.py")
+    assert push(pre_push, clone, line(head, ZERO, "feat/x")) == 0
+    assert log(clone) == [ci(clone, "--quick")]
+    assert "scripts/ci --quick on" in capsys.readouterr().out
+
+
+def test_main_and_a_feature_branch_on_the_same_commit_run_the_full_ci_once(pre_push, clone):
+    head = commit(clone, "backend/app.py")
+    stdin = line(head, remote(clone)) + line(head, ZERO, "feat/x")
+    assert push(pre_push, clone, stdin) == 0
+    assert log(clone) == [ci(clone)]
+
+
+def test_a_tree_that_passed_the_full_ci_is_not_tested_again_on_a_feature_branch(pre_push, clone):
+    head = commit(clone, "backend/app.py")
+    assert push(pre_push, clone, line(head, remote(clone))) == 0
+    assert push(pre_push, clone, line(head, ZERO, "feat/x")) == 0
+    assert log(clone) == [ci(clone)]
+
+
+def test_a_tree_that_passed_only_the_quick_ci_is_tested_in_full_on_main(pre_push, clone):
+    head = commit(clone, "backend/app.py")
+    assert push(pre_push, clone, line(head, ZERO, "feat/x")) == 0
+    assert push(pre_push, clone, line(head, ZERO, "feat/y")) == 0
+    assert push(pre_push, clone, line(head, remote(clone))) == 0
+    assert log(clone) == [ci(clone, "--quick"), ci(clone)]
 
 
 HOOK = Path(__file__).resolve().parents[3] / "scripts" / "hooks" / "pre-push"

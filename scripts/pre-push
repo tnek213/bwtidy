@@ -8,7 +8,9 @@ being pushed on stdin, one `LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA` per line.
 ref whose commit the remote already has (a tag on a pushed commit), check nothing. A push with no
 new commit runs nothing at all. Any failure exits 1, so git stops the push.
 
-1. scripts/ci on the commit of each ref with new commits. When that commit is the checked-out
+1. scripts/ci on the commit of each ref with new commits: the full one when an update naming
+   the commit pushes main or a tag, else scripts/ci --quick (without pytest and npm test, the CI
+   workflow runs those on the pull request). When that commit is the checked-out
    HEAD and the checkout has no changes (nor untracked files), ci runs here. Otherwise it runs in
    a temporary worktree of the commit (git worktree add --detach, removed again), whose
    dependencies ci installs first, so what is tested is always the pushed commit.
@@ -21,7 +23,8 @@ new commit runs nothing at all. Any failure exits 1, so git stops the push.
    the screenshots current.
 
 A step that passed on a tree (the same files, whatever the commit) is noted in the git
-directory (bwtidy-pre-push) and skipped on the next push of that tree.
+directory (bwtidy-pre-push) and skipped on the next push of that tree. The full ci is noted as
+ci and skips both kinds, the quick one as ci-quick and skips only the quick kind.
 """
 
 import os
@@ -78,41 +81,50 @@ def run(argv: list[str], cwd: Path) -> tuple[bool, float]:
     return code == 0, time.monotonic() - started
 
 
-def ci_in_worktree(commit: str) -> tuple[bool, float]:
-    """scripts/ci of COMMIT in a temporary worktree of it, removed again."""
+def ci_in_worktree(commit: str, args: list[str]) -> tuple[bool, float]:
+    """scripts/ci ARGS of COMMIT in a temporary worktree of it, removed again."""
     place = Path(tempfile.mkdtemp(prefix="bwtidy-pre-push-"))
     worktree = place / "checkout"
     git("worktree", "add", "--detach", "--quiet", str(worktree), commit, repo=ROOT)
     try:
-        return run([str(worktree / "scripts" / "ci")], worktree)
+        return run([str(worktree / "scripts" / "ci"), *args], worktree)
     finally:
         git("worktree", "remove", "--force", str(worktree), repo=ROOT, check=False)
         shutil.rmtree(place, ignore_errors=True)
 
 
 def ci_step(updates: list[prepush.RefUpdate]) -> bool:
-    """scripts/ci on every commit pushed, once per commit, False at the first that fails."""
-    commits: dict[str, list[str]] = {}
+    """scripts/ci on every commit pushed, once per commit, False at the first that fails.
+
+    The full ci for a commit that main or a tag pushes, else scripts/ci --quick.
+    """
+    commits: dict[str, list[prepush.RefUpdate]] = {}
     for update in updates:
         commit = prepush.tip(update, ROOT)
         assert commit is not None
-        commits.setdefault(commit, []).append(update.name)
-    for commit, names in commits.items():
-        what = f"{short(commit)} ({', '.join(names)})"
-        if prepush.passed("ci", tree(commit), ROOT):
-            say(f"scripts/ci passed on the files of {what} before, skipped")
+        commits.setdefault(commit, []).append(update)
+    for commit, named in commits.items():
+        what = f"{short(commit)} ({', '.join(u.name for u in named)})"
+        full = any(prepush.full_ci(u) for u in named)
+        step, args = ("ci", []) if full else ("ci-quick", ["--quick"])
+        command = "scripts/ci" if full else "scripts/ci --quick"
+        tree_id = tree(commit)
+        if prepush.passed("ci", tree_id, ROOT) or (
+            not full and prepush.passed("ci-quick", tree_id, ROOT)
+        ):
+            say(f"{command} passed on the files of {what} before, skipped")
             continue
         if commit == head() and clean():
-            say(f"scripts/ci on {what}, the checked-out HEAD")
-            ok, took = run([str(SCRIPTS / "ci")], ROOT)
+            say(f"{command} on {what}, the checked-out HEAD")
+            ok, took = run([str(SCRIPTS / "ci"), *args], ROOT)
         else:
-            say(f"scripts/ci on {what} in a temporary worktree (it is not the clean HEAD here)")
-            ok, took = ci_in_worktree(commit)
+            say(f"{command} on {what} in a temporary worktree (it is not the clean HEAD here)")
+            ok, took = ci_in_worktree(commit, args)
         if not ok:
-            say(f"scripts/ci failed on {what} after {took:.0f} s, push stopped")
+            say(f"{command} failed on {what} after {took:.0f} s, push stopped")
             return False
-        prepush.record("ci", tree(commit), ROOT)
-        say(f"scripts/ci passed on {what} in {took:.0f} s")
+        prepush.record(step, tree_id, ROOT)
+        say(f"{command} passed on {what} in {took:.0f} s")
     return True
 
 

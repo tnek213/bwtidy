@@ -23,11 +23,13 @@ uv sync --locked --project backend   # backend venv with dev tools
 npm ci --prefix frontend             # frontend dependencies
 scripts/ci                           # all fast checks, backend and frontend
 scripts/ci --fix                     # let ruff fix what it can, then check
+scripts/ci --quick                   # everything except pytest and npm test
 scripts/install-hooks                # once: test every push, take the docs screenshots of a UI change
 ```
 
 `scripts/install-hooks` installs the pre-push hook: before every push it runs
-`scripts/ci` on what you push and, when the push changes the UI, takes the
+`scripts/ci` on what you push to main (`scripts/ci --quick` for any other branch,
+the pull request's CI runs the rest) and, when the push changes the UI, takes the
 docs screenshots again and commits those that changed (see
 [The pre-push hook](testing.md#the-pre-push-hook)).
 
@@ -65,7 +67,7 @@ Every script prints its usage with `--help`.
 | `scripts/e2e`           | the browser tests against the gateway ([Testing](testing.md#end-to-end-tests))           |
 | `scripts/docs-shots`    | takes the documentation screenshots ([Testing](testing.md#documentation-screenshots))    |
 | `scripts/install-hooks` | installs the pre-push hook ([Testing](testing.md#the-pre-push-hook))                      |
-| `scripts/pre-push`      | what the pre-push hook runs: ci on what is pushed, the docs screenshots of a UI change ([Testing](testing.md#the-pre-push-hook)) |
+| `scripts/pre-push`      | what the pre-push hook runs: ci (quick unless main) on what is pushed, the docs screenshots of a UI change ([Testing](testing.md#the-pre-push-hook)) |
 | `scripts/docs-lint`     | checks the images, links and prose of every markdown file ([Testing](testing.md#docs-lint)) |
 | `scripts/mcp-reference` | writes `docs/reference/mcp-tools.md` from the MCP tools ([Testing](testing.md#the-mcp-reference)) |
 | `scripts/third-party`   | writes the About page's list of packages ([Testing](testing.md#dependencies))           |
