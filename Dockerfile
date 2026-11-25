@@ -62,6 +62,10 @@ RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
 
 FROM python AS app
 
+## pip comes with the base image and nothing here runs it (the venv is built by uv in the backend stage)
+RUN rm -rf /usr/local/lib/python3.13/site-packages/pip /usr/local/lib/python3.13/site-packages/pip-*.dist-info \
+    /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.13
+
 COPY --from=bitwarden-cli /usr/local/bin/node /usr/local/bin/node
 COPY --from=bitwarden-cli /usr/local/lib/bitwarden-cli/node_modules /usr/local/lib/bitwarden-cli/node_modules
 

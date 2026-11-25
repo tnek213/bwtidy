@@ -117,7 +117,8 @@ final stage, `node:24-trixie-slim` of the build stages. The stages `frontend`, `
 `bitwarden-cli` (`npm ci` in `docker/bitwarden-cli/`) and `backend` (the venv) build
 what the final stage `app` copies: the node binary, the CLI's `node_modules`, the venv,
 the static files and the docs site. npm, uv, uv's cache and the backend's sources stay
-in the build stages.
+in the build stages. The app stage also removes pip, which comes with the base image: nothing
+in the image runs it, and a scanner would report on its vendored packages.
 
 A push to main that changes only files the image never copies (the `paths-ignore` list in
 the workflow: `README.md`, the other top-level docs, the compose files, `dev/`, the tests,
