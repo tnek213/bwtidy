@@ -37,9 +37,17 @@ CDN, as a running bwtidy serves the site offline. -#}
     .md-typeset table li {
       max-width: none;
     }
-    /* the theme breaks code anywhere, which splits a variable name over lines in a table */
-    .md-typeset table:not([class]) td code {
+    /* inline code stays on one line, in text and tables alike (the theme breaks it anywhere, even
+       at a hyphen), and may break only on a narrow screen where it would not fit at all */
+    .md-typeset :not(pre) > code {
+      white-space: nowrap;
       word-break: normal;
+    }
+    @media screen and (max-width: 44.9375em) {
+      .md-typeset :not(pre) > code {
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
     }
     .md-typeset img[data-zoom] {
       cursor: zoom-in;

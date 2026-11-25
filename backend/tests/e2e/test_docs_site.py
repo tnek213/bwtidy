@@ -59,14 +59,17 @@ def test_search_finds_pages(page: Page):
 THEME_COLUMN = 810
 
 
-def test_the_content_column_is_wide_and_keeps_a_variable_on_one_line(page: Page):
+def test_the_content_column_is_wide_and_keeps_inline_code_on_one_line(page: Page):
     page.goto("/docs/reference/configuration/")
     width = page.locator(".md-content").evaluate("e => e.getBoundingClientRect().width")
     assert width > THEME_COLUMN + 150
-    variables = page.locator("article td:first-child code")
-    assert variables.count() > 10
-    split = variables.evaluate_all("codes => codes.filter(c => c.getClientRects().length > 1)")
+    codes = page.locator("article :not(pre) > code")
+    assert codes.count() > 10
+    split = codes.evaluate_all(
+        "codes => codes.filter(c => c.getClientRects().length > 1).map(c => c.textContent)"
+    )
     assert split == []
+    assert page.locator("article td code", has_text="bwtidy-backups").count() > 0
 
 
 def test_running_text_wraps_at_a_readable_length_while_pictures_use_the_column(page: Page):
