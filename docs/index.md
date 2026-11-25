@@ -67,7 +67,7 @@ How each part works is under [Explanation](#explanation).
   Claude Code, Codex, Copilot CLI or Gemini CLI.
 - [Show or hide columns](how-to/show-hide-columns.md) in the grid.
 - [Rename an attachment](how-to/rename-attachment.md).
-- [Restore a vault from a backup](restore.md), with only age, Python 3 and
+- [Restore a vault from a backup](restore.md), with only age, Python 3, bash and
   the Bitwarden CLI.
 
 ## Reference
