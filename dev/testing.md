@@ -72,6 +72,8 @@ modules of `backend/tests/support/` that help them:
 - `quiet.py`, see [Vault values in a failure](#vault-values-in-a-failure).
 - `hooks.py`, hooks that do nothing, for a test that builds an object such as
   `VaultCache` or `BwServeProcess` without the app around it.
+- `git_repo.py`, a clone with a bare origin and `commit`, for the tests of a
+  script that reads git (the pre-push hook's).
 
 The tests of `tests/scripts` load a script by name with the fixture
 `load_script` (`load_script("dev-vault")`), and `backend/tests/conftest.py`
@@ -532,7 +534,47 @@ deletes nothing and rewrites only their images. Both then run
 no test takes any more, fails the run. Two runs on the same code give the same
 files on one machine, byte for byte, but another machine's fonts give other
 files. A UI change reruns the docs tests of what it touches
-(`scripts/docs-shots -k NAME`) and commits the changed images with it.
+(`scripts/docs-shots -k NAME`) and commits the changed images with it. The
+[pre-push hook](#the-pre-push-hook) makes sure of it: a push that touches the
+UI takes every screenshot again and commits those that changed.
+
+## The pre-push hook
+
+```sh
+scripts/install-hooks           # once after cloning, --force replaces a pre-push hook that is not ours
+```
+
+`scripts/install-hooks` links `hooks/pre-push` of the repo's git directory
+(`git rev-parse --git-common-dir`, which every worktree shares) to the
+committed `scripts/hooks/pre-push`, in the main checkout when it has that
+file. Running it again changes nothing. It keeps a pre-push hook that is not
+its own and prints it, and it never changes git's config: with
+`core.hooksPath` set git runs the hooks there instead, which it says. The hook
+runs `scripts/pre-push` of the checkout you push from, so the checks are those
+of the code you push. Its decisions are in `scripts/devlib/prepush.py`.
+
+On every push it reads the refs git pushes. A delete, a tag on a commit the
+remote has and a branch on such a commit check nothing, so a push without a
+new commit runs nothing. Otherwise, in two steps that each say what they do:
+
+1. `scripts/ci` on the commit of each ref pushed. When that commit is the
+   checked-out HEAD and the checkout has no changes nor untracked files, ci
+   runs in place. Otherwise it runs in a temporary worktree of the commit
+   (`git worktree add --detach`, removed after), where ci first installs the
+   dependencies. Either way it tests what is pushed. A failure stops the push.
+2. When the push changes a file under `frontend/src/` or
+   `backend/tests/e2e/docs/` (against the remote's commit, or for a new
+   branch against its merge base with the remote's `main`),
+   `scripts/docs-shots` takes every screenshot again, about 3 minutes when the
+   dev stack's snapshot exists (the dev stack stays up, `scripts/dev-vault down`
+   stops it). That needs the pushed commit checked out without changes, else
+   the push stops and says so. When `docs/images` changed, the hook commits
+   exactly those files as "Take the docs screenshots again" and stops the push.
+   Push again: the screenshots are then current.
+
+A step that passed on a tree (the same files, whatever the commit) is noted in
+`bwtidy-pre-push` in the git directory and skipped when that tree is pushed
+again, so the push after the screenshots commit runs only `scripts/ci`.
 
 ## Checks on the repo
 

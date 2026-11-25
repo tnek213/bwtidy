@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""install-hooks: install the pre-push hook, run once after cloning.
+
+  scripts/install-hooks [--force]
+
+Links hooks/pre-push of the repo's git directory (git rev-parse --git-common-dir, so every
+worktree shares it) to the committed scripts/hooks/pre-push, which runs scripts/pre-push of the
+checkout being pushed from: scripts/ci on what is pushed, then the docs screenshots for a UI
+change (see scripts/pre-push --help). The link points into the main checkout when it has that
+file, else into this checkout, which it then names: run install-hooks again once the main
+checkout has it.
+
+Running it again changes nothing, and moves a link of ours that points elsewhere. A pre-push hook
+that is not ours is printed and kept, --force replaces it. It never changes git's config: when
+core.hooksPath is set, git runs the hooks there instead, which it says.
+"""
+
+import os
+import sys
+from pathlib import Path
+
+from devlib.git import git, output
+from devlib.paths import ROOT
+
+NAME = "install-hooks"
+HOOK = Path("scripts") / "hooks" / "pre-push"
+
+
+def git_dir(repo: Path) -> Path:
+    return (repo / output("rev-parse", "--git-common-dir", name=NAME, repo=repo)).resolve()
+
+
+def main_checkout(repo: Path) -> Path | None:
+    """The main worktree, None for a bare repo."""
+    lines = output("worktree", "list", "--porcelain", name=NAME, repo=repo).splitlines()
+    first = lines[: lines.index("")] if "" in lines else lines
+    if "bare" in first or not first[0].startswith("worktree "):
+        return None
+    return Path(first[0].removeprefix("worktree "))
+
+
+def target(repo: Path) -> Path:
+    """The committed hook the link points to: the main checkout's, else this checkout's."""
+    main = main_checkout(repo)
+    if main is not None and (main / HOOK).is_file():
+        return main / HOOK
+    return repo / HOOK
+
+
+def ours(link: Path) -> bool:
+    """A link to some checkout's scripts/hooks/pre-push, even one that is gone."""
+    return link.is_symlink() and Path(os.readlink(link)).parts[-3:] == HOOK.parts
+
+
+def describe(link: Path) -> str:
+    if link.is_symlink():
+        return f"{link} is a link to {os.readlink(link)}"
+    return f"{link} holds:\n{link.read_text(errors='replace').rstrip()}"
+
+
+def install(repo: Path, force: bool) -> int:
+    link = git_dir(repo) / "hooks" / "pre-push"
+    hook = target(repo)
+    if link.is_symlink() and Path(os.readlink(link)) == hook:
+        print(f"{NAME}: {link} already links to {hook}")
+    elif (link.exists() or link.is_symlink()) and not ours(link) and not force:
+        print(describe(link))
+        print(
+            f"{NAME}: {link} is a pre-push hook that is not ours, kept. Move it away (or fold it "
+            f"into {HOOK}) and run scripts/install-hooks again, or run "
+            "scripts/install-hooks --force to replace it.",
+            file=sys.stderr,
+        )
+        return 1
+    else:
+        link.parent.mkdir(parents=True, exist_ok=True)
+        if link.exists() or link.is_symlink():
+            print(f"{NAME}: replacing what was there: {describe(link)}")
+            link.unlink()
+        link.symlink_to(hook)
+        print(f"{NAME}: installed {link}, a link to {hook}")
+    main = main_checkout(repo)
+    if main is not None and hook != main / HOOK:
+        print(
+            f"{NAME}: the main checkout {main} has no {HOOK} yet, so the link points into this "
+            "worktree and breaks when it is removed: run scripts/install-hooks again once the "
+            "main checkout has it"
+        )
+    hooks_path = git("config", "--get", "core.hooksPath", repo=repo, check=False).stdout.strip()
+    if hooks_path:
+        print(
+            f"{NAME}: core.hooksPath is {hooks_path}, so git runs the hooks there and not this "
+            "one. Unset it (git config --unset core.hooksPath) for the hook to run.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def main(args: list[str]) -> int:
+    if args[:1] in (["-h"], ["--help"]):
+        print(__doc__)
+        return 0
+    if args not in ([], ["--force"]):
+        print(f"usage: {NAME} [--force]", file=sys.stderr)
+        return 2
+    return install(ROOT, force=args == ["--force"])
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
