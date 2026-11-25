@@ -112,6 +112,13 @@ main. The image is built for `linux/amd64` with the OCI labels `source`, `versio
 | Push to main | `main` and the short commit (7 characters) |
 | Release | the version as `frontend/package.json` spells it (`0.1.0-alpha.1`) and `latest` |
 
+The image builds on Debian 13 (trixie): `python:3.13-slim-trixie` is the base of the
+final stage, `node:24-trixie-slim` of the build stages. The stages `frontend`, `docs`,
+`bitwarden-cli` (`npm ci` in `docker/bitwarden-cli/`) and `backend` (the venv) build
+what the final stage `app` copies: the node binary, the CLI's `node_modules`, the venv,
+the static files and the docs site. npm, uv, uv's cache and the backend's sources stay
+in the build stages.
+
 A push to main that changes only files the image never copies (the `paths-ignore` list in
 the workflow: `README.md`, the other top-level docs, the compose files, `dev/`, the tests,
 the other workflows) builds nothing. Keep that list in step with the Dockerfile's `COPY`

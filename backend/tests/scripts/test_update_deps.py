@@ -14,10 +14,10 @@ DOCKERFILE = f"""# syntax=docker/dockerfile:1@{OLD}
 
 FROM ghcr.io/astral-sh/uv:0.11@{OLD} AS uv
 
-FROM node:24-bookworm-slim AS node
+FROM node:24-trixie-slim AS node
 
 FROM node AS frontend
-FROM --platform=linux/amd64 python:3.13-slim-bookworm@{OLD} AS python
+FROM --platform=linux/amd64 python:3.13-slim-trixie@{OLD} AS python
 """
 
 WORKFLOW = f"""jobs:
@@ -49,8 +49,8 @@ def test_image_refs_are_the_syntax_line_and_every_from_with_a_tag(deps):
     assert [(r.image, r.tag, r.digest) for r in refs] == [
         ("docker/dockerfile", "1", OLD),
         ("ghcr.io/astral-sh/uv", "0.11", OLD),
-        ("node", "24-bookworm-slim", None),
-        ("python", "3.13-slim-bookworm", OLD),
+        ("node", "24-trixie-slim", None),
+        ("python", "3.13-slim-trixie", OLD),
     ]
 
 
@@ -61,9 +61,9 @@ def test_a_new_digest_keeps_the_tag_and_the_rest_of_the_line(deps):
         text = deps.with_digest(text, ref, NEW)
     assert text.splitlines()[0] == f"# syntax=docker/dockerfile:1@{NEW}"
     assert f"FROM ghcr.io/astral-sh/uv:0.11@{NEW} AS uv" in text
-    assert f"FROM node:24-bookworm-slim@{NEW} AS node" in text
+    assert f"FROM node:24-trixie-slim@{NEW} AS node" in text
     assert "FROM node AS frontend" in text
-    assert f"FROM --platform=linux/amd64 python:3.13-slim-bookworm@{NEW} AS python" in text
+    assert f"FROM --platform=linux/amd64 python:3.13-slim-trixie@{NEW} AS python" in text
     assert OLD not in text
 
 
@@ -82,17 +82,17 @@ def test_registry_of_an_image(deps, image, where):
 
 def test_newer_tags_have_the_same_form_and_a_higher_version(deps):
     tags = [
-        "3.12-slim-bookworm",
-        "3.13-slim-bookworm",
-        "3.14-slim-bookworm",
+        "3.12-slim-trixie",
+        "3.13-slim-trixie",
+        "3.14-slim-trixie",
         "3.14-alpine",
-        "3.14.1-slim-bookworm",
-        "3.15-slim-bookworm",
+        "3.14.1-slim-trixie",
+        "3.15-slim-trixie",
         "latest",
     ]
-    assert deps.newer_tags("3.13-slim-bookworm", tags) == [
-        "3.14-slim-bookworm",
-        "3.15-slim-bookworm",
+    assert deps.newer_tags("3.13-slim-trixie", tags) == [
+        "3.14-slim-trixie",
+        "3.15-slim-trixie",
     ]
     assert deps.newer_tags("0.11", ["0.9", "0.10", "0.11", "0.12", "0.13-alpine", "1.0"]) == [
         "0.12",

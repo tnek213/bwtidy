@@ -75,7 +75,7 @@ class ActionPin:
 
 
 def numbers(tag: str) -> tuple[tuple[int, ...], str] | None:
-    """The leading numbers of a tag and the rest: 24-bookworm-slim is ((24,), "-bookworm-slim")."""
+    """The leading numbers of a tag and the rest: 24-trixie-slim is ((24,), "-trixie-slim")."""
     match = re.fullmatch(r"v?(\d+(?:\.\d+)*)(.*)", tag)
     if match is None:
         return None
@@ -85,7 +85,7 @@ def numbers(tag: str) -> tuple[tuple[int, ...], str] | None:
 def newer_tags(tag: str, tags: list[str]) -> list[str]:
     """The tags of the same form as TAG (as many numbers, the same rest) with a higher version.
 
-    That is what a human decides on: python 3.13-slim-bookworm finds 3.14-slim-bookworm, node 24
+    That is what a human decides on: python 3.13-slim-trixie finds 3.14-slim-trixie, node 24
     finds 26, never a variant such as 3.14-alpine. Oldest first.
     """
     own = numbers(tag)
