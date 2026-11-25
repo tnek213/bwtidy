@@ -323,6 +323,7 @@ The tool note's sections, `sections/`:
 - `sections/datatypes.py` the datatypes section and the check that no datatype a template uses is deleted.
 - `sections/generator.py` the generator section and the query of bw's generator for a set of options.
 - `sections/to_fill.py` the toFill section as the note stores it, and its changes.
+- `sections/note.py` the note section, the name the tool note is expected to have.
 - `sections/matching.py` the scoring and matching of an item against the templates and datatypes.
 
 The operations:
@@ -394,7 +395,7 @@ The browser's door, `api/`:
 - `api/queue.py` the queue: UI edits, decisions, the auto-commit.
 - `api/operations.py` `POST /api/operations` straight to the write path for scripts and test setup, the change log, restore plans, each from the parts `AppState` holds.
 - `api/backups.py` list, take, download and delete backups.
-- `api/templates.py` the templates section and the matches, and the tool note's rename back straight to the write path.
+- `api/templates.py` the templates section and the matches, and the tool note's rename back and keep name straight to the write path.
 - `api/datatypes.py` the datatypes section and the live pattern checks.
 - `api/generator.py` the generator settings and an example value.
 - `api/statistics.py` the numbers of the Statistics page.
@@ -491,8 +492,9 @@ The other ways in:
   operation and its summary and queues it through `AgentVault` with source
   mcp. The check on arrival refuses any secret value. The auto-commit never
   takes it: the user approves it on the Queue page, through the same approve.
-- The tool note's rename back: `POST /api/tool-note/rename-back`
-  (`api/templates.py`) calls the write path directly, without the queue.
+- The tool note's rename back and keep name: `POST
+  /api/tool-note/rename-back` and `POST /api/tool-note/keep-name`
+  (`api/templates.py`) call the write path directly, without the queue.
 - `POST /api/operations` (`api/operations.py`) calls the write path directly,
   without the queue, for scripts and test setup.
 

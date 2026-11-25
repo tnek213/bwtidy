@@ -16,7 +16,7 @@ from support.app import App
 from support.cli import BwCli
 from support.vault import Vault, edit_by_cli, same_secret
 
-from bwtidy.vault.tool_note import TOOL_NOTE_NAME
+from bwtidy.vault.tool_note import TOOL_NOTE_NAME, ToolNoteId, find_tool_note
 from tests.support.section_changes import (
     add_datatype,
     add_template,
@@ -250,6 +250,42 @@ def test_a_note_renamed_in_bitwarden_keeps_the_templates_and_no_second_note(vaul
         ## the app fixture purges the note by its name, so it must be bwtidy again
         if vault.raw(note_id)["name"] != TOOL_NOTE_NAME:
             rename_by_cli(vault, note_id, TOOL_NOTE_NAME)
+
+
+def test_keep_this_name_on_the_real_note(vault: Vault):
+    client = vault.app.client
+    vault.beat()
+    before = client.get("/api/templates").json()
+    note_id = before["toolNoteId"]
+    notes = vault.raw(note_id)["notes"]
+    rename_by_cli(vault, note_id, "bwtidyK")
+    try:
+        assert vault.app.login().status_code == 200
+        vault.beat()
+        after = client.get("/api/templates").json()
+        assert (after["toolNoteName"], after["toolNoteExpectedName"]) == ("bwtidyK", "bwtidy")
+
+        response = client.post("/api/tool-note/keep-name", json={"name": "bwtidyK"})
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert (body["toolNoteName"], body["toolNoteExpectedName"]) == ("bwtidyK", "bwtidyK")
+        assert body["backup"]
+        kept = vault.raw_after(note_id, after["revisionDate"])
+        assert kept["name"] == "bwtidyK"
+        assert json.loads(kept["notes"]) == {**json.loads(notes), "note": {"name": "bwtidyK"}}
+        doc = client.get("/api/templates").json()
+        assert (doc["toolNoteName"], doc["toolNoteExpectedName"]) == ("bwtidyK", "bwtidyK")
+        assert doc["templates"] == before["templates"]
+        ## a bwtidy that does not know the id (a reinstall) finds the note by the name it kept
+        found = find_tool_note(vault.app.session.cache, ToolNoteId())
+        assert found is not None
+        assert found["id"] == note_id
+        assert [n["id"] for n in personal_notes_named_bwtidy(vault)] == [note_id]
+    finally:
+        ## the app fixture purges the note by its name, so it must be bwtidy again
+        edit_by_cli(vault, note_id, name=TOOL_NOTE_NAME, notes=notes)
+        vault.call(vault.client.sync)
+        vault.call(vault.app.session.cache.load)
 
 
 def test_a_templates_save_keeps_a_section_it_does_not_know(vault: Vault):

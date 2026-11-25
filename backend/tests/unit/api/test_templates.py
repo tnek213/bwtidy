@@ -87,6 +87,7 @@ def test_a_fresh_tool_note_holds_no_templates(env: AppEnv):
         "revisionDate": note["revisionDate"],
         "toolNoteId": note["id"],
         "toolNoteName": "bwtidy",
+        "toolNoteExpectedName": "bwtidy",
         "saving": False,
     }
     assert env.client.get("/api/grid").json()["toolNoteId"] == note["id"]
@@ -139,6 +140,69 @@ def test_rename_it_back_goes_through_the_write_path(env: AppEnv):
     [entry] = env.client.get("/api/change-log").json()
     assert (entry["operationKind"], entry["itemIds"]) == ("setLeaf", [note["id"]])
     assert env.client.get("/api/templates").json()["toolNoteName"] == "bwtidy"
+
+
+def test_keep_this_name_saves_the_expected_name_through_the_write_path(env: AppEnv):
+    assert save(env, COMPUTER).status_code == 202
+    note = rename_in_bitwarden(env, "Pass")
+    assert env.client.get("/api/templates").json()["toolNoteExpectedName"] == "bwtidy"
+    logged = len(env.client.get("/api/change-log").json())
+    backups = len(env.backups)
+    assert env.client.post("/api/tool-note/keep-name", json={}).status_code == 422
+    ## the warning showed another name than the note has now
+    response = env.client.post("/api/tool-note/keep-name", json={"name": "Other"})
+    assert response.status_code == 409
+    assert "renamed again" in response.json()["detail"]
+    assert len(env.client.get("/api/change-log").json()) == logged
+    assert len(env.backups) == backups
+    response = env.client.post("/api/tool-note/keep-name", json={"name": "Pass"})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert (body["toolNoteName"], body["toolNoteExpectedName"]) == ("Pass", "Pass")
+    assert len(env.backups) == backups + 1
+    assert body["backup"] == env.backups[-1]
+    saved = named(env, "Pass")
+    assert saved["id"] == note["id"]
+    assert body["revisionDate"] == saved["revisionDate"]
+    ## only the note section is new, the templates and the password field stay
+    assert json.loads(saved["notes"]) == {
+        "version": 1,
+        "templates": [COMPUTER],
+        "note": {"name": "Pass"},
+    }
+    assert [f["name"] for f in saved["fields"]] == ["backup-password"]
+    entries = env.client.get("/api/change-log").json()
+    assert (entries[0]["operationKind"], entries[0]["itemIds"]) == (
+        "setToolNoteSection",
+        [note["id"]],
+    )
+    doc = env.client.get("/api/templates").json()
+    assert (doc["toolNoteName"], doc["toolNoteExpectedName"]) == ("Pass", "Pass")
+    assert doc["templates"] == [COMPUTER]
+
+
+def test_rename_it_back_gives_the_note_the_name_it_kept(env: AppEnv):
+    rename_in_bitwarden(env, "Pass")
+    assert env.client.post("/api/tool-note/keep-name", json={"name": "Pass"}).status_code == 200
+    note = rename_in_bitwarden_again(env, "Pass", "Other")
+    doc = env.client.get("/api/templates").json()
+    assert (doc["toolNoteName"], doc["toolNoteExpectedName"]) == ("Other", "Pass")
+    response = env.client.post(
+        "/api/tool-note/rename-back", json={"revisionDate": note["revisionDate"]}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert (body["toolNoteName"], body["toolNoteExpectedName"]) == ("Pass", "Pass")
+    assert named(env, "Pass")["id"] == note["id"]
+
+
+def rename_in_bitwarden_again(env: AppEnv, name: str, to: str) -> dict[str, Any]:
+    """Rename the tool note named name behind bwtidy's back."""
+    note = named(env, name)
+    note["name"] = to
+    note["revisionDate"] = "2026-10-28T11:00:00.000Z"
+    env.app.state.bw.session.cache.items = copy.deepcopy(env.bw.items)
+    return note
 
 
 def test_a_grid_rename_of_the_tool_note_is_refused(env: AppEnv):

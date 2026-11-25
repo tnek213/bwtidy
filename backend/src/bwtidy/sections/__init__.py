@@ -16,9 +16,10 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Field, TypeAdapter, ValidationError
 
-from bwtidy.sections import datatypes, generator, templates, to_fill
+from bwtidy.sections import datatypes, generator, note, templates, to_fill
 from bwtidy.sections.datatypes import AddDatatype, RemoveDatatype, SetDatatype
 from bwtidy.sections.generator import RemoveItem, SetDefault, SetItem
+from bwtidy.sections.note import SetName
 from bwtidy.sections.notes import (
     SECTIONS_VERSION,
     InvalidToolNote,
@@ -53,13 +54,14 @@ __all__ = [
     "with_section",
 ]
 
-Section = Literal["templates", "toFill", "generator", "datatypes"]
+Section = Literal["templates", "toFill", "generator", "datatypes", "note"]
 
 SECTIONS: dict[str, SectionRules] = {
     "templates": templates.RULES,
     "toFill": to_fill.RULES,
     "generator": generator.RULES,
     "datatypes": datatypes.RULES,
+    "note": note.RULES,
 }
 
 CHANGES_OF: dict[str, frozenset[str]] = {name: rules.changes for name, rules in SECTIONS.items()}
@@ -77,7 +79,8 @@ type SectionChange = Annotated[
     | RemoveTemplate
     | AddDatatype
     | SetDatatype
-    | RemoveDatatype,
+    | RemoveDatatype
+    | SetName,
     Field(discriminator="op"),
 ]
 

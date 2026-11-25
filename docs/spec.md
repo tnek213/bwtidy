@@ -1084,8 +1084,9 @@ Secret coordinates: `login.password`, `login.totp`, `card.number`,
   `GET`) and the ones it left: a shown value holds when a run of them, each
   finding what the one before it left, leads from it to the value now.
 - Every UI write is a `ui` entry of the queue (see MCP and the queue) but
-  one: the tool note's rename back (`POST /api/tool-note/rename-back`, see
-  The tool note) goes straight to the write path. `POST /api/operations` is
+  two: the tool note's rename back and keeping its new name (`POST
+  /api/tool-note/rename-back` and `POST /api/tool-note/keep-name`, see The
+  tool note) go straight to the write path. `POST /api/operations` is
   for scripts and tests.
 - Every operation (an operation may touch many items, it gets one backup, not
   one per item) has a full backup that matches the vault as it is right before
@@ -1310,12 +1311,13 @@ Secret coordinates: `login.password`, `login.totp`, `card.number`,
     has kind `renameAttachment`, the item in `itemIds`, column `attachments`
     and `attachmentIds`. Restore of the row renames the copy back, see
     Restoring a change log row.
-- `setToolNoteSection` (`section`, one of `templates`, `toFill`, `generator` and
-  `datatypes`, and `changes`, no `revisionDate`)
+- `setToolNoteSection` (`section`, one of `templates`, `toFill`, `generator`,
+  `datatypes` and `note`, and `changes`, no `revisionDate`)
   saves one section of the tool note's notes (see The tool note). Only
   bwtidy's own code queues it (the templates save, the to-fill list, the
-  generator settings, the datatypes save): `POST /api/queue`, `POST
-  /api/operations` and MCP refuse it like every other operation on the note.
+  generator settings, the datatypes save) or writes it (keeping the note's
+  new name): `POST /api/queue`, `POST /api/operations` and MCP refuse it
+  like every other operation on the note.
   At write time the write path GETs the tool note as it is then, saves only
   that section of its notes and PUTs the note (nothing when the notes stay as
   they are), so it never works on a stale copy and never conflicts on the
@@ -1342,7 +1344,8 @@ Secret coordinates: `login.password`, `login.totp`, `card.number`,
     Datatypes), `{"op": "setDatatype", "datatype"}` (fails its entry when the
     datatype is gone) and `{"op": "removeDatatype", "id"}` (nothing when it
     is gone already, refused while a template of the note as it is then uses
-    it). Templates have no id, they are known by name. Reason for changes
+    it). `note`: `{"op": "setName", "name"}` (a name that is not empty).
+    Templates have no id, they are known by name. Reason for changes
     rather than whole sections: two tabs that save templates or datatypes
     would otherwise lose each other's change, and a save of the whole section
     would undo another save built on the same base. Every item id is followed
@@ -1350,10 +1353,10 @@ Secret coordinates: `login.password`, `login.totp`, `card.number`,
     `moveToPersonal`, an `applyTemplate` that changes the type, kept in RAM
     like the own writes), so a change queued before a conversion and
     committed after it lands on the new item instead of being written back
-    under the old id and then dropped. A `generator`, `toFill` or `templates`
-    section that does not parse starts over empty, as a whole save replaced
-    it. The `datatypes` keep their broken entries, so the section still fails
-    its check until a broken one is fixed or deleted. The `generator` write
+    under the old id and then dropped. A `generator`, `toFill`, `templates`
+    or `note` section that does not parse starts over empty, as a whole save
+    replaced it. The `datatypes` keep their broken entries, so the section
+    still fails its check until a broken one is fixed or deleted. The `generator` write
     drops the settings of items that are gone (the trash counts, an item a
     conversion made since the batch began does not).
   The changes are checked against their section (options against the
@@ -1520,17 +1523,19 @@ Secret coordinates: `login.password`, `login.totp`, `card.number`,
   neither of `type` and `template`, an empty name, `name` among the values,
   an unknown organization, an organization without collections or
   collections without one, a column that does not exist for the type (or is
-  no leaf), and a personal secure note named `bwtidy` (it would be taken
-  for the tool note).
+  no leaf), and a personal secure note named `bwtidy` or one whose `notes`
+  hold a `note` section with its own name (either would be taken for the
+  tool note, see Found by id there).
 
 ## The tool note
 
-One secure note named `bwtidy` in the user's personal vault (never in an
-organization: its other members would see it). Created on first login when missing.
+One secure note named `bwtidy` (or the name the user kept, see the `note`
+section) in the user's personal vault (never in an organization: its other
+members would see it). Created on first login when missing.
 
 - `notes` holds one JSON object, `{"version": 1, ...}`, with one key per
-  section: `templates` (see Templates), `datatypes` (see Datatypes), `toFill`
-  and `generator`. A key bwtidy does not know is kept. Each section
+  section: `templates` (see Templates), `datatypes` (see Datatypes), `toFill`,
+  `generator` and `note`. A key bwtidy does not know is kept. Each section
   is saved alone with `setToolNoteSection` (see Writes), so a save of one
   never loses another. Empty notes read as no sections. Notes that are not
   such an object (edited by hand) read as no templates, and the next section
@@ -1559,6 +1564,16 @@ organization: its other members would see it). Created on first login when missi
   the new one (see `setToolNoteSection` in Writes). Settings of items that are
   gone (the trash counts) are dropped the next time the section is saved,
   by that write. Every other change goes through `setToolNoteSection`.
+- The `note` section holds the note's expected name: `{"name": NAME}`, a
+  string that is not empty, with the parser in `sections/note.py`. Without
+  the section, without `name`, or with a section that does not parse, the
+  expected name is `bwtidy`, so a note written before the section existed
+  keeps working as it is, with the same `version`. The only change is
+  `setName` (see `setToolNoteSection` in Writes), written by Keep this name
+  (below). Reason: bwtidy finds the note
+  by its id, so its name is only a label for the user, who may prefer
+  another one, and the grid's warning about a rename should not come back
+  for a name the user chose.
 - The section `toFill` is the to-fill list: the secret fields the user still has
   to fill in, a list of `{"itemId": ID, "columns": [COLUMN, ...], "since":
   "YYYY-MM-DD"}`, secret columns only (grid column ids, `fields.NAME` for a
@@ -1670,10 +1685,13 @@ organization: its other members would see it). Created on first login when missi
 - Found by id: bwtidy remembers the note's id in the `settings` table (key
   `tool_note_id`) whenever it finds or creates the note. The lookup tries the
   remembered id first (a personal secure note, whatever its name now), then
-  the name. Every user of the note (templates, backup-password, the write
-  path, the queue, MCP) uses that one lookup, so a note renamed in Bitwarden
-  still holds the templates, still gets the backup password updates and stays
-  invisible to MCP. A login creates a note only when neither finds one.
+  the name `bwtidy`, then a personal secure note whose `note` section holds
+  its own name (a note that kept a new name, found after a reinstall or by
+  another bwtidy that does not know its id). Every user of the note
+  (templates, backup-password, the write path, the queue, MCP) uses that one
+  lookup, so a note renamed in Bitwarden still holds the templates, still
+  gets the backup password updates and stays invisible to MCP. A login
+  creates a note only when none of them finds one.
   Reason: a rename in the grid would otherwise make the templates vanish, and
   the next login would create a second, empty note.
 - Read-only in the grid: its row is light grey, every cell is read-only
@@ -1684,16 +1702,25 @@ organization: its other members would see it). Created on first login when missi
   The only exceptions are bwtidy's own writes: a section save such as the
   templates save (a `ui` queue entry of `setToolNoteSection` that carries the
   permission with it, so the commit passes it on to the write path for that
-  entry alone) and Rename it back, which say so
+  entry alone), Rename it back and Keep this name, which say so
   explicitly in their call to the write path (never judged by the column).
   Every other operation on the note is refused at `POST /api/queue` too. The
   backup password updates write the note directly through bw serve.
-- When the note found is not named `bwtidy`, the grid shows a warning
-  (bwtidy's note is named "<name>" now) with a button Rename it back:
-  `POST /api/tool-note/rename-back` with the note's `revisionDate`, a
-  `setLeaf` of `name` through the write path (backup, revisionDate check, 409
-  on a conflict). It answers `toolNoteName`, the new `revisionDate` and the
-  backup.
+- `GET /api/templates` answers the note's name now (`toolNoteName`) and its
+  expected name (`toolNoteExpectedName`, see the `note` section). When they
+  differ, the grid shows a warning (bwtidy's note is named "<name>" now) with
+  two buttons:
+  - Rename it back: `POST /api/tool-note/rename-back` with the note's
+    `revisionDate`, a `setLeaf` of `name` to the expected name through the
+    write path (backup, revisionDate check, 409 on a conflict).
+  - Keep this name: `POST /api/tool-note/keep-name` with the name the warning
+    showed (`name`), a `setToolNoteSection` of `note` with `setName` through
+    the write path (backup). 422 without a name, 409 when the note is not
+    named that any more (renamed again since the grid loaded it).
+  Both answer `toolNoteName`, `toolNoteExpectedName`, the new `revisionDate`
+  and the backup. Reason for the second button: a user who renamed the note
+  on purpose would otherwise have to rename it back or live with the
+  warning.
 - MCP never lists, reads or touches it.
 - The Vault grid can leave out the note's row: the setting "Hide bwtidy's own
   note" (see Settings, Display), off by default. Only the Vault grid hides it.
