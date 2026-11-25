@@ -24,7 +24,6 @@ npm ci --prefix frontend             # frontend dependencies
 scripts/ci                           # all fast checks, backend and frontend
 scripts/ci --fix                     # let ruff fix what it can, then check
 scripts/install-hooks                # once: test every push, take the docs screenshots of a UI change
-scripts/ci install-githooks          # run ci on every commit, --force replaces a hook that is not ours
 ```
 
 `scripts/install-hooks` installs the pre-push hook: before every push it runs
