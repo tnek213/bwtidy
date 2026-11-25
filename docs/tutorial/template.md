@@ -150,5 +150,5 @@ the trash and moves the new login there.
   patterns.
 - [The web UI, Toolbar](../reference/ui.md#toolbar): the Template and Format
   filters.
-- [Clean up with an AI agent](mcp.md): an agent sees your templates and how
+- [Your first MCP-assisted cleanup](mcp.md): an agent sees your templates and how
   well each item fits them, and can propose applying one.

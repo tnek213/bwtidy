@@ -1,4 +1,4 @@
-# Clean up with an AI agent
+# Your first MCP-assisted cleanup
 
 In this tutorial you connect an AI agent to bwtidy and ask it to sort the
 logins that are in no folder. The agent looks through your vault and
