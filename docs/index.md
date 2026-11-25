@@ -56,6 +56,8 @@ How each part works is under [Explanation](#explanation).
 - [Your first template](tutorial/template.md): make a datatype and a
   template, see the fill scores and format marks in the grid, and turn notes
   into logins with the template.
+- [Clean up with an AI agent](tutorial/mcp.md): make an MCP token, connect
+  your agent, and approve its proposals in the Queue.
 
 ## How-to guides
 
