@@ -92,6 +92,16 @@ def test_running_text_wraps_at_a_readable_length_while_pictures_use_the_column(p
     assert table.evaluate("t => t.getBoundingClientRect().width") > limit + 100
 
 
+def test_the_disclaimer_banner_is_one_slim_line(page: Page):
+    page.goto("/docs/reference/configuration/")
+    text = page.locator("[data-disclaimer]")
+    expect(text).to_be_visible()
+    height = text.evaluate("p => p.getBoundingClientRect().height")
+    line = text.evaluate("p => parseFloat(getComputedStyle(p).lineHeight)")
+    assert height < line * 1.5
+    assert page.locator(".md-banner").evaluate("b => b.getBoundingClientRect().height") < 30
+
+
 def test_a_picture_shown_smaller_opens_larger_from_the_site_itself(page: Page):
     ## a running bwtidy serves the site offline, so its scripts, styles and pictures are its own
     hosts: set[str] = set()
