@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { COLOR_MODE_COOKIE, ColorModeProvider, useColorMode } from './colorMode.tsx'
+import { appTheme, COLOR_MODE_COOKIE, ColorModeProvider, useColorMode } from './colorMode.tsx'
 
 function stubMatchMedia(dark: boolean) {
   vi.stubGlobal(
@@ -117,5 +117,34 @@ describe('ColorModeProvider', () => {
     expect(written).toContain('Path=/')
     expect(written).toContain('Max-Age=0')
     setter.mockRestore()
+  })
+})
+
+describe('appTheme', () => {
+  it('rings the keyboard focus of every button in the text color, inside a menu, list or tab', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      const theme = appTheme(mode, 'normal')
+      const ring = (name: 'MuiButtonBase' | 'MuiMenuItem' | 'MuiTab') => {
+        const root = theme.components?.[name]?.styleOverrides?.root
+        return typeof root === 'function' ? root({ theme, ownerState: {} } as never) : undefined
+      }
+      expect(ring('MuiButtonBase')).toEqual({
+        '&.Mui-focusVisible': { outline: `2px solid ${theme.palette.text.primary}`, outlineOffset: 2 },
+      })
+      expect(ring('MuiMenuItem')).toEqual({
+        '&.Mui-focusVisible': { outline: `2px solid ${theme.palette.text.primary}`, outlineOffset: -2 },
+      })
+      expect(ring('MuiTab')).toEqual({
+        '&.Mui-focusVisible': { outline: `2px solid ${theme.palette.text.primary}`, outlineOffset: -2 },
+      })
+    }
+  })
+
+  it('picks button text for AA contrast and a lighter red in the dark mode', () => {
+    const dark = appTheme('dark', 'normal')
+    expect(dark.palette.contrastThreshold).toBe(4.5)
+    expect(dark.palette.error.main).toBe('#e57373')
+    expect(dark.palette.getContrastText(dark.palette.error.main)).toBe('rgba(0, 0, 0, 0.87)')
+    expect(appTheme('light', 'normal').palette.error.main).toBe('#d32f2f')
   })
 })

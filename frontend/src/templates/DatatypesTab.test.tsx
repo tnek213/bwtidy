@@ -133,6 +133,7 @@ test('the list shows name, pattern, description and how many coordinates use it,
   expect(second).toHaveTextContent('Broken')
   expect(second).toHaveTextContent('unbalanced parenthesis (column 1)')
   expect(screen.getByText(/no save goes through until it is fixed or deleted/)).toBeInTheDocument()
+  expect(within(table).getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
 })
 
 test('no datatypes yet says so', async () => {

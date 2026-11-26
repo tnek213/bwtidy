@@ -7,7 +7,8 @@ import {
 import type { GridColumn, GridRow } from '../../api/grid.ts'
 import { EyeIcon } from '../../shared/EyeIcon.tsx'
 import { useRevealedSecret } from '../reveal.ts'
-import { formatValue, MASK } from '../../shared/values.ts'
+import { formatValue } from '../../shared/values.ts'
+import Masked from '../../shared/Masked.tsx'
 
 function RevealValue({ itemId, columnId }: { itemId: string; columnId: string }) {
   const { value: revealed, failed, toggle } = useRevealedSecret(itemId, columnId)
@@ -21,7 +22,7 @@ function RevealValue({ itemId, columnId }: { itemId: string; columnId: string })
         title={failed ? 'Could not reveal the value' : undefined}
         sx={{ fontFamily: shown ? 'monospace' : undefined, color: failed ? 'error.main' : undefined, wordBreak: 'break-all' }}
       >
-        {shown ? revealed : MASK}
+        {shown ? revealed : <Masked />}
       </Box>
       <Tooltip title={shown ? 'Hide' : 'Reveal'}>
         <IconButton size="small" aria-label={shown ? `Hide ${columnId}` : `Reveal ${columnId}`} onClick={toggle}>

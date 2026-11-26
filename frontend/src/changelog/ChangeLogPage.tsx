@@ -12,7 +12,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  type Theme,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -25,6 +24,7 @@ import ChangeLogFilterBar from './ChangeLogFilterBar.tsx'
 import { shownRows, useFilteredChangeLog } from './filters.ts'
 import DiffReportDialog from './DiffReportDialog.tsx'
 import DeleteBackupDialog from './DeleteBackupDialog.tsx'
+import { VISUALLY_HIDDEN } from '../shared/visuallyHidden.ts'
 import { RestoredIcon } from './icons.tsx'
 import {
   attachmentText,
@@ -46,11 +46,17 @@ import Prose from '../theme/Prose.tsx'
 const NEWEST = 'The newest backup cannot be deleted, the next write may reuse it.'
 
 // A deleted backup leaves its name on the rows it was taken for, greyed and struck through.
-const GONE = { color: 'text.disabled', textDecoration: 'line-through' } as const
+// The grey is text.secondary: a fainter one would fall under the 4.5:1 contrast of WCAG AA.
+const GONE = { color: 'text.secondary', textDecoration: 'line-through' } as const
 
-// Mixes a color 43% toward the page background, for the repeated backup of a group.
-export function faded(color: string, theme: Theme): string {
-  return `color-mix(in srgb, ${color} 57%, ${theme.palette.background.default})`
+// The strike-through and the title are not read out, so a screen reader hears it.
+function DeletedMark() {
+  return (
+    <Box component="span" sx={VISUALLY_HIDDEN}>
+      {' '}
+      (deleted)
+    </Box>
+  )
 }
 
 const MONO_GREY = { fontFamily: 'monospace', fontSize: '0.75rem', color: 'text.secondary' } as const
@@ -146,6 +152,7 @@ function RestoredFrom({
       >
         {entry.restoredBackup}
       </Box>
+      {gone && <DeletedMark />}
       {entry.restoredChangeId != null && at !== undefined && (
         <>
           {', '}
@@ -256,7 +263,11 @@ export default function ChangeLogPage() {
                 <TableCell>Items</TableCell>
                 <TableCell>Result</TableCell>
                 <TableCell>Backup</TableCell>
-                <TableCell />
+                <TableCell>
+                  <Box component="span" sx={VISUALLY_HIDDEN}>
+                    Actions
+                  </Box>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -300,13 +311,16 @@ export default function ChangeLogPage() {
                     <TableCell
                       sx={[
                         { fontFamily: 'monospace' },
-                        shared[index] && ((theme: Theme) => ({ color: faded(theme.palette.text.primary, theme) })),
+                        shared[index] && { color: 'text.secondary' },
                       ]}
                     >
                       {row.entry.backup !== null && existing !== undefined && !existing.has(row.entry.backup) ? (
-                        <Box component="span" sx={GONE} title="This backup was deleted">
-                          {row.entry.backup}
-                        </Box>
+                        <>
+                          <Box component="span" sx={GONE} title="This backup was deleted">
+                            {row.entry.backup}
+                          </Box>
+                          <DeletedMark />
+                        </>
                       ) : (
                         (row.entry.backup ?? '')
                       )}
@@ -316,7 +330,7 @@ export default function ChangeLogPage() {
                         <Button
                           size="small"
                           onClick={() => setRestoring(row.entry)}
-                          sx={shared[index] ? (theme) => ({ color: faded(theme.palette.primary.main, theme) }) : undefined}
+                          sx={shared[index] ? { color: 'text.secondary' } : undefined}
                         >
                           Restore
                         </Button>
@@ -331,7 +345,12 @@ export default function ChangeLogPage() {
                     <TableCell />
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatSize(row.backup.size)}</TableCell>
                     <TableCell sx={{ fontFamily: 'monospace' }}>
-                      <Link href={downloadUrl(row.backup)} download={row.backup.name}>
+                      {/* Darker in light mode: the link color has too little contrast on the row's tint. */}
+                      <Link
+                        href={downloadUrl(row.backup)}
+                        download={row.backup.name}
+                        sx={(theme) => (theme.palette.mode === 'light' ? { color: 'primary.dark' } : {})}
+                      >
                         {row.backup.name}
                       </Link>
                     </TableCell>

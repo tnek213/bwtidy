@@ -28,6 +28,7 @@ import { type DatatypeChange, type DatatypeDraft, datatypesQueryKey, saveDatatyp
 import { templatesQueryKey, useTemplates } from '../api/templates.ts'
 import { coordinatesUsing, datatypeChange, templatesUsing } from './drafts.ts'
 import Prose from '../theme/Prose.tsx'
+import { VISUALLY_HIDDEN } from '../shared/visuallyHidden.ts'
 
 function saveErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 422) {
@@ -178,7 +179,11 @@ export default function DatatypesTab({ onStatistics }: { onStatistics: () => voi
                 <TableCell>Pattern</TableCell>
                 <TableCell>Description</TableCell>
                 <TableCell align="right">Coordinates using it</TableCell>
-                <TableCell />
+                <TableCell>
+                  <Box component="span" sx={VISUALLY_HIDDEN}>
+                    Actions
+                  </Box>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

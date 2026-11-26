@@ -98,7 +98,7 @@ export default function ColumnChooser(props: ColumnChooserProps) {
               const shown = toggleable.filter((column) => !hidden.has(column.id)).length
               return (
                 <Box key={group} role="group" aria-label={GROUP_LABELS[group]}>
-                  <ListSubheader disableGutters sx={{ lineHeight: '32px' }}>
+                  <ListSubheader component="div" disableGutters sx={{ lineHeight: '32px' }}>
                     {toggleable.length > 0 ? (
                       <FormControlLabel
                         control={

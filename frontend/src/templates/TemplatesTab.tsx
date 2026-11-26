@@ -56,6 +56,7 @@ import {
 } from './drafts.ts'
 import Prose from '../theme/Prose.tsx'
 import ProseAlert from '../theme/ProseAlert.tsx'
+import { VISUALLY_HIDDEN } from '../shared/visuallyHidden.ts'
 
 function ExtensionHint() {
   return (
@@ -426,7 +427,11 @@ export function TemplatesTab() {
                 <TableCell>Type</TableCell>
                 <TableCell>Coordinates</TableCell>
                 <TableCell align="right">Matching items</TableCell>
-                <TableCell />
+                <TableCell>
+                  <Box component="span" sx={VISUALLY_HIDDEN}>
+                    Actions
+                  </Box>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
