@@ -1,6 +1,6 @@
 # Restore a vault from a backup
 
-Written for bwtidy COMMIT. The project is at https://github.com/tnek213/bwtidy.
+Written for bwtidy COMMIT. The project is at <https://github.com/tnek213/bwtidy>.
 
 This page is for when the vault itself is gone or badly broken. The account
 may be lost or most items deleted, or you may be moving to a new account. You
@@ -190,7 +190,7 @@ in the account.
 ## 3. Set up a Bitwarden CLI of its own
 
 Take the official CLI as the native executable or as the npm package. The
-native one is under Command line interface at https://bitwarden.com/download/
+native one is under Command line interface at <https://bitwarden.com/download/>
 and goes on your `PATH`. The npm package goes into a directory of its own,
 which may be on the disk since it holds no secrets. These commands install
 the version that bwtidy uses.

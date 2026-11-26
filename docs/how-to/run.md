@@ -44,9 +44,9 @@ Then start the container.
 docker compose up -d
 ```
 
-Open http://127.0.0.1:8765 on the host. Compose publishes only that port and
+Open <http://127.0.0.1:8765> on the host. Compose publishes only that port and
 only on the host's 127.0.0.1 (`BWTIDY_HOST_PORT` in `.env` changes the
-port). These docs are at http://127.0.0.1:8765/docs/ for anyone who can
+port). These docs are at <http://127.0.0.1:8765/docs/> for anyone who can
 reach that address, without a login.
 
 ## Log in the first time
@@ -55,7 +55,7 @@ The first login goes through a few forms and may need a code from your
 mail.
 
 1. Enter the server and your email, then click Continue. The server is
-   https://vault.bitwarden.com unless you use another one.
+   <https://vault.bitwarden.com> unless you use another one.
 
     ![The account form with the server and email filled in and Continue outlined](../images/tutorial-account-form.png)
 
@@ -99,7 +99,7 @@ from the checkout and names the image `bwtidy:local`. Everything else comes
 from `compose.yaml` and `.env`.
 
 Building with Compose needs buildx 0.17 or later. The build also draws the
-diagrams of these docs on a Kroki server. That is https://kroki.io unless
+diagrams of these docs on a Kroki server. That is <https://kroki.io> unless
 the build arg `BWTIDY_KROKI_URL` names your own, which `compose.build.yaml`
 takes from the environment (see the section Diagrams of `dev/release.md`).
 

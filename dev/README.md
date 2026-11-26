@@ -15,9 +15,9 @@ The other pages of this guide:
   and a smoke test on a real account.
 - [Releasing](release.md): the version, the release notes, the documentation
   site, GitHub Pages and publishing the image.
-- [The demo](demo.md): the design of the public demo (the project `demo/`, with its own
-  `pyproject.toml` and `uv.lock`), its containers and
-  networks, the start flow, the cleanup and its limits.
+- [The demo](demo.md): the design of the public demo (the project `demo/`, with
+  its own `pyproject.toml` and `uv.lock`), its containers and networks, the
+  start flow, the cleanup and its limits.
 
 ## Getting started
 
@@ -25,7 +25,7 @@ The other pages of this guide:
 uv sync --locked --project backend   # backend venv with dev tools
 npm ci --prefix frontend             # frontend dependencies
 scripts/ci                           # all fast checks, reinstalls the frontend when its lock changed
-scripts/ci --fix                     # let ruff fix what it can, then check
+scripts/ci --fix                     # let markdownlint and ruff fix what they can, then check
 scripts/ci --quick                   # everything except pytest and npm test
 scripts/install-hooks                # once: test every push, take the docs screenshots of a UI change
 ```
@@ -60,24 +60,24 @@ cd frontend && BWTIDY_API=http://127.0.0.1:<BWTIDY_APP_PORT> npm run dev
 
 Every script prints its usage with `--help`.
 
-| Script                  | What it does                                                                             |
-| ----------------------- | ---------------------------------------------------------------------------------------- |
-| `scripts/ci`            | every fast check: lint, format, types, imports, unit tests, docs, build ([Testing](testing.md)) |
-| `scripts/dev-vault`     | the worktree's dev stacks: `up`, `setup`, `seed`, `exec`, `reset`, `down` ([The dev vault](dev-vault.md#commands)) |
-| `scripts/dev-app`       | starts the stack and the gateway, opens bwtidy at the account form                       |
-| `scripts/manual`        | tests main by hand: updates it, resets the vault, runs `scripts/dev-app` ([The dev vault](dev-vault.md#testing-by-hand)) |
-| `scripts/integration`   | the integration tests in the app container ([Testing](testing.md#integration-tests))     |
-| `scripts/e2e`           | the browser tests against the gateway ([Testing](testing.md#end-to-end-tests))           |
-| `scripts/demo-stack`    | the worktree's demo stack: `up`, `test`, `compose`, `down` ([The demo](demo.md#the-stack-test)) |
-| `scripts/docs-shots`    | takes the documentation screenshots ([Testing](testing.md#documentation-screenshots))    |
-| `scripts/install-hooks` | installs the pre-push hook ([Testing](testing.md#the-pre-push-hook))                      |
+| Script                  | What it does                                                                                                                                         |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/ci`            | every fast check: lint, format, types, imports, unit tests, docs, build ([Testing](testing.md))                                                      |
+| `scripts/dev-vault`     | the worktree's dev stacks: `up`, `setup`, `seed`, `exec`, `reset`, `down` ([The dev vault](dev-vault.md#commands))                                   |
+| `scripts/dev-app`       | starts the stack and the gateway, opens bwtidy at the account form                                                                                   |
+| `scripts/manual`        | tests main by hand: updates it, resets the vault, runs `scripts/dev-app` ([The dev vault](dev-vault.md#testing-by-hand))                             |
+| `scripts/integration`   | the integration tests in the app container ([Testing](testing.md#integration-tests))                                                                 |
+| `scripts/e2e`           | the browser tests against the gateway ([Testing](testing.md#end-to-end-tests))                                                                       |
+| `scripts/demo-stack`    | the worktree's demo stack: `up`, `test`, `compose`, `down` ([The demo](demo.md#the-stack-test))                                                      |
+| `scripts/docs-shots`    | takes the documentation screenshots ([Testing](testing.md#documentation-screenshots))                                                                |
+| `scripts/install-hooks` | installs the pre-push hook ([Testing](testing.md#the-pre-push-hook))                                                                                 |
 | `scripts/pre-push`      | what the pre-push hook runs: ci (quick unless main) on what is pushed, the docs screenshots of a UI change ([Testing](testing.md#the-pre-push-hook)) |
-| `scripts/docs-lint`     | checks the images, links and prose of every markdown file ([Testing](testing.md#docs-lint)) |
-| `scripts/mcp-reference` | writes `docs/reference/mcp-tools.md` from the MCP tools ([Testing](testing.md#the-mcp-reference)) |
-| `scripts/third-party`   | writes the About page's list of packages ([Testing](testing.md#dependencies))           |
-| `scripts/update-deps`   | updates every dependency within its range, lists the rest ([Testing](testing.md#dependencies)) |
-| `scripts/docs-site`     | builds or serves the documentation site ([Releasing](release.md#the-documentation-site)) |
-| `scripts/prune-tags`    | deletes the old short-commit image tags on Docker Hub, a dry run by default ([Releasing](release.md#pruning-the-short-commit-tags)) |
+| `scripts/docs-lint`     | checks the images, links and prose of every markdown file ([Testing](testing.md#docs-lint))                                                          |
+| `scripts/mcp-reference` | writes `docs/reference/mcp-tools.md` from the MCP tools ([Testing](testing.md#the-mcp-reference))                                                    |
+| `scripts/third-party`   | writes the About page's list of packages ([Testing](testing.md#dependencies))                                                                        |
+| `scripts/update-deps`   | updates every dependency within its range, lists the rest ([Testing](testing.md#dependencies))                                                       |
+| `scripts/docs-site`     | builds or serves the documentation site ([Releasing](release.md#the-documentation-site))                                                             |
+| `scripts/prune-tags`    | deletes the old short-commit image tags on Docker Hub, a dry run by default ([Releasing](release.md#pruning-the-short-commit-tags))                  |
 
 After ty, `scripts/ci` runs `uv run --locked lint-imports --no-cache` in `backend/`:
 import-linter checks the backend's imports against the contracts in
@@ -98,22 +98,24 @@ Every script but `scripts/docs-site` is a command line over the package
 seeding of the dev vault, the gateway in the app container (how it starts and
 stops, and the run `scripts/dev-app` and `scripts/manual` share), `/api/health`,
 the options and test paths of the two test scripts with the sleep lock, git, what
-the pre-push hook checks, the version, the backend venv and the demo stack. `scripts/docs-site` stays
-on its own, the Dockerfile's docs stage copies it alone.
+the pre-push hook checks, the version, the npm lock files, markdownlint, the
+backend venv and the demo stack.
+`scripts/docs-site` stays on its own, the Dockerfile's docs stage copies it
+alone.
 
 ## Credentials
 
 Dev only, never used anywhere else.
 
-| What            | Value                    |
-| --------------- | ------------------------ |
+| What            | Value                   |
+| --------------- | ----------------------- |
 | Email           | `dev@bwtidy.test`       |
-| Name            | `Dev`                    |
+| Name            | `Dev`                   |
 | Master password | `bwtidy-dev-password-1` |
-| Organization    | `Family`                 |
-| Collections     | `Shared`, `Youth`        |
-| Organization    | `Club`                   |
-| Collections     | `Shared`                 |
+| Organization    | `Family`                |
+| Collections     | `Shared`, `Youth`       |
+| Organization    | `Club`                  |
+| Collections     | `Shared`                |
 
 `setup` also registers a second account with the same master password and an
 empty vault, for importing a backup into (`test_backup_import.py`,
@@ -124,9 +126,9 @@ None of the three has a collection.
 
 | What            | Value                       |
 | --------------- | --------------------------- |
-| Email           | `restore@bwtidy.test`      |
+| Email           | `restore@bwtidy.test`       |
 | Name            | `Restore`                   |
-| Master password | `bwtidy-dev-password-1`    |
+| Master password | `bwtidy-dev-password-1`     |
 | Organizations   | `Restore`, `Family`, `Club` |
 
 What the dev vault holds is in [The dev vault](dev-vault.md#the-fixture).
