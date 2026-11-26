@@ -168,7 +168,8 @@ services:
       DEMO_SESSION_MAX: ${DEMO_SESSION_MAX:-2700}
       ## the one server a worker may log in to. The wrapper refuses to start with any other value.
       BWTIDY_ALLOWED_SERVERS: https://vaultwarden
-      ## as many visitors at once as the controller has vaults for
+      ## as many visitors at once as the controller has vaults for. 6 fits a 4 GB VPS with 1 GB
+      ## free (about 220 MB each, dev/demo.md, Memory)
       BWTIDY_MAX_WORKERS: ${DEMO_MAX:-6}
       BWTIDY_MAX_PENDING: ${DEMO_MAX_PENDING:-2}
       BWTIDY_SESSION_IDLE_TIMEOUT: ${DEMO_SESSION_IDLE:-900}

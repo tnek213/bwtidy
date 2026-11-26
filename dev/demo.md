@@ -398,7 +398,7 @@ the demo. Two independent guarantees hold, so either alone is enough:
 
 ## Limits and timeouts
 
-The defaults, adjusted after measuring:
+The defaults, kept after measuring (Memory):
 
 | Limit                          | Default    | Setting                                                    |
 | ------------------------------ | ---------- | ---------------------------------------------------------- |
@@ -611,11 +611,198 @@ request = urllib.request.Request('http://127.0.0.1:8100/status', headers={'Autho
 print(urllib.request.urlopen(request).read().decode())"
 ```
 
+## Memory
+
+Measured on 2026-11-26 with `scripts/demo-stack up` (bwtidy 0.1.0a1 at
+v0.1.0-alpha.1-30-gd3c16ef, bw 2026.10.0, Vaultwarden 1.37.4), a visitor
+being `POST /demo/start` through the edge followed by `GET /api/session`.
+`docker stats --no-stream`, in MiB, with the pool full (2 vaults ready):
+
+| Visitors | edge | demo | controller | vaultwarden | total |
+| -------- | ---- | ---- | ---------- | ----------- | ----- |
+| 0        | 10   | 42   | 44         | 15          | 111   |
+| 1        | 10   | 261  | 44         | 18          | 333   |
+| 2        | 11   | 486  | 44         | 19          | 560   |
+| 3        | 11   | 704  | 44         | 20          | 779   |
+
+Each visitor costs about 220 MiB in the demo container and 2 to 3 MiB in
+Vaultwarden. The split of one visitor in the demo container (RSS, from
+`/proc`, since the image has no `ps`):
+
+| Process                          | RSS      |
+| -------------------------------- | -------- |
+| `bw serve` (node), per visitor   | 205-215 MB |
+| the worker (`bwtidy`), per visitor | 91 MB  |
+| the gateway, once                | 62-65 MB |
+
+The two RSS figures add up to more than the 220 MiB the container's cgroup
+counts, because the processes share the pages of the Python and node
+binaries. The controller is at 44 MiB when it idles and peaks at about 210
+MiB while it builds a vault (it runs bw for the login and the import), so
+allow for one such peak. A start takes about 13 s and a vault build about 12
+s on the machine of the measurement.
+
+The two tmpfs that visitors can fill count as memory once full: up to 512
+MiB for the accounts (`DEMO_ACCOUNTS_SIZE`) and 256 MiB for Vaultwarden
+(`DEMO_VAULTWARDEN_DATA_SIZE`). A fixture vault is far below that.
+
+The budget for a 4 GB x86 VPS, with about 1 GB kept for the OS and peaks:
+
+| Part                                     | MiB       |
+| ---------------------------------------- | --------- |
+| the four containers with no visitor      | 111       |
+| 6 visitors at 220 MiB plus 3 in Vaultwarden | 1,340  |
+| the controller's peak while it builds    | 170 more  |
+| two starts in flight (`BWTIDY_MAX_PENDING`), about 100 each for bw's login | 200 |
+| tmpfs full (both)                        | 768       |
+| total in the worst case                  | about 2,600 |
+
+That is under the 3 GB that remain after the 1 GB, so the default stays at
+`DEMO_MAX=6` and `BWTIDY_MAX_WORKERS=6`, and `DEMO_POOL_READY=2` (a ready
+vault is only a user in Vaultwarden, no process, so the pool costs almost
+nothing). 8 visitors would add 440 MiB and reach the limit with full tmpfs,
+so a bigger machine is what raises `DEMO_MAX`, by about 220 MiB each.
+
 ## On the maintainer's host
 
-To be written with the deployment: bound to 127.0.0.1 and reached through
-an SSH tunnel, no reverse proxy and no DNS.
+For a host where only the maintainer may reach the demo (the demo is not
+public there). Keep the default `DEMO_BIND=127.0.0.1`, so the edge listens
+on loopback of the host and nothing else can connect:
+
+```sh
+git clone https://github.com/tnek213/bwtidy.git
+cd bwtidy
+BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234 docker compose -f compose.demo.yaml up -d --build
+```
+
+From a laptop, an SSH tunnel brings the port over, and the demo is at
+`http://localhost:8770`:
+
+```sh
+ssh -L 8770:127.0.0.1:8770 HOST
+```
+
+The cookies then travel over http on loopback, so leave
+`DEMO_SECURE_COOKIES` empty.
+
+Why a tunnel and not a name that only the Tailnet resolves behind a reverse
+proxy: a name is only hidden, not closed. The proxy listens on its address
+and answers whatever name a request carries, so anyone who finds the address
+(or guesses the name, which certificate transparency logs and DNS scans
+often reveal) gets the demo. A port on loopback has no address anyone else
+can reach, and the tunnel is authenticated by SSH.
 
 ## On a VPS
 
-To be written: a 4 GB x86 VPS, documented but not deployed.
+For a public demo. What it needs: a 4 GB x86 (amd64) machine (the budget in
+Memory), Docker with Compose, a name in DNS that points at it and ports 80
+and 443 open. The demo stack stays bound to loopback and a reverse proxy in
+front of it holds the certificate for the public name.
+
+1. Put these in a `.env` beside `compose.demo.yaml`, with the public name:
+
+   ```sh
+   BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234
+   DEMO_HOST=demo.example.org
+   DEMO_SECURE_COOKIES=1
+   ```
+
+   `DEMO_SECURE_COOKIES=1` sets the Secure flag on the cookies, which only
+   works behind HTTPS. `DEMO_HOST` lets MCP's host check accept the name.
+   `BWTIDY_IMAGE` pins the normal image to a short-commit tag, so the demo
+   runs a bwtidy somebody chose.
+
+2. Build from a pinned commit with a remote git context, so the VPS needs no
+   checkout of the sources (only `compose.demo.yaml` and
+   `demo/edge/default.conf.template` at their paths):
+
+   ```sh
+   DEMO_BUILD_CONTEXT=https://github.com/tnek213/bwtidy.git#COMMIT docker compose -f compose.demo.yaml up -d --build
+   ```
+
+   With a buildx older than 0.17, build with plain docker as in Run it.
+
+3. A reverse proxy for the public name, which sets no limits of its own
+   (the edge has them). Caddy gets the certificate by itself:
+
+   ```
+   demo.example.org {
+       reverse_proxy 127.0.0.1:8770
+   }
+   ```
+
+   The same with nginx and a certificate from certbot:
+
+   ```
+   server {
+       listen 443 ssl;
+       server_name demo.example.org;
+       ssl_certificate     /etc/letsencrypt/live/demo.example.org/fullchain.pem;
+       ssl_certificate_key /etc/letsencrypt/live/demo.example.org/privkey.pem;
+       location / {
+           proxy_pass http://127.0.0.1:8770;
+           proxy_set_header Host $host;
+           proxy_buffering off;
+           proxy_read_timeout 300s;
+       }
+   }
+   ```
+
+   The edge limits go by the address of the peer, and behind the proxy that
+   is the proxy for every visitor. The limits then cap the demo as a whole
+   instead of each visitor, which protects it just as well and means one
+   visitor's burst can use the rest's share.
+
+Updating: pull the new commit or set a new `COMMIT` and `BWTIDY_IMAGE`, and
+run the `up -d --build` again. Every container that changed is made anew,
+and every demo running ends with it (Vaultwarden starts empty). The ledger
+volume stays, so no id is used twice.
+
+Logs: `docker compose -f compose.demo.yaml logs -f demo controller edge`
+(each log is capped at 3 files of 10 MB). The controller's counts are in the
+last command of Run it: ready, taken, building and failed. Failed above 0 for
+long is a vault that cannot be built, and the controller log says why.
+
+What to watch:
+
+- Memory: `docker stats --no-stream`, about 110 MiB with no visitor and 220
+  MiB for each. Taken at the limit of 6 with the machine near its memory is a
+  reason to lower `DEMO_MAX`.
+- The ledger volume: it grows by one line (an id) for every vault ever made,
+  so `docker system df -v` and the size of `ledger` show it. It stays small
+  (tens of bytes a vault) for years, and it is never cleared.
+- The tmpfs: a demo container whose `/data/accounts` is full fails starts.
+  `docker compose -f compose.demo.yaml exec demo df -h /data/accounts`.
+
+## What a visitor can and cannot do
+
+For a review of the demo's safety. The tests of the stack
+(`scripts/demo-stack test`) check every line of it.
+
+A visitor can:
+
+- Start one demo at a time, which logs bw in server side to a fresh vault of
+  its own on the demo's Vaultwarden, seeded with the dev fixture (made-up
+  data). No field of the demo asks for a credential.
+- Use everything bwtidy does on that vault: sort, edit, delete, restore,
+  commit and undo, with the backups of the account.
+- Create an MCP token (valid at most 1 day) and use `/mcp` for that vault
+  only. The token opens nothing else.
+- End the demo (End demo, Lock, MCP's `end_session`). Idle for 15 minutes,
+  a closed tab for 2 minutes and a total of 45 minutes end it too. Its
+  account directory, backups and Vaultwarden user are then deleted.
+
+A visitor cannot:
+
+- Log in to any other server or account: `BWTIDY_ALLOWED_SERVERS` holds only
+  the demo's Vaultwarden, the routes that create or change a login or an
+  account are refused (Refused routes), and no container but the edge has a
+  route out of the host.
+- See or reach another visitor's vault: each has its own account directory,
+  its own uid and cookies, and its own Vaultwarden user.
+- Reach Vaultwarden's admin page, the controller or the demo gateway
+  directly: only the edge is published, and it forwards to the gateway alone.
+- Get a vault the same id twice: the ledger keeps every id ever used.
+- Fill the machine: the tmpfs have sizes, request bodies are 1 MB, the
+  edge rate limits starts and MCP, and `DEMO_MAX` caps the visitors.
+- Keep a demo beyond its maximum, or a token beyond 1 day.
