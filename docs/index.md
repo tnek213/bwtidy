@@ -1,8 +1,8 @@
 # bwtidy documentation
 
-## Alpha software
+## Beta software
 
-> **Alpha software, made with AI.** bwtidy was written entirely by AI coding
+> **Beta software, made with AI.** bwtidy was written entirely by AI coding
 > agents. Several advanced models (Claude Fable, Opus and Sonnet) built it in
 > many small steps under the author's guidance, and Codex (GPT-6.2-Astra)
 > reviewed it for security and stability. No human has read every line of the

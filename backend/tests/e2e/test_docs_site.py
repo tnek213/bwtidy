@@ -121,6 +121,15 @@ def test_the_disclaimer_banner_is_one_slim_line(page: Page):
     assert page.locator(".md-banner").evaluate("b => b.getBoundingClientRect().height") < 30
 
 
+def test_the_disclaimer_banner_links_to_the_disclaimer_on_the_home(page: Page):
+    page.goto("/docs/reference/configuration/")
+    banner = page.locator("[data-disclaimer]")
+    expect(banner).to_contain_text("bwtidy is beta software made with AI")
+    banner.get_by_role("link", name="Read the disclaimer before you use it.").click()
+    expect(page).to_have_url(re.compile(r"/docs/#beta-software$"))
+    expect(page.locator("h2#beta-software")).to_contain_text("Beta software")
+
+
 def test_the_disclaimer_banner_text_is_centered(page: Page):
     page.set_viewport_size({"width": 1600, "height": 900})
     page.goto("/docs/reference/configuration/")

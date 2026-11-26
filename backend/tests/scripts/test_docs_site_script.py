@@ -6,7 +6,7 @@ import pytest
 
 from bwtidy.backups.collect import RESTORE_DOC_COMMIT
 
-BANNER = "<p data-disclaimer>bwtidy is alpha software</p>"
+BANNER = "<p data-disclaimer>bwtidy is beta software</p>"
 REAL_ROOT = Path(__file__).resolve().parents[3]
 COMMIT = "261111 7db8830"
 

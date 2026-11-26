@@ -1,4 +1,4 @@
-{#- The alpha disclaimer as a banner above every page, without a button to close it. A wider content
+{#- The beta disclaimer as a banner above every page, without a button to close it. A wider content
 column than the theme's, and a picture that opens larger on a click. All of it inline, from no
 CDN, as a running bwtidy serves the site offline. -#}
 {% extends "base.html" %}
@@ -131,8 +131,8 @@ CDN, as a running bwtidy serves the site offline. -#}
 
 {% block announce %}
   <p data-disclaimer>
-    bwtidy is alpha software made with AI, with very few users so far.
-    <a href="{{ base_url | trim("/") }}/#alpha-software">Read the disclaimer before you use it.</a>
+    bwtidy is beta software made with AI, with very few users so far.
+    <a href="{{ base_url | trim("/") }}/#beta-software">Read the disclaimer before you use it.</a>
   </p>
 {% endblock %}
 
