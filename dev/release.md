@@ -54,7 +54,12 @@ table or code block, keeps inline code on one line (in text and tables, except
 on a narrow screen where it would not fit) and frames the pictures in the
 content (a 1 px border and a small shadow, so a white screenshot shows on a
 white page), and its inline script makes a picture shown smaller than it is
-open larger in a dialog on a click (`data-zoom`). Both stay inline, as a
+open larger in a dialog on a click (`data-zoom`). It also links every page to the
+issue form `.github/ISSUE_TEMPLATE/docs_improvement.yml` (`partials/improve-link.html`
+builds the link, `partials/toc.html` puts it in the right sidebar below the table of
+contents and `main.html` at the end of the content on a narrow screen), with the
+page's source path, its address on the GitHub Pages site and the version, which
+`scripts/docs-site` hands over as `extra.bwtidy_version`. Both stay inline, as a
 running bwtidy serves the site offline: nothing comes from a CDN. Zensical's
 own lightbox (its glightbox extension) loads GLightbox from unpkg.com, so it
 stays off. After the build, `scripts/docs-site build` checks

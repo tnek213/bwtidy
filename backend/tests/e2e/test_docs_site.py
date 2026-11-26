@@ -1,9 +1,28 @@
 """The documentation site at /docs/ of the gateway, without a login (docs/spec.md, Gateway)."""
 
 import re
-from urllib.parse import urlsplit
+import tomllib
+from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import Page, Request, Response, expect
+
+from bwtidy.version import semver
+
+ROOT = Path(__file__).resolve().parents[3]
+VERSION = semver(
+    tomllib.loads((ROOT / "backend" / "pyproject.toml").read_text())["project"]["version"]
+)
+PAGES_HOST = "tnek213.github.io"
+## the pages to check: the address under /docs/, the source file and the address on GitHub Pages
+IMPROVE_PAGES = [
+    ("/docs/", "docs/index.md", f"https://{PAGES_HOST}/bwtidy/"),
+    (
+        "/docs/tutorial/first-cleanup/",
+        "docs/tutorial/first-cleanup.md",
+        f"https://{PAGES_HOST}/bwtidy/tutorial/first-cleanup/",
+    ),
+]
 
 ## the header's background is transparent unless the site's stylesheet loaded
 TRANSPARENT = "rgba(0, 0, 0, 0)"
@@ -165,3 +184,55 @@ def test_a_screenshot_has_a_border_and_a_shadow(page: Page):
     border = picture.evaluate("i => getComputedStyle(i).borderTopColor")
     assert border != TRANSPARENT
     assert picture.evaluate("i => getComputedStyle(i).borderTopWidth") == "1px"
+
+
+def improve_link_checks(page: Page, source: str, public: str):
+    link = page.get_by_role("link", name="Suggest an improvement to this page").locator(
+        "visible=true"
+    )
+    expect(link).to_have_count(1)
+    expect(link).to_have_attribute("target", "_blank")
+    expect(link).to_have_attribute("rel", "noopener")
+    href = link.get_attribute("href")
+    assert href is not None
+    parts = urlsplit(href)
+    assert (parts.scheme, parts.netloc, parts.path) == (
+        "https",
+        "github.com",
+        "/tnek213/bwtidy/issues/new",
+    )
+    query = parse_qs(parts.query, strict_parsing=True)
+    assert query["template"] == ["docs_improvement.yml"]
+    assert query["page"] == [source]
+    assert query["url"] == [public]
+    assert query["title"][0].startswith("Docs: ")
+    assert len(query["title"][0]) > len("Docs: ")
+    assert query["version"][0].startswith(VERSION)
+    hosts = {urlsplit(value).netloc for value in query["url"]} | {parts.netloc}
+    assert hosts == {"github.com", PAGES_HOST}
+    assert "localhost" not in href and "127.0.0.1" not in href
+    return link
+
+
+def test_every_docs_page_links_to_the_docs_issue_form_in_the_right_sidebar(page: Page):
+    for path, source, public in IMPROVE_PAGES:
+        page.goto(path)
+        link = improve_link_checks(page, source, public)
+        sidebar = page.locator(".md-sidebar--secondary")
+        expect(sidebar.get_by_text("Improve this page", exact=True)).to_be_visible()
+        assert sidebar.get_by_role("link", name="Suggest an improvement to this page").count() == 1
+        contents = sidebar.locator("nav").first
+        top = link.evaluate("(a) => a.getBoundingClientRect().top")
+        assert top >= contents.evaluate("(n) => n.getBoundingClientRect().bottom")
+
+
+def test_the_docs_issue_link_sits_at_the_end_of_the_content_on_a_narrow_screen(page: Page):
+    page.set_viewport_size({"width": 600, "height": 900})
+    for path, source, public in IMPROVE_PAGES:
+        page.goto(path)
+        improve_link_checks(page, source, public)
+        expect(page.locator(".md-improve--sidebar")).not_to_be_visible()
+        article = page.locator("article.md-content__inner")
+        assert article.get_by_role("link", name="Suggest an improvement to this page").count() == 1
+        last = article.locator("> :last-child")
+        assert last.get_by_role("link", name="Suggest an improvement to this page").count() == 1

@@ -6,6 +6,8 @@ site_description = "A web UI and MCP server for keeping a Bitwarden vault tidy"
 docs_dir = "docs"
 repo_url = "https://github.com/tnek213/bwtidy"
 repo_name = "tnek213/bwtidy"
+# the edit address of every page, which overrides/partials/improve-link.html reads the source path from
+edit_uri = "edit/main/docs/"
 # no site_url: the pages link to each other relatively, so the site works under /docs/ and /bwtidy/
 
 nav = [

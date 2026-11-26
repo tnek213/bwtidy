@@ -66,6 +66,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-testmon" },
     { name = "pytest-xdist" },
+    { name = "pyyaml" },
     { name = "ruff" },
     { name = "ty" },
 ]
@@ -90,6 +91,7 @@ dev = [
     { name = "pytest", specifier = ">=9.0,<10" },
     { name = "pytest-testmon", specifier = ">=2.3.0,<3" },
     { name = "pytest-xdist", specifier = ">=3.8.0,<4" },
+    { name = "pyyaml", specifier = ">=6.0.4,<7" },
     { name = "ruff", specifier = ">=0.17,<0.18" },
     { name = "ty", specifier = ">=0.0.1,<0.1" },
 ]
