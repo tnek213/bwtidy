@@ -47,6 +47,9 @@ COPY docs/ docs/
 ARG BWTIDY_COMMIT=""
 ## the Kroki server that renders the diagrams of the docs, https://kroki.io when empty
 ARG BWTIDY_KROKI_URL=""
+## the repo's star count for the header comes in as an arg too, as the docs ask GitHub for nothing
+## (the image workflow looks it up, scripts/docs-site leaves it out when empty)
+ARG BWTIDY_STARS=""
 RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
     scripts/docs-site build /site
 
