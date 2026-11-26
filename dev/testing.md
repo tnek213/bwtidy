@@ -644,6 +644,11 @@ A package whose metadata names no license makes it stop with the package's
 name. Look the license up in the package's own repository and add it to
 `OVERRIDES` in the script, with where you checked it.
 
+A package whose files are committed as they are instead (IBM Plex Mono, the
+docs site's code font in `docs/assets/fonts/ibm-plex-mono/`) has its entry in
+`BUNDLED` of the script. `tests/repo/test_third_party.py` checks that the list
+holds it and that its folder holds the two woff2 files and `LICENSE.txt`.
+
 ### Docs lint
 
 `scripts/docs-lint` (stdlib only, run by `scripts/ci` after the third-party

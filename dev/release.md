@@ -100,13 +100,30 @@ Dockerfile's docs stage takes it as a build arg, and `scripts/dev-vault up`,
 environment. `serve` shows a diagram as its code block, an editor's Kroki
 preview or a build shows the picture.
 
+The site's colors and its code font are in
+`docs/assets/stylesheets/theme.css` (`extra_css` in `zensical.toml`): a warm
+ivory and deep teal palette for each of the theme's two color schemes
+(`default` and `slate`, whose palettes name the colors `custom`, so none of
+the theme's named colors applies), the colors of the banner and the boxes,
+and IBM Plex Mono for code. The font's regular and bold woff2 files, IBM's
+complete build with the box-drawing characters of the directory trees, come
+from the npm package `@ibm/plex-mono` (the files only, as its postinstall
+would report to IBM's telemetry) and lie in `docs/assets/fonts/ibm-plex-mono/`
+with its `LICENSE.txt` (SIL Open Font License 1.1). The package's entry in
+`BUNDLED` of `scripts/third-party` puts it on the About page's list: files
+of another version change the version there too. The search dialog draws
+in a shadow root of its own: the stylesheet colors it through the theme's
+`--color-*` variables, but its code stays in the browser's monospace font.
+
 The theme overrides are in `overrides/` (outside `docs/`, so they are not
-built as pages). Its `main.html` fills the theme's `announce` block with the
+built as pages). `partials/copyright.html` is the line at the bottom of the
+footer, which credits Zensical and the Diátaxis framework. `main.html` fills the theme's `announce` block with the
 beta disclaimer banner on every page, one slim line with its text centered,
 which links to the disclaimer at the top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
 the theme's 61rem leaves tables little room), keeps paragraphs, list items,
-quotes and admonitions at most 80 characters wide unless they hold a picture,
-table or code block, keeps inline code on one line (in text and tables, except
+quotes and admonitions as well as headings at most 72 characters wide
+(`72ch`, in each one's own font) unless they hold a picture, table or code
+block, keeps inline code on one line (in text and tables, except
 on a narrow screen where it would not fit) and frames the pictures in the
 content (a 1 px border and a small shadow, so a white screenshot shows on a
 white page), and its inline script makes a picture shown smaller than it is

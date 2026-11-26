@@ -182,6 +182,13 @@
     "direct": false
   },
   {
+    "name": "@ibm/plex-mono",
+    "version": "2.5.0",
+    "ecosystem": "npm",
+    "license": "OFL-1.1",
+    "direct": true
+  },
+  {
     "name": "@jridgewell/gen-mapping",
     "version": "0.3.13",
     "ecosystem": "npm",
