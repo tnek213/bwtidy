@@ -165,23 +165,41 @@ A gateway restart never leaves a vault behind.
 
 ## Controller
 
-The controller keeps `DEMO_POOL_READY` vaults ready, hands one out per
-start and deletes the users of ended demos.
+The controller (`bwtidy_demo.controller`, `bwtidy-demo-controller`) keeps
+`DEMO_POOL_READY` vaults ready, hands one out per start and deletes the
+users of ended demos. It never holds more than `DEMO_MAX` vaults ready plus
+handed out, and builds one vault at a time: each costs a bw process and
+Vaultwarden's KDF, and its requests count against Vaultwarden's rate limit
+for unauthenticated requests. Vaultwarden's data is temporary, so the pool
+starts empty and fills at every start.
 
 - A new vault: the controller draws an id, four words from `bw generate
   --passphrase --words 4 --separator -`, and makes the email
   `ID@demo.bwtidy.test` and a random master password. It registers the
-  account through Vaultwarden's two-step registration
+  account (`bwtidy_demo.vaultwarden`) through Vaultwarden's two-step registration
   (`/identity/accounts/register/send-verification-email`, which answers the
   token itself without SMTP, then `/identity/accounts/register/finish`),
   with the client-side crypto a Bitwarden client does: the master key from
   the password with the server's KDF, the master password hash, the
-  encrypted user key and the key pair. It then logs in with bw in a
-  directory of its own, seeds the vault with `bw import bitwardenjson` of
-  `dev/fixture-personal.json`, logs out and deletes that directory.
-- The ledger: a file on a persistent volume holds every id ever drawn. A
-  drawn id already in it is drawn again, so an id is never reused, not even
-  after a restart that emptied Vaultwarden.
+  encrypted user key and the key pair. It then seeds the vault with bw in a
+  fresh `BITWARDENCLI_APPDATA_DIR` of its own, trusting the stack's CA
+  through `NODE_EXTRA_CA_CERTS`: `bw config server`, `bw login
+  --passwordenv`, `bw unlock --raw`, `bw import bitwardenjson` of the
+  fixture (`dev/fixture-personal.json`, its path in `DEMO_FIXTURE`) and `bw
+  sync`, and deletes that directory. The password and the session key go to
+  bw in its environment, never in its arguments, and bw's output is never
+  logged.
+- A vault that fails to register or seed is deleted through the admin API,
+  and its id stays in the ledger. The next build waits a backoff (10
+  seconds, doubled after each failure up to 5 minutes), so a broken step
+  neither loops fast nor leaves a user behind.
+- The ledger: a file on a persistent volume (`DEMO_LEDGER`, by default
+  `/ledger/ids`) holds every id ever drawn, one per line. A drawn id already
+  in it is drawn again, so an id is never reused, not even after a restart
+  that emptied Vaultwarden. A new id is appended and synced to disk before
+  it is used. bw writes noise on stderr without a server, so only its
+  stdout counts, and an answer that is not four or more lowercase words is
+  drawn again.
 - Handing out: a ready vault goes to exactly one start and leaves the pool,
   then the controller makes a new one in the background.
 - Deleting a user: through Vaultwarden's admin API. `POST /admin` with the
@@ -190,20 +208,45 @@ start and deletes the users of ended demos.
   per 300 seconds. `GET /admin/users/by-mail/EMAIL` finds the user's UUID,
   `POST /admin/users/UUID/delete` (with `Content-Type: application/json`)
   deletes it. A user that is not there counts as deleted.
-- Its HTTP API listens on `back` only and needs `Authorization: Bearer
-  TOKEN`, the controller token from the secrets volume, on every request.
-  It never answers a password but to the start that takes the vault.
+- Its HTTP API listens on `back` only, port 8100, and needs
+  `Authorization: Bearer TOKEN`, the controller token from the secrets
+  volume, on every request (compared in constant time, an unknown path gets
+  401 too, and there are no docs pages). It never answers a password but to
+  the start that takes the vault. No log line holds a password or a token:
+  the logs name ids and counts.
+
+| Route           | Body      | Answer                                                                         |
+| --------------- | --------- | ------------------------------------------------------------------------------ |
+| `POST /take`    |           | `{server, email, password}` of a ready vault, now taken. 409 with a text when none is ready |
+| `POST /release` | `{email}` | 204 once the user is deleted and forgotten. 400 for an email outside `demo.bwtidy.test`. 502 when Vaultwarden refused: the vault stays taken and the caller releases it again |
+| `GET /status`   |           | `{ready, taken, building, failed}`, counts only, `failed` since the start      |
+
+A release of a user the controller does not know (one from before a
+restart) deletes it all the same, which is what the wrapper's cleanup at its
+start needs.
+
+Its settings: `DEMO_POOL_READY`, `DEMO_MAX`, `DEMO_FIXTURE` (required),
+`DEMO_LEDGER`, `DEMO_SECRETS` (by default `/secrets`) and `DEMO_SERVER` (by
+default `https://vaultwarden`).
 
 ## Secrets
 
-`init` writes into the `secrets` volume at every start of the stack:
+`init` (`bwtidy_demo.init`, `bwtidy-demo-init`) writes into the `secrets`
+volume (`DEMO_SECRETS`, by default `/secrets`) at every start of the stack,
+replacing what is there, each file in one rename:
 
-- a random Vaultwarden admin token (Vaultwarden reads it with
-  `ADMIN_TOKEN_FILE`, the controller reads the same file),
-- a random controller API token (the controller and the wrapper read it),
-- the TLS key and the self-signed certificate for the name `vaultwarden`
-  (Vaultwarden reads both, the workers and the controller trust the
-  certificate with `NODE_EXTRA_CA_CERTS`, bw refuses plain http).
+| File                      | Mode | What                                                              |
+| ------------------------- | ---- | ----------------------------------------------------------------- |
+| `vaultwarden-admin-token` | 0600 | Vaultwarden reads it with `ADMIN_TOKEN_FILE`, the controller too   |
+| `controller-token`        | 0600 | the controller's API token, the controller and the wrapper read it |
+| `vaultwarden.key`         | 0600 | the server's TLS key, Vaultwarden reads it                        |
+| `vaultwarden.crt`         | 0644 | the server certificate for the name `vaultwarden`, then the CA    |
+| `ca.crt`                  | 0644 | the self-signed CA, trusted by the workers and the controller (`NODE_EXTRA_CA_CERTS`, bw refuses plain http) |
+
+The CA's key is never written: it signs the server certificate and is gone,
+so nothing can sign another certificate the stack trusts. Both certificates
+carry the extensions a strict verifier asks for (Python's
+`VERIFY_X509_STRICT`, on by default, and Node). The directory is 0755.
 
 No secret ever leaves the stack, and none comes from outside: nothing is
 configured by hand and nothing is shown. The tokens are readable by root
@@ -259,6 +302,7 @@ The defaults, adjusted after measuring:
 | Limit                          | Default    | Setting                                                    |
 | ------------------------------ | ---------- | ---------------------------------------------------------- |
 | vaults ready in the pool       | 2          | `DEMO_POOL_READY` (controller)                             |
+| vaults ready plus handed out   | 6          | `DEMO_MAX` (controller)                                    |
 | visitors at once               | 6          | `BWTIDY_MAX_WORKERS=6`                                     |
 | starts in flight               | 2          | `BWTIDY_MAX_PENDING=2` (a start's directory is pending until its unlock) |
 | idle session end               | 15 minutes | `BWTIDY_SESSION_IDLE_TIMEOUT=900` (seconds)               |
@@ -277,8 +321,17 @@ minutes."
 The demo's tests are in `demo/tests`, `scripts/ci` runs them:
 
 ```sh
-cd demo && uv run --locked pytest tests/test_vaultwarden.py -q
+cd demo && uv run --locked pytest -q
 ```
+
+`test_init.py` checks the files of `init`, their modes, that a second run
+replaces them and that a strict TLS client trusting the CA accepts the
+server certificate for `vaultwarden` only. `test_controller.py` runs the
+pool and the API with fakes for Vaultwarden and bw injected (the pool's
+counts and limits, the ledger across a restart, failed builds, the token on
+every route, `/status` and the log lines without a secret), and `BwCli`
+against a fake `bw` script (the arguments, the environment and the
+temporary directory).
 
 `bwtidy_demo.vaultwarden` registers and deletes the users. Its module
 docstring says where in Vaultwarden's and the Bitwarden clients' source each
