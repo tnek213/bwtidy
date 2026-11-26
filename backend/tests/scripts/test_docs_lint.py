@@ -205,3 +205,21 @@ def test_double_hyphen_dash_is_reported(repo, docs_lint):
 def test_html_entity_is_not_a_semicolon(repo, docs_lint):
     write(repo, "README.md", "Fish &amp; chips &#169; &lt;tag&gt; &#x27;\n")
     assert docs_lint.lint(repo) == []
+
+
+def test_a_diagram_without_alt_text_is_reported(repo, docs_lint):
+    write(repo, "docs/how-to/a.md", "# A\n\nThe flow:\n\n```mermaid\ngraph TD\n  A --> B\n```\n")
+    assert docs_lint.lint(repo) == ["docs/how-to/a.md:5: diagram without alt text"]
+
+
+def test_a_diagram_with_alt_text_and_other_code_pass(repo, docs_lint):
+    write(
+        repo,
+        "docs/how-to/a.md",
+        '# A\n\n```mermaid alt="A flow"\ngraph TD\n```\n\n```python\nprint(1)\n```\n',
+    )
+    assert docs_lint.lint(repo) == []
+
+
+def test_the_diagram_types_are_the_docs_sites(docs_lint, load_script):
+    assert docs_lint.load_docs_site().KROKI_TYPES == load_script("docs-site").KROKI_TYPES

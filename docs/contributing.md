@@ -59,5 +59,25 @@ card links to the issue form or the file in the repository that says how.
 
 </div>
 
+## A diagram in these docs
+
+A page of these docs can hold a diagram, written as a fenced code block in
+any of the diagram languages that [Kroki](https://kroki.io/) supports
+(`mermaid`, `plantuml`, `d2`, `graphviz` and the others), with `alt="..."`
+after the language to say what it shows:
+
+````markdown
+```mermaid alt="A login reaches the gateway, which starts the account's worker"
+flowchart LR
+  Login --> Gateway --> Worker
+```
+````
+
+The docs build turns it into a picture, so the docs that a running bwtidy
+serves fetch nothing from elsewhere. A diagram without alt text fails the
+build. While you write, a Kroki preview in your editor (such as a Kroki
+extension for VS Code) shows the picture. Building docs with a diagram needs
+a Kroki server, `dev/release.md` (Diagrams) says which.
+
 The rules and reasons behind the code, its map and the developer guide are
 under [For contributors](index.md#for-contributors) on the home page.

@@ -51,6 +51,43 @@ line `Written for bwtidy COMMIT.`, as every backup does in its `RESTORE.md`:
 `BWTIDY_COMMIT` (the Dockerfile's docs stage takes it as a build arg) or else
 the checkout's last commit. The page in the checkout keeps `COMMIT`.
 
+### Diagrams
+
+A page holds a diagram as a fenced code block whose language is a Kroki
+diagram type (`KROKI_TYPES` in `scripts/docs-site`, every type
+https://kroki.io/ lists) with `alt="TEXT"` after it. Before Zensical runs,
+the build turns each such block of its copy of `docs/` into a PNG beside the
+page and a Markdown picture of it with that alt text. It sends the source to
+the Kroki server that `BWTIDY_KROKI_URL` names, https://kroki.io (the free
+public one) when it is unset, and asks for SVG, as 12 of Kroki's types have
+no PNG and its PNGs are drawn at 1x. resvg (`resvg-py` in the group `docs`)
+converts the SVG at twice its size on a white background, and the picture is
+shown at half its width, so it is sharp on a HiDPI screen. A transparent
+picture would vanish in the dark color scheme. A Mermaid source gets the
+first line `%%{init: {"htmlLabels": false, ...}}%%` unless it starts with an
+init directive of its own, as resvg leaves out the HTML labels Mermaid writes
+otherwise. resvg draws the text with the system's fonts, so the Dockerfile's
+docs stage installs `fonts-dejavu-core` (in that stage only). For serif,
+sans-serif and monospace it takes the first installed font of the lists in
+`GENERIC_FONTS` of the script, as resvg's own choices (Times New Roman, Arial,
+Courier New) are missing on many Linux systems and resvg leaves out a label
+whose font it cannot find. A Graphviz or PlantUML picture sized in `pt` is
+drawn at 96 dpi, the CSS pixel's.
+
+Each PNG is kept in `.cache/kroki/` at the repo root (git-ignored), named
+after a hash of the type, the source and the converter's settings, and a
+later build takes it from there without asking the server. So building docs
+that hold a diagram needs a Kroki server, unless the cache has every one
+(the image's build has no cache). A server that cannot be reached or answers
+with an error fails the build, naming the page, the line and the server's
+message. A diagram without alt text fails it before any request, and
+`scripts/docs-lint` reports it already. Docs without a diagram build without
+any request. To use a Kroki server of your own, set `BWTIDY_KROKI_URL`: the
+Dockerfile's docs stage takes it as a build arg, and `scripts/dev-vault up`,
+`compose.dev.yaml` and `compose.build.yaml` pass on the one of the
+environment. `serve` shows a diagram as its code block, an editor's Kroki
+preview or a build shows the picture.
+
 The theme overrides are in `overrides/` (outside `docs/`, so they are not
 built as pages). Its `main.html` fills the theme's `announce` block with the
 beta disclaimer banner on every page, one slim line with its text centered,
@@ -74,7 +111,8 @@ those whose output needs nothing from another host: GitHub's alerts as boxes
 (`pymdownx.quotes` with `callouts`), the cards (`md_in_html` and `attr_list`)
 and their icons, which `pymdownx.emoji` draws inline from the theme's icon
 sets. An emoji shortcode such as `:smile:` would be a picture from a CDN, and
-a mermaid diagram loads its script from one. After the build,
+a Mermaid diagram that Zensical draws loads its script from one, so diagrams
+become pictures at build time (see Diagrams above). After the build,
 `scripts/docs-site build` checks
 that every built HTML page has the banner (the attribute `data-disclaimer`)
 and fails naming those without it. It also fails on a numbered list that

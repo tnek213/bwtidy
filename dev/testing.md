@@ -644,7 +644,9 @@ that a `#anchor` on a link to a markdown file (or a bare `#anchor`) matches a
 heading of that file by GitHub's slug rules. Finally it applies the prose
 style rule of `AGENTS.md`: a semicolon, an em dash or ` -- ` as a dash
 outside code, HTML comments and link targets is a problem (an HTML entity
-such as `&amp;` is not). It prints one line per problem and exits 1, nothing
+such as `&amp;` is not). A diagram (a fenced code block of a Kroki type,
+see [Releasing](release.md#diagrams)) without `alt="TEXT"` after its type is
+a problem too. It prints one line per problem and exits 1, nothing
 and 0 when all is well.
 
 ### Frontend linters

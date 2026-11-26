@@ -76,6 +76,9 @@ def up(stack: Stack) -> int:
             "dev",
             "--build-arg",
             f"BWTIDY_COMMIT={git.commit('dev-vault', stack.root)}",
+            ## the Kroki server of scripts/docs-site, so the docs stage renders on the same one
+            "--build-arg",
+            f"BWTIDY_KROKI_URL={os.environ.get('BWTIDY_KROKI_URL', '')}",
             "-t",
             f"{env['COMPOSE_PROJECT_NAME']}-app",
             ".",

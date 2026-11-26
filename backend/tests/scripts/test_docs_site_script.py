@@ -1,6 +1,13 @@
+import re
 import shutil
+import socket
+import struct
 import subprocess
+import threading
+import zlib
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -41,15 +48,24 @@ def repo(tmp_path: Path, monkeypatch, docs_site) -> Path:
     return root
 
 
-def fake_zensical(monkeypatch, pages: dict[str, str], docs_site) -> dict[str, str]:
+def fake_zensical(
+    monkeypatch, pages: dict[str, str], docs_site, keep: Path | None = None
+) -> dict[str, str]:
     """Stand in for Zensical: write the given pages into site/ of the build directory.
 
-    Returns what it saw: the restore page it was handed, under "restore.md"."""
+    Returns what it saw: the restore page it was handed, under "restore.md". With keep, the docs
+    it was handed are copied there. Other commands (the conversion of diagrams) run as they are."""
     seen: dict[str, str] = {}
+    real = subprocess.run
 
-    def run(cmd, cwd):
+    def run(cmd, cwd: str | Path | None = None, **kwargs):
+        if "zensical" not in cmd:
+            return real(cmd, cwd=cwd, **kwargs)
+        assert cwd is not None
         assert (Path(cwd) / "overrides" / "main.html").is_file()
         seen["restore.md"] = (Path(cwd) / "docs" / "restore.md").read_text()
+        if keep is not None:
+            shutil.copytree(Path(cwd) / "docs", keep)
         for name, text in pages.items():
             write(Path(cwd) / "site", name, text)
         return subprocess.CompletedProcess(cmd, 0)
@@ -290,3 +306,273 @@ def test_build_fails_naming_a_page_that_loads_from_another_host(
     assert docs_site.build(None) == 1
     err = capsys.readouterr().err
     assert "docs-site: index.html:3: loads https://cdn.example/x.js from another host" in err
+
+
+## what the stand-in for Kroki answers: black text on nothing, at 120 by 40
+SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" viewBox="0 0 120 40">'
+    '<text x="10" y="30" font-family="sans-serif" font-size="24" fill="#000">Kroki</text></svg>'
+)
+GRAPHVIZ_PAGE = '# Run\n\nThe flow:\n\n```graphviz alt="Two boxes"\ndigraph { a -> b }\n```\n'
+
+
+class FakeKroki:
+    """A local HTTP server that answers like Kroki: SVG for every POST, or the status set."""
+
+    def __init__(self) -> None:
+        self.requests: list[tuple[str, str]] = []
+        self.status = 200
+        self.answer = SVG
+        fake = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                body = self.rfile.read(int(self.headers["Content-Length"])).decode()
+                fake.requests.append((self.path, body))
+                data = fake.answer.encode()
+                self.send_response(fake.status)
+                kind = "image/svg+xml" if fake.status == 200 else "text/plain"
+                self.send_header("Content-Type", kind)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, format: str, *args) -> None:
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def close(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+@pytest.fixture
+def kroki(monkeypatch, docs_site):
+    fake = FakeKroki()
+    monkeypatch.setenv(docs_site.KROKI_URL, fake.url)
+    yield fake
+    fake.close()
+
+
+def pixels(path: Path) -> list[list[tuple[int, ...]]]:
+    """The rows of an 8 bit RGB or RGBA PNG without interlacing, each pixel a tuple."""
+    data = path.read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    offset, idat, header = 8, b"", b""
+    while offset < len(data):
+        (length,) = struct.unpack(">I", data[offset : offset + 4])
+        kind = data[offset + 4 : offset + 8]
+        chunk = data[offset + 8 : offset + 8 + length]
+        if kind == b"IHDR":
+            header = chunk
+        elif kind == b"IDAT":
+            idat += chunk
+        offset += 12 + length
+    width, height, depth, color, _, _, interlace = struct.unpack(">IIBBBBB", header)
+    assert depth == 8 and color in (2, 6) and interlace == 0
+    channels = 4 if color == 6 else 3
+    raw = zlib.decompress(idat)
+    stride = width * channels
+    rows: list[bytearray] = []
+    previous = bytearray(stride)
+    for y in range(height):
+        start = y * (stride + 1)
+        kind, line = raw[start], bytearray(raw[start + 1 : start + 1 + stride])
+        for i in range(stride):
+            left = line[i - channels] if i >= channels else 0
+            up = previous[i]
+            corner = previous[i - channels] if i >= channels else 0
+            if kind == 1:
+                line[i] = (line[i] + left) & 0xFF
+            elif kind == 2:
+                line[i] = (line[i] + up) & 0xFF
+            elif kind == 3:
+                line[i] = (line[i] + (left + up) // 2) & 0xFF
+            elif kind == 4:
+                guess = left + up - corner
+                pa, pb, pc = abs(guess - left), abs(guess - up), abs(guess - corner)
+                best = left if pa <= pb and pa <= pc else up if pb <= pc else corner
+                line[i] = (line[i] + best) & 0xFF
+        rows.append(line)
+        previous = line
+    return [[tuple(row[x : x + channels]) for x in range(0, stride, channels)] for row in rows]
+
+
+def white(pixel: tuple[int, ...]) -> bool:
+    return pixel[:3] == (255, 255, 255) and (len(pixel) == 3 or pixel[3] == 255)
+
+
+def build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, page: str) -> Path:
+    """Build with page as docs/how-to/run.md, the docs Zensical was handed in the result."""
+    write(repo, "docs/how-to/run.md", page)
+    kept = tmp_path / f"kept-{len(list(tmp_path.glob('kept-*')))}"
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site, keep=kept)
+    assert docs_site.build(None) == 0
+    return kept
+
+
+def test_a_diagram_becomes_a_picture_of_a_png(repo, monkeypatch, tmp_path, kroki, docs_site):
+    kept = build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, GRAPHVIZ_PAGE)
+    text = (kept / "how-to" / "run.md").read_text()
+    match = re.search(r'!\[Two boxes\]\((diagram-[0-9a-f]+\.png)\)\{ width="(\d+)" \}', text)
+    assert match, text
+    assert "```" not in text and "digraph" not in text
+    png = kept / "how-to" / match[1]
+    rows = pixels(png)
+    assert len(rows[0]) == 240 and len(rows) == 80
+    assert int(match[2]) == len(rows[0]) // 2
+    ## the corner is white, the text (x 10 to about 80, y 10 to 30 in the SVG) is not
+    assert white(rows[0][0]) and white(rows[-1][-1])
+    text_area = [pixel for row in rows[20:60] for pixel in row[20:160]]
+    assert any(not white(pixel) for pixel in text_area)
+    assert kroki.requests == [("/graphviz/svg", "digraph { a -> b }\n")]
+    assert "```graphviz" in (repo / "docs" / "how-to" / "run.md").read_text()
+
+
+def test_a_diagram_sized_in_pt_is_drawn_at_96_dpi(repo, monkeypatch, tmp_path, kroki, docs_site):
+    """As Graphviz and PlantUML size their SVG, 90 by 30 pt being 120 by 40 CSS pixels."""
+    kroki.answer = SVG.replace('width="120" height="40"', 'width="90pt" height="30pt"')
+    kept = build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, GRAPHVIZ_PAGE)
+    [png] = (kept / "how-to").glob("diagram-*.png")
+    rows = pixels(png)
+    assert (len(rows[0]), len(rows)) == (240, 80)
+    assert 'width="120"' in (kept / "how-to" / "run.md").read_text()
+
+
+def test_an_svg_resvg_cannot_read_fails_the_build(repo, monkeypatch, capsys, kroki, docs_site):
+    kroki.answer = "<html>not a picture</html>"
+    write(repo, "docs/how-to/run.md", GRAPHVIZ_PAGE)
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 1
+    err = capsys.readouterr().err
+    assert "docs-site: docs/how-to/run.md:5: resvg could not convert the SVG of Kroki" in err
+    assert not (repo / ".cache" / "kroki").exists() or not any(
+        (repo / ".cache" / "kroki").iterdir()
+    )
+
+
+def generic_families(docs_site, installed: set[str]) -> dict[str, str]:
+    """What the converter picks with only the installed families drawing any text."""
+    namespace: dict[str, Any] = {"__name__": "convert"}
+    exec(docs_site.CONVERT, namespace)
+
+    def render(svg_string: str) -> bytes:
+        match = re.search(r'font-family="([^"]*)">(\w*)<', svg_string)
+        assert match
+        return b"text" if match[2] and match[1] in installed else b"empty"
+
+    return namespace["generic_families"](render, docs_site.GENERIC_FONTS)
+
+
+def test_the_converter_takes_the_first_installed_font_of_each_generic_family(docs_site):
+    installed = {"DejaVu Serif", "DejaVu Sans", "Liberation Sans", "DejaVu Sans Mono"}
+    assert generic_families(docs_site, installed) == {
+        "serif_family": "DejaVu Serif",
+        "sans_serif_family": "Liberation Sans",
+        "monospace_family": "DejaVu Sans Mono",
+        "font_family": "DejaVu Serif",
+    }
+
+
+def test_a_generic_family_without_an_installed_font_keeps_resvgs_default(docs_site):
+    assert generic_families(docs_site, {"Arial"}) == {"sans_serif_family": "Arial"}
+
+
+def test_a_diagram_in_a_list_step_keeps_its_indent(repo, monkeypatch, tmp_path, kroki, docs_site):
+    page = '# Run\n\n1. Look:\n\n    ```d2 alt="A to B"\n    a -> b\n    ```\n\n2. Done.\n'
+    kept = build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, page)
+    lines = (kept / "how-to" / "run.md").read_text().split("\n")
+    assert lines[4].startswith("    ![A to B](diagram-")
+    assert lines[6] == "2. Done."
+    assert kroki.requests == [("/d2/svg", "a -> b\n")]
+
+
+def test_a_code_block_of_another_language_stays(repo, monkeypatch, tmp_path, kroki, docs_site):
+    page = "# Run\n\n```python\nprint('hi')\n```\n\n````markdown\n```mermaid\nx\n```\n````\n"
+    kept = build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, page)
+    assert (kept / "how-to" / "run.md").read_text() == page
+    assert kroki.requests == []
+    assert not (repo / ".cache").exists()
+
+
+def test_a_diagram_without_alt_text_fails_the_build(repo, monkeypatch, capsys, kroki, docs_site):
+    write(repo, "docs/how-to/run.md", "# Run\n\n```mermaid\ngraph TD\n```\n")
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 1
+    assert "docs-site: docs/how-to/run.md:3: diagram without alt text" in capsys.readouterr().err
+    assert kroki.requests == []
+
+
+def test_mermaid_gets_the_line_that_keeps_its_labels(repo, monkeypatch, tmp_path, kroki, docs_site):
+    page = '# Run\n\n```mermaid alt="A flow"\ngraph TD\n  A --> B\n```\n'
+    build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, page)
+    assert kroki.requests == [("/mermaid/svg", f"{docs_site.MERMAID_INIT}\ngraph TD\n  A --> B\n")]
+
+
+def test_mermaid_with_its_own_init_reaches_kroki_unchanged(
+    repo, monkeypatch, tmp_path, kroki, docs_site
+):
+    source = '%%{init: {"theme": "forest"}}%%\ngraph TD\n  A --> B\n'
+    page = f'# Run\n\n```mermaid alt="A flow"\n{source}```\n'
+    build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, page)
+    assert kroki.requests == [("/mermaid/svg", source)]
+
+
+def test_a_second_build_takes_the_diagram_from_the_cache(
+    repo, monkeypatch, tmp_path, kroki, docs_site
+):
+    first = build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, GRAPHVIZ_PAGE)
+    assert len(kroki.requests) == 1
+    assert len(list((repo / ".cache" / "kroki").glob("*.png"))) == 1
+    second = build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, GRAPHVIZ_PAGE)
+    assert len(kroki.requests) == 1
+    assert (first / "how-to" / "run.md").read_text() == (second / "how-to" / "run.md").read_text()
+    [png] = (second / "how-to").glob("diagram-*.png")
+    assert png.read_bytes() == next((first / "how-to").glob("diagram-*.png")).read_bytes()
+
+
+def test_kroki_answering_an_error_fails_the_build(repo, monkeypatch, capsys, kroki, docs_site):
+    kroki.status = 400
+    kroki.answer = "Error 400: Syntax error in graph (line: 1)"
+    write(repo, "docs/how-to/run.md", GRAPHVIZ_PAGE)
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 1
+    err = capsys.readouterr().err
+    assert "docs-site: docs/how-to/run.md:5: Kroki could not render the graphviz diagram" in err
+    assert "answered 400: Error 400: Syntax error in graph (line: 1)" in err
+
+
+def test_an_unreachable_kroki_fails_the_build(repo, monkeypatch, capsys, docs_site):
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    monkeypatch.setenv(docs_site.KROKI_URL, f"http://127.0.0.1:{port}")
+    write(repo, "docs/how-to/run.md", GRAPHVIZ_PAGE)
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 1
+    err = capsys.readouterr().err
+    assert "docs-site: docs/how-to/run.md:5: Kroki could not render the graphviz diagram" in err
+    assert f"http://127.0.0.1:{port}/graphviz/svg could not be reached" in err
+
+
+def test_bwtidy_kroki_url_picks_the_server(monkeypatch, docs_site):
+    monkeypatch.setenv(docs_site.KROKI_URL, "https://kroki.bwtidy.example/")
+    assert docs_site.kroki_url("d2") == "https://kroki.bwtidy.example/d2/svg"
+
+
+@pytest.mark.parametrize("value", [None, "", " "])
+def test_without_bwtidy_kroki_url_the_public_kroki_is_used(monkeypatch, docs_site, value):
+    if value is None:
+        monkeypatch.delenv(docs_site.KROKI_URL, raising=False)
+    else:
+        monkeypatch.setenv(docs_site.KROKI_URL, value)
+    assert docs_site.kroki_url("graphviz") == "https://kroki.io/graphviz/svg"
+
+
+def test_the_types_are_kroki_s_thirty(docs_site):
+    assert len(set(docs_site.KROKI_TYPES)) == 30
+    assert {"mermaid", "plantuml", "d2", "graphviz", "vegalite"} <= set(docs_site.KROKI_TYPES)
