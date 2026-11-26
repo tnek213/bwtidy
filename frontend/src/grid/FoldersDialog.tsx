@@ -18,6 +18,7 @@ import { NO_PASSWORD_MANAGER } from '../shared/noPasswordManager.ts'
 import type { QueueEntry } from '../api/queue.ts'
 import type { VaultFolder } from '../api/grid.ts'
 import { deleteFolder, type Operation, renameFolder } from '../api/operations.ts'
+import { caseFold } from '../shared/caseFold.ts'
 
 function count(n: number): string {
   return n === 1 ? '1 item' : `${n} items`
@@ -56,7 +57,7 @@ function queuedChange(folder: VaultFolder, pending: readonly QueueEntry[]): stri
 }
 
 // Why a new name cannot be saved, null when it can. Another folder's name counts ignoring case,
-// like the backend checks it.
+// like the backend checks it (str.casefold).
 function nameProblem(folder: VaultFolder, name: string, folders: readonly VaultFolder[]): string | null {
   if (name.trim() === '') {
     return 'The name is empty'
@@ -64,8 +65,8 @@ function nameProblem(folder: VaultFolder, name: string, folders: readonly VaultF
   if (name === folder.name) {
     return 'The folder has this name already'
   }
-  const wanted = name.toLowerCase()
-  const other = folders.find((candidate) => candidate.id !== folder.id && candidate.name.toLowerCase() === wanted)
+  const wanted = caseFold(name)
+  const other = folders.find((candidate) => candidate.id !== folder.id && caseFold(candidate.name) === wanted)
   return other ? `Another folder is named ${other.name}` : null
 }
 

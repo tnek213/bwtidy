@@ -32,7 +32,7 @@ import { organizationCollections } from './editing.ts'
 import { type GridRow, type VaultOrganization } from '../api/grid.ts'
 import { liveFormatText, useFormatVerdict } from './formats.ts'
 import { FIRST_OPERATION, type LeafValue, type Operation } from '../api/operations.ts'
-import { BUILT_IN_SLOTS, coordinateColumn, isSecretCoordinate, typeLabel } from '../shared/templateRules.ts'
+import { BUILT_IN_SLOTS, coordinateColumn, foldedName, isSecretCoordinate, typeLabel } from '../shared/templateRules.ts'
 import { fitsPattern, patternPrefix } from './matches.ts'
 import { describeOptions } from './ownGenerator.ts'
 
@@ -98,7 +98,7 @@ function patternNameProblem(pattern: string, name: string, others: ReadonlySet<s
   if (!fitsPattern(pattern, name)) {
     return `The name must fit ${pattern.trim()}`
   }
-  if (others.has(name.trim().toLocaleLowerCase())) {
+  if (others.has(foldedName(name))) {
     return `${fieldColumn(name.trim())} is another field of the template`
   }
   return null
@@ -352,11 +352,11 @@ export default function NewItemDialog({ rows, organizations: vaultOrganizations,
   // The folded names of the template's fields other than the one of this pattern.
   function otherNames(field: NewItemField): Set<string> {
     const named = (template?.coordinates ?? []).flatMap((coordinate) =>
-      coordinate.kind === 'field' ? [coordinate.name.trim().toLocaleLowerCase()] : [],
+      coordinate.kind === 'field' ? [foldedName(coordinate.name)] : [],
     )
     const typed = fields
       .filter((other) => other.pattern !== null && other.column !== field.column)
-      .map((other) => nameFor(other).trim().toLocaleLowerCase())
+      .map((other) => foldedName(nameFor(other)))
     return new Set([...named, ...typed])
   }
 

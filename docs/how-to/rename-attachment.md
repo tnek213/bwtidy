@@ -12,7 +12,8 @@
 
 Save stays off, with the reason under the field, for an empty name, a name
 with a slash or a backslash, the name it has, or the name of another
-attachment of the item. Close leaves the dialog without a change.
+attachment of the item. Names that differ only in case count as one name
+(Straße.txt and STRASSE.txt too). Close leaves the dialog without a change.
 
 The rename is an unsaved change like any edit (see
 [How edits are saved](../explanation/edits.md)), and the attachment says it

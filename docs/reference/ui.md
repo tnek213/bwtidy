@@ -165,9 +165,10 @@ The three dots in a column header open its menu. A field column's menu:
   above.
 - Manage folders… (the Folder column): lists every folder with its number of
   items. Rename gives a folder a new name in place, Delete deletes an empty
-  one (a folder that holds items, also in the trash, cannot be deleted). A
-  folder with a rename or delete in the queue takes no other until it is
-  written.
+  one (a folder that holds items, also in the trash, cannot be deleted). Save
+  stays off for the name of another folder, also when only its case differs
+  (Straße and STRASSE count as one name). A folder with a rename or delete in
+  the queue takes no other until it is written.
 
 A merge that finds items with a value in more than one of the columns asks
 which value each of them keeps (Choose the values to keep).
