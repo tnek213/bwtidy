@@ -234,6 +234,10 @@ reasons behind some:
   The worker stop time, the `bw` time limits, the display limits and the
   datatype pattern limits stay fixed. A value that cannot be used stops the
   gateway and the app at the start with an error that names the variable.
+- Every number setting of the gateway, and `BWTIDY_IDLE_EXIT`, is checked at
+  the start against the values that Configuration names. Reason: a typo in
+  `.env` stops the gateway with an error that names the variable, not with a
+  traceback or a limit under which no account can open.
 - `BWTIDY_IDLE_EXIT` is passed on so a test can shorten it, and
   `BWTIDY_MCP_HOSTS` so the public host name passes the worker's DNS
   rebinding check (see MCP and the queue).

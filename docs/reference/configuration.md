@@ -2,9 +2,12 @@
 
 Every setting is a variable in `.env` next to `compose.yaml`, which Compose
 reads by itself. `example.env` lists the ones you may set, with a comment
-each. An empty value means the default. A timeout, a backup count or an age
-in hours that is not a positive number (a whole number for counts and hours)
-stops the gateway at its start with a message that names the variable.
+each. An empty value means the default.
+
+A time in seconds is a positive number such as `90` or `0.5`. Every other
+number the gateway reads is a whole number of at least 1, and a port is at
+most 65535. A value that a setting cannot take stops the gateway at its start
+with a message that names the variable and what it takes.
 
 ## Compose and the build
 
@@ -33,7 +36,7 @@ starts one worker per open account (see
 | `BWTIDY_ALLOWED_SERVERS` | | Servers (comma separated URLs) that may resolve to a private address, like a Vaultwarden on your own network. |
 | `BWTIDY_MAX_PENDING` | `2` | Most new accounts that wait for their first login at once. |
 | `BWTIDY_MAX_WORKERS` | `8` | Most accounts open at once, one worker each. |
-| `BWTIDY_UID_BASE` | `70000` | The account workers' uids start above it: the first account gets 70001, each new one the next. The gateway refuses to start when it is below 1. |
+| `BWTIDY_UID_BASE` | `70000` | The account workers' uids start above it: the first account gets 70001, each new one the next. |
 | `BWTIDY_HEARTBEAT_TIMEOUT` | `120` | Seconds without a heartbeat (all tabs closed) before the session ends, at least 60. |
 | `BWTIDY_SESSION_IDLE_TIMEOUT` | `7200` | Seconds without activity before the session ends. |
 | `BWTIDY_BACKUP_KEEP_NEWEST` | `40` | A backup past the newest this many is deleted. |
@@ -59,7 +62,7 @@ The image and `compose.yaml` set these, leave them as they are.
 | `BWTIDY_BACKUPS_ROOT` | | Where the backups are, `/backups` in `compose.yaml`. Unset, each account keeps them in its own `app/backups`. |
 | `BWTIDY_STATIC_DIR` | | The built web page, `/app/static` in the image. Unset, only the API is served. |
 | `BWTIDY_DOCS_DIR` | | The built documentation site served at `/docs/`, `/app/site` in the image. Unset, there is none. |
-| `BWTIDY_IDLE_EXIT` | `600` | Seconds a worker waits for its first session before it exits. Passed on to every worker. |
+| `BWTIDY_IDLE_EXIT` | `600` | Seconds a worker waits for its first session before it exits. The gateway checks it at its start and passes it on to every worker. |
 | `BWTIDY_GATEWAY_SWITCH_UID` | `1` | `0` keeps every worker on the gateway's own uid, for the unit tests only. |
 
 ## Worker
