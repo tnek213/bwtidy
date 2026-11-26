@@ -55,8 +55,8 @@ def test_the_document_needs_no_jq_or_unzip():
 
 
 def test_the_document_says_what_each_system_needs():
-    for heading in ("Linux:", "macOS:", "Windows:"):
-        assert f"\n{heading}\n" in TEXT
+    for heading in ("Linux", "macOS", "Windows"):
+        assert f"\n### {heading}\n" in TEXT
     commands_needed = ("brew install age", "winget install --id FiloSottile.age", "winpty")
     for needed in (*commands_needed, "alias python3=python"):
         assert needed in TEXT

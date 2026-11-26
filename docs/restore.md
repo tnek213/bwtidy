@@ -6,8 +6,11 @@ This is for when the vault itself is gone or badly broken: the account is
 lost, most items are deleted, or you move to a new account. It imports a
 backup's exports into an empty account and puts the attachments back. Every
 item comes back, but as a new item with a new id (see What does not come
-back). When only a bwtidy change went wrong and the vault is otherwise fine,
-use Restore on that change's row in bwtidy's Change log instead.
+back).
+
+> [!TIP]
+> When only a bwtidy change went wrong and the vault is otherwise fine, use
+> Restore on that change's row in bwtidy's Change log instead.
 
 Every step is here, nothing of bwtidy is needed: only `age` (or `rage`) from
 any distribution, Python 3 (3.8 or later, with nothing but its standard
@@ -21,7 +24,7 @@ The commands are written for bash and work the same on every system once
 these four are installed. Check them with `age --version`, `python3 --version`,
 `bw --version` and `bash --version`.
 
-Linux:
+### Linux
 
 - `age` from your distribution (`apt install age`, `dnf install age`,
   `pacman -S age` and so on, the
@@ -32,7 +35,7 @@ Linux:
   [standalone build](https://bitwarden.com/download/).
 - bash, there already.
 
-macOS:
+### macOS
 
 - `age`: `brew install age` or a release binary from the
   [age page](https://github.com/FiloSottile/age#installation).
@@ -47,7 +50,7 @@ macOS:
   Terminal's default shell is zsh, so run `bash` first, or paste the
   commands into zsh, which takes them as they are.
 
-Windows:
+### Windows
 
 - bash: either Git Bash, which comes with
   [Git for Windows](https://git-scm.com/download/win), or WSL. In WSL
@@ -79,13 +82,21 @@ Windows:
 
 ## What a backup holds
 
-    personal-export.zip       data.json (bw import takes it) and attachments folders not to use
-    org-<orgId>-export.json   one per organization
-    item-attachments/<itemId>/<fileName>   every attachment by the id of its item
-    raw/items.json            every active item as bwtidy saw it
-    raw/trash.json            the trash, which no export holds
-    raw/folders.json, raw/collections.json, raw/organizations.json
-    RESTORE.md                this file
+```text
+backup.zip                    the backup FILE.zip.age, decrypted in step 1
+├── personal-export.zip       data.json (bw import takes it) and attachments folders not to use
+├── org-<orgId>-export.json   one per organization
+├── item-attachments/
+│   └── <itemId>/
+│       └── <fileName>        every attachment by the id of its item
+├── raw/
+│   ├── items.json            every active item as bwtidy saw it
+│   ├── trash.json            the trash, which no export holds
+│   ├── folders.json
+│   ├── collections.json
+│   └── organizations.json
+└── RESTORE.md                this file
+```
 
 The `attachments` folders in `personal-export.zip` are filed by item name and
 lose files of items with the same name. Take attachments from
@@ -141,9 +152,10 @@ for item in json.load(open("raw/items.json")):
 
 ## 2. The account to import into
 
-Import into an empty account: a new one, or the old one after Settings, My
-account, Purge vault. An import into a vault with items adds the backup's
-items next to them, it does not replace anything.
+> [!WARNING]
+> Import into an empty account: a new one, or the old one after Settings, My
+> account, Purge vault. An import into a vault with items adds the backup's
+> items next to them, it does not replace anything.
 
 Organization items go into organizations you own, one per
 `org-<orgId>-export.json`, each with the name it had in the backup (step 1

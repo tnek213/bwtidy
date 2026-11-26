@@ -31,8 +31,9 @@ matches its format, never whether the value is right.
 
 5. Click Save.
 
-Make up your examples. An agent connected through MCP can read them, so
-never type a real address or password there.
+> [!WARNING]
+> Make up your examples. An agent connected through MCP can read them, so
+> never type a real address or password there.
 
 ## Make a template
 

@@ -62,12 +62,21 @@ page's source path, its address on the GitHub Pages site and the version, which
 `scripts/docs-site` hands over as `extra.bwtidy_version`. Both stay inline, as a
 running bwtidy serves the site offline: nothing comes from a CDN. Zensical's
 own lightbox (its glightbox extension) loads GLightbox from unpkg.com, so it
-stays off. After the build, `scripts/docs-site build` checks
+stays off. For the same reason the Markdown extensions in `zensical.toml` are
+those whose output needs nothing from another host: GitHub's alerts as boxes
+(`pymdownx.quotes` with `callouts`), the cards (`md_in_html` and `attr_list`)
+and their icons, which `pymdownx.emoji` draws inline from the theme's icon
+sets. An emoji shortcode such as `:smile:` would be a picture from a CDN, and
+a mermaid diagram loads its script from one. After the build,
+`scripts/docs-site build` checks
 that every built HTML page has the banner (the attribute `data-disclaimer`)
 and fails naming those without it. It also fails on a numbered list that
 starts at 1 again right after another one with only a picture or code block
 between them, naming the page and the line of its HTML: a step's picture, code
 block or paragraph is indented by 4 spaces under it, or the list ends there.
+And it fails on a page that has the browser fetch anything from another host
+(a script, stylesheet, icon, picture, frame or CSS `url()`), naming the page,
+the line and the URL. A link to another host is fine.
 
 `scripts/ci` runs `scripts/docs-site build` after the MCP reference check.
 It fails on a page of `docs/` that the nav of `zensical.toml` leaves out,

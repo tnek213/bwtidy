@@ -23,7 +23,8 @@ request does not ask for spec changes.
 - `docs/` the user docs, from `docs/index.md` into four folders:
   `tutorial/`, `how-to/`, `reference/` and `explanation/`. Beside them
   `docs/spec.md` (the rules and reasons the user docs do not state),
-  `docs/architecture.md` and
+  `docs/architecture.md`, `docs/contributing.md` (cards that lead to the
+  issue forms and the repo's contributing files) and
   `docs/restore.md` (a how-to that every backup holds as RESTORE.md).
 - `dev/` the developer guide and the dev vault's fixture: `dev/README.md` (set
   up, the commands, the credentials), `dev/dev-vault.md` (the dev stacks, the
@@ -107,7 +108,13 @@ speaks to the reader as "you". The docs describe what happens, in the present
 or future tense, never what happened in one run. A bullet list is for parallel
 items that can be read in any order, while sentences that follow from each
 other are paragraphs, so new text follows both. UI that is used often gets a screenshot from
-the docs suite. Examples use placeholder hosts such as https://bwtidy.example.
+the docs suite. A prerequisite, a tip or a warning that matters may go in a
+box, written as GitHub's alert (`> [!NOTE]`, `> [!TIP]` or `> [!WARNING]`),
+and a directory layout is drawn as a tree in a `text` code block. No content
+tabs and no `!!!` admonitions: GitHub shows these pages too, and every backup
+holds `docs/restore.md` as plain text, where that syntax turns into code
+blocks. Cards (`<div class="grid cards" markdown>`) are for a landing page.
+Examples use placeholder hosts such as https://bwtidy.example.
 `README.md` and `docs/index.md` share three texts, each the same in both:
 the introduction (between the comments `<!-- intro: ... -->` and
 `<!-- end of intro -->`), the alpha disclaimer (the blockquote "Alpha

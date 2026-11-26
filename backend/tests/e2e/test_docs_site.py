@@ -236,3 +236,27 @@ def test_the_docs_issue_link_sits_at_the_end_of_the_content_on_a_narrow_screen(p
         assert article.get_by_role("link", name="Suggest an improvement to this page").count() == 1
         last = article.locator("> :last-child")
         assert last.get_by_role("link", name="Suggest an improvement to this page").count() == 1
+
+
+def test_the_cards_and_boxes_draw_from_the_site_itself(page: Page):
+    hosts: set[str] = set()
+
+    def note(request: Request) -> None:
+        if request.resource_type in ("script", "stylesheet", "image", "font"):
+            hosts.add(urlsplit(request.url).netloc)
+
+    page.on("request", note)
+    page.goto("/docs/contributing/")
+    cards = page.locator("article .grid.cards > ul > li")
+    expect(cards).to_have_count(6)
+    expect(cards.first.locator("svg").first).to_be_visible()
+    bug = cards.first.get_by_role("link", name="Report a bug")
+    expect(bug).to_have_attribute(
+        "href", "https://github.com/tnek213/bwtidy/issues/new?template=bug_report.yml"
+    )
+    page.goto("/docs/restore/")
+    warning = page.locator("article .admonition.warning")
+    expect(warning).to_contain_text("Import into an empty account")
+    expect(warning.locator(".admonition-title")).to_have_text("Warning")
+    expect(warning).not_to_have_css("background-color", TRANSPARENT)
+    assert hosts == {urlsplit(page.url).netloc}

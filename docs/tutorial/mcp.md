@@ -27,8 +27,9 @@ The token lets your client in, and picks your account.
 
     ![The MCP token dialog with Copy of the token and Copy of the MCP URL outlined and numbered 1 and 2](../images/tutorial-mcp-token.png)
 
-bwtidy keeps only a hash of the token, so close the dialog only once you
-have both.
+> [!WARNING]
+> bwtidy keeps only a hash of the token, so close the dialog only once you
+> have both.
 
 ## Switch MCP on
 

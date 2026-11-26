@@ -41,6 +41,7 @@ nav = [
     "explanation/isolation.md",
   ] },
   { "For contributors" = [
+    "contributing.md",
     "spec.md",
     { "The architecture, a map of the code" = "architecture.md" },
   ] },
@@ -80,11 +81,19 @@ scheme = "slate"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 
+# only what renders without a script or a picture from another host (scripts/docs-site checks every
+# built page): an emoji shortcode such as :smile: or a mermaid block would load one from a CDN
 [project.markdown_extensions]
 admonition = {}
 attr_list = {}
 md_in_html = {}
 toc.permalink = true
+# the icons of the cards, drawn inline from the theme's own icon sets
+pymdownx.emoji.emoji_index = "zensical.extensions.emoji.twemoji"
+pymdownx.emoji.emoji_generator = "zensical.extensions.emoji.to_svg"
 pymdownx.highlight.anchor_linenums = true
 pymdownx.inlinehilite = {}
+# GitHub's alerts (> [!NOTE], > [!TIP], > [!WARNING]) as boxes, so a box also shows on GitHub
+# and reads as a quote in a backup's RESTORE.md
+pymdownx.quotes.callouts = true
 pymdownx.superfences = {}

@@ -110,11 +110,11 @@ Take them in order: each continues from the vault the one before left.
 
 ## For contributors
 
+- [Contributing](contributing.md): report a bug, ask for a change, improve
+  the docs, make a pull request or report a security issue.
 - [The spec](spec.md): the rules and reasons these pages do not state.
 - [The architecture](architecture.md): the map of the code, its layers and
   what each may import, who writes each kind of data and how a write flows.
-- `CONTRIBUTING.md` in the repository: where to start, and how to report a
-  bug, ask for a feature or report a security issue (`SECURITY.md`).
 - The developer guide in the repository: `dev/README.md` to set up and for
   the commands, `dev/dev-vault.md` for the dev stack, `dev/testing.md` for
   the tests and the docs screenshots, `dev/release.md` for the docs site and
