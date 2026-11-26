@@ -19,7 +19,7 @@ up. -->
 
 <!-- Optional. Design choices, trade-offs, follow-ups. Delete if not needed. -->
 
-Closes #
+<!-- When this closes an issue, add a line like: Closes #123 -->
 
 ## Checklist
 
