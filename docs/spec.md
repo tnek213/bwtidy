@@ -463,7 +463,11 @@ reaches a worker. FastAPI's own API pages (`/docs`, `/redoc`) are off. How
 the site is built is in [architecture.md](architecture.md#the-container).
 Its look: a content column wider than the theme's, running text at most 80
 characters a line, pictures with a thin border that open larger on a click,
-and nothing loaded from a CDN.
+and nothing loaded from a CDN. The site sends another site nothing about the
+host it is served from, as the address of a self-hosted bwtidy stays private:
+no page requests anything from another host (the header's version and star
+count are written at build time, not fetched from GitHub), and the referrer
+policy `same-origin` keeps the `Referer` off every link to another site.
 
 ### MCP
 

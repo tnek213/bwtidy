@@ -201,7 +201,7 @@ def improve_link_checks(page: Page, source: str, public: str):
     )
     expect(link).to_have_count(1)
     expect(link).to_have_attribute("target", "_blank")
-    expect(link).to_have_attribute("rel", "noopener")
+    assert set((link.get_attribute("rel") or "").split()) >= {"noopener", "noreferrer"}
     href = link.get_attribute("href")
     assert href is not None
     parts = urlsplit(href)
@@ -269,3 +269,27 @@ def test_the_cards_and_boxes_draw_from_the_site_itself(page: Page):
     expect(warning.locator(".admonition-title")).to_have_text("Warning")
     expect(warning).not_to_have_css("background-color", TRANSPARENT)
     assert hosts == {urlsplit(page.url).netloc}
+
+
+## pages with the header, the links out and the cards, whose requests must all stay on the site
+OWN_HOST_PAGES = ["/docs/", "/docs/tutorial/first-cleanup/", "/docs/contributing/"]
+
+
+def test_the_docs_send_requests_only_to_bwtidy_itself(page: Page):
+    """No request of any kind (fetch and XHR too) tells another site a self-hosted bwtidy's host."""
+    hosts: set[str] = set()
+    page.on("request", lambda request: hosts.add(urlsplit(request.url).netloc))
+    for path in OWN_HOST_PAGES:
+        page.goto(path)
+        page.wait_for_load_state("networkidle")
+        referrer = page.locator('meta[name="referrer"]')
+        expect(referrer).to_have_count(1)
+        expect(referrer).to_have_attribute("content", "same-origin")
+    assert hosts == {urlsplit(page.url).netloc}
+
+
+def test_the_header_shows_the_version_without_asking_github(page: Page):
+    page.goto("/docs/")
+    source = page.locator(".md-header .md-source")
+    expect(source).to_have_attribute("href", "https://github.com/tnek213/bwtidy")
+    expect(source.locator(".md-source__fact--version")).to_have_text(VERSION)
