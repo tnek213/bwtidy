@@ -28,6 +28,11 @@ FROM python AS docs
 ENV UV_PYTHON=/usr/local/bin/python3 \
     UV_PYTHON_DOWNLOADS=never \
     UV_LINK_MODE=copy
+## resvg draws the text of a diagram with the system's fonts and the base image has none. This
+## stage only, the app stage stays without them.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY backend/pyproject.toml backend/uv.lock backend/
 RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
@@ -40,6 +45,8 @@ COPY overrides/ overrides/
 COPY docs/ docs/
 ## the build has no .git, so the commit comes in as an arg (scripts/docs-site reads it)
 ARG BWTIDY_COMMIT=""
+## the Kroki server that renders the diagrams of the docs, https://kroki.io when empty
+ARG BWTIDY_KROKI_URL=""
 ## the repo's star count for the header comes in as an arg too, as the docs ask GitHub for nothing
 ## (the image workflow looks it up, scripts/docs-site leaves it out when empty)
 ARG BWTIDY_STARS=""

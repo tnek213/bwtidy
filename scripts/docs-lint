@@ -31,9 +31,17 @@ targets and URLs, a semicolon, an em dash (U+2014) or ` -- ` used as a dash is r
 STYLE `semicolon`, `em dash` or `double hyphen as a dash`. The semicolon of an HTML entity
 (like `&amp;`) does not count.
 
+Diagrams: a fenced code block whose info string starts with a Kroki diagram type (```mermaid,
+```d2 and the others) needs `alt="TEXT"` after the type, as scripts/docs-site turns it into a
+picture with that alt text. One without is reported as `FILE:LINE: diagram without alt text`,
+so ci finds it before the docs build asks Kroki for any diagram. The types and the way a block is
+found come from scripts/docs-site, loaded by its path, so both read the one list.
+
 Prints nothing and exits 0 when all is well, exits 1 otherwise.
 """
 
+import importlib.machinery
+import importlib.util
 import os
 import re
 import subprocess
@@ -42,6 +50,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent.parent
+DOCS_SITE = Path(__file__).resolve().parent / "docs-site"
 IMAGES = "docs/images"
 
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
@@ -245,6 +254,17 @@ def tracked(root: Path, *patterns: str) -> list[Path]:
     return sorted(p for p in paths if p.is_file())
 
 
+def load_docs_site():
+    """scripts/docs-site as a module, for its KROKI_TYPES and diagrams()."""
+    ## the script has no .py suffix, so the loader must be named outright
+    loader = importlib.machinery.SourceFileLoader("docs_site", str(DOCS_SITE))
+    spec = importlib.util.spec_from_loader("docs_site", loader)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
 def lint(root: Path) -> list[str]:
     """The problems of the repo at root, one line each."""
     problems: list[str] = []
@@ -257,10 +277,15 @@ def lint(root: Path) -> list[str]:
             cache[path] = anchors(text)
         return cache[path]
 
+    docs_site = load_docs_site()
     for md in tracked(root, "*.md"):
         text = md.read_text(encoding="utf-8", errors="replace")
         rel = md.relative_to(root)
-        found: list[tuple[int, str]] = []
+        found: list[tuple[int, str]] = [
+            (diagram.line, "diagram without alt text")
+            for diagram in docs_site.diagrams(text)
+            if not diagram.alt
+        ]
         for line, link, has_alt in image_links(text):
             if not has_alt:
                 found.append((line, "picture without alt text"))

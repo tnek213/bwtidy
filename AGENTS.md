@@ -24,7 +24,7 @@ request does not ask for spec changes.
   `tutorial/`, `how-to/`, `reference/` and `explanation/`. Beside them
   `docs/spec.md` (the rules and reasons the user docs do not state),
   `docs/architecture.md`, `docs/contributing.md` (cards that lead to the
-  issue forms and the repo's contributing files) and
+  issue forms and the repo's contributing files, and how to add a diagram) and
   `docs/restore.md` (a how-to that every backup holds as RESTORE.md).
 - `dev/` the developer guide and the dev vault's fixture: `dev/README.md` (set
   up, the commands, the credentials), `dev/dev-vault.md` (the dev stacks, the
@@ -126,6 +126,13 @@ and a directory layout is drawn as a tree in a `text` code block. No content
 tabs and no `!!!` admonitions: GitHub shows these pages too, and every backup
 holds `docs/restore.md` as plain text, where that syntax turns into code
 blocks. Cards (`<div class="grid cards" markdown>`) are for a landing page.
+A diagram is a fenced code block whose language is a Kroki diagram type
+(`mermaid`, `plantuml`, `d2`, `graphviz` or any other type https://kroki.io/
+lists) with `alt="WHAT IT SHOWS"` after the type, as in
+```` ```mermaid alt="The gateway starts one worker per account" ````. An
+editor's Kroki preview (such as a Kroki extension of VS Code) shows it while
+you write, and the docs build turns it into a picture (dev/release.md,
+"Diagrams"). `scripts/docs-lint` reports a diagram without alt text.
 Examples use placeholder hosts such as https://bwtidy.example.
 `README.md` and `docs/index.md` share three texts, each the same in both:
 the introduction (between the comments `<!-- intro: ... -->` and

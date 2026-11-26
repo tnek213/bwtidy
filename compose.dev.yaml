@@ -27,6 +27,9 @@ services:
     build:
       context: .
       target: dev
+      args:
+        ## the Kroki server of scripts/docs-site, https://kroki.io when unset
+        BWTIDY_KROKI_URL: ${BWTIDY_KROKI_URL:-}
     environment:
       BWTIDY_DATA_DIR: /data/app
       NODE_EXTRA_CA_CERTS: /tls/cert.pem

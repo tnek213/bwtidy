@@ -82,6 +82,13 @@ The tests of `tests/scripts` load a script by name with the fixture
 `load_script` (`load_script("dev-vault")`), and `backend/tests/conftest.py`
 puts `scripts/` on the import path so they import `devlib` too.
 
+The tests of `scripts/docs-site` (`tests/scripts/test_docs_site_script.py`)
+convert a diagram with the real resvg, so they need one of the fonts that
+[Releasing](release.md#diagrams) lists, as a docs build does. Without one
+they fail with the build's message that no installed font draws the text.
+On Debian or Ubuntu `fonts-dejavu-core` is enough, which the CI workflow
+installs before `scripts/ci`. Releasing names the packages of other systems.
+
 ### Workers and timeouts
 
 `scripts/ci` runs the backend tests of `tests/unit`, `tests/scripts` and
@@ -645,7 +652,9 @@ that a `#anchor` on a link to a markdown file (or a bare `#anchor`) matches a
 heading of that file by GitHub's slug rules. Finally it applies the prose
 style rule of `AGENTS.md`: a semicolon, an em dash or ` -- ` as a dash
 outside code, HTML comments and link targets is a problem (an HTML entity
-such as `&amp;` is not). It prints one line per problem and exits 1, nothing
+such as `&amp;` is not). A diagram (a fenced code block of a Kroki type,
+see [Releasing](release.md#diagrams)) without `alt="TEXT"` after its type is
+a problem too. It prints one line per problem and exits 1, nothing
 and 0 when all is well.
 
 ### Frontend linters

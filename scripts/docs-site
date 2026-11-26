@@ -43,20 +43,43 @@ docs issue form), its semver alone as extra.bwtidy_release and the repo's star c
 BWTIDY_STARS as extra.bwtidy_stars, left out when the variable is unset or not digits only (the
 docs and image workflows look it up). The header shows the last two beside the repository link
 (overrides/partials/source.html), so the pages fetch nothing from GitHub.
+
+A diagram is a fenced code block whose info string starts with a Kroki diagram type (KROKI_TYPES,
+as in ```mermaid alt="What it shows"). Before Zensical runs, `build` turns each one of its copy of
+docs/ into a PNG beside the page and puts a Markdown picture of it in the block's place, with the
+alt text and `{ width="W" }`, W half the PNG's width. It refuses a diagram without alt text, naming
+the page and the line, before any request (scripts/docs-lint reports it as well). It POSTs the
+source to BWTIDY_KROKI_URL (https://kroki.io when unset or empty) as TYPE/svg, a Mermaid source
+with MERMAID_INIT as its first line unless it starts with an init directive of its own, and resvg
+(resvg-py of the group docs, run through uv) converts the SVG at ZOOM and DPI on BACKGROUND,
+drawing the text with the system's fonts (GENERIC_FONTS: the first installed one of each list
+stands in for serif, sans-serif and monospace). A diagram with a text that none of them draws
+(resvg would leave it out without a word) fails the build, naming the page, the line, the generic
+family and the fonts it tried. The PNG is named after a hash of the type, the source and the
+converter's settings, and kept under that hash in .cache/kroki/ at the repo root, so a later build
+finds it there and makes no request. A server that cannot be reached or answers with an error fails
+the build, naming the page, the line and the server's message. Docs without a diagram build without
+any request. `serve` shows a diagram as its code block.
 """
 
+import hashlib
+import http.client
 import importlib.util
+import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 import tomllib
+import urllib.error
+import urllib.request
 from collections.abc import Iterator
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 from urllib.parse import urlsplit
 
 ## the Dockerfile's docs stage copies this script alone, so it stays free of scripts/devlib
@@ -73,7 +96,8 @@ RESTORE_PAGE = "restore.md"
 RESTORE_DOC_COMMIT = "Written for bwtidy COMMIT."
 ## what Zensical writes at the top of every site, so a directory that holds both is a build
 BUILD_MARKERS = ("index.html", "sitemap.xml")
-ZENSICAL = [
+## a command in the backend's group docs (Zensical and resvg-py), without bwtidy itself
+DOCS_GROUP = [
     "uv",
     "run",
     "--quiet",
@@ -82,8 +106,184 @@ ZENSICAL = [
     str(BACKEND),
     "--only-group",
     "docs",
-    "zensical",
 ]
+ZENSICAL = [*DOCS_GROUP, "zensical"]
+## the diagram types of Kroki, by the name its URL takes, as https://kroki.io/ lists them (its
+## "Diagram types" and https://kroki.io/cheatsheet.html). scripts/docs-lint loads this list too.
+KROKI_TYPES = (
+    "actdiag",
+    "blockdiag",
+    "bpmn",
+    "bytefield",
+    "c4plantuml",
+    "d2",
+    "dbml",
+    "ditaa",
+    "erd",
+    "excalidraw",
+    "goat",
+    "graphviz",
+    "lini",
+    "mermaid",
+    "nomnoml",
+    "nwdiag",
+    "packetdiag",
+    "pikchr",
+    "plantuml",
+    "rackdiag",
+    "seqdiag",
+    "structurizr",
+    "svgbob",
+    "symbolator",
+    "tikz",
+    "umlet",
+    "vega",
+    "vegalite",
+    "wavedrom",
+    "wireviz",
+)
+KROKI_URL = "BWTIDY_KROKI_URL"
+KROKI_DEFAULT = "https://kroki.io"
+KROKI_TIMEOUT = 60
+## relative to ROOT, read at build time
+KROKI_CACHE = Path(".cache") / "kroki"
+## Mermaid writes its labels as HTML in foreignObject elements, which resvg leaves out, unless
+## this first line has it write SVG text
+MERMAID_INIT = '%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%'
+MERMAID_HAS_INIT = re.compile(r"\s*%%\{\s*init(?:ialize)?\s*:")
+## drawn at twice its size and shown at half the width, so it is sharp on a HiDPI screen. White,
+## as a transparent picture vanishes in the dark color scheme.
+ZOOM = 2
+BACKGROUND = "#ffffff"
+## the CSS pixel's. resvg-py's default of 0 makes a size in pt or cm (as Graphviz and PlantUML
+## write them) 0, an invalid size.
+DPI = 96
+CONVERTER = f"resvg zoom={ZOOM} background={BACKGROUND} dpi={DPI}"
+## the installed fonts that may stand in for each generic family, the first one that draws wins.
+## resvg maps them to Times New Roman, Arial and Courier New, so on a system without those (the
+## Dockerfile's docs stage has DejaVu only) a label in serif or sans-serif is left out.
+GENERIC_FONTS = {
+    "serif": ["Times New Roman", "Times", "Liberation Serif", "DejaVu Serif", "Noto Serif"],
+    "sans_serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans", "Noto Sans"],
+    "monospace": ["Courier New", "Liberation Mono", "DejaVu Sans Mono", "Noto Sans Mono"],
+}
+## run in the group docs with ZOOM, BACKGROUND, DPI, the JSON of GENERIC_FONTS and then pairs of
+## an SVG and a PNG path. It converts what it can and prints a line "SVG<tab>WHY" for each SVG it
+## cannot convert or whose text no installed font draws.
+CONVERT = """
+import html
+import json
+import re
+import sys
+import xml.etree.ElementTree as ElementTree
+
+PROBE = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20">'
+    '<text x="2" y="16" font-size="16" font-family="{family}">{text}</text></svg>'
+)
+## a family no system has. resvg draws a text whose families it cannot find in the serif one,
+## so a probe with this as serif finds only the family it names.
+NOWHERE = "bwtidy no such font"
+CSS_FAMILY = re.compile(r"font-family\\s*:\\s*([^;}]+)")
+GENERIC_NAMES = {"serif": "serif", "sans-serif": "sans_serif", "monospace": "monospace"}
+
+
+def draws(render, family, fonts):
+    try:
+        text = render(svg_string=PROBE.format(family=html.escape(family), text="Mg"), **fonts)
+        empty = render(svg_string=PROBE.format(family=html.escape(family), text=""), **fonts)
+    except ValueError:
+        return False
+    return bytes(text) != bytes(empty)
+
+
+def generic_families(render, candidates):
+    chosen = {}
+    for generic, families in candidates.items():
+        probe = {"serif_family": NOWHERE}
+        found = next((family for family in families if draws(render, family, probe)), None)
+        chosen[f"{generic}_family"] = found or NOWHERE
+    chosen["font_family"] = chosen.get("serif_family", NOWHERE)
+    return chosen
+
+
+## the font-family lists of an SVG that holds text, "" for resvg's default, else none.
+def text_families(svg):
+    try:
+        root = ElementTree.fromstring(svg)
+    except ElementTree.ParseError:
+        return []
+    elements = list(root.iter())
+    texts = [e for e in elements if e.tag.rsplit("}", 1)[-1] == "text"]
+    if not any("".join(text.itertext()).strip() for text in texts):
+        return []
+    found = []
+    for element in elements:
+        if element.get("font-family"):
+            found.append(element.get("font-family"))
+        css = element.get("style") or ""
+        if element.tag.rsplit("}", 1)[-1] == "style":
+            css += " " + "".join(element.itertext())
+        found += CSS_FAMILY.findall(css)
+    return list(dict.fromkeys(family.strip() for family in found)) or [""]
+
+
+## the generic family a font-family list falls back on, serif as resvg's when it names none.
+def generic_of(family):
+    for name in family.split(","):
+        name = name.strip().strip("'\\"").lower()
+        if name in GENERIC_NAMES:
+            return name
+    return "serif"
+
+
+## why a text of the SVG would be left out for want of a font, or None when all draw.
+def missing_font(render, svg, fonts, candidates):
+    for family in text_families(svg):
+        generic = generic_of(family)
+        key = GENERIC_NAMES[generic]
+        ## the text has to draw in a font of its own list, not in resvg's serif fallback
+        probe = {**fonts, "serif_family": fonts.get(f"{key}_family", NOWHERE)}
+        if not draws(render, family, probe):
+            tried = ", ".join(candidates.get(key, []))
+            return f"no installed font draws its {generic} text, tried {tried}"
+    return None
+
+
+def main(args):
+    import resvg_py
+
+    zoom, background, dpi, candidates, *paths = args
+    candidates = json.loads(candidates)
+    render = resvg_py.svg_to_bytes
+    fonts = generic_families(render, candidates)
+    failed = False
+    for svg, png in zip(paths[::2], paths[1::2]):
+        with open(svg, "rb") as file:
+            source = file.read()
+        why = missing_font(render, source, fonts, candidates)
+        if why:
+            print(f"{svg}\\t{why}", file=sys.stderr)
+            failed = True
+            continue
+        try:
+            data = render(
+                svg_path=svg, zoom=float(zoom), background=background, dpi=float(dpi), **fonts
+            )
+        except Exception as error:
+            print(f"{svg}\\tresvg could not convert the SVG of Kroki, {error}", file=sys.stderr)
+            failed = True
+            continue
+        with open(png, "wb") as file:
+            file.write(bytes(data))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
+"""
+OPENING_FENCE = re.compile(r"^([ \t]*)(`{3,}|~{3,})[ \t]*(.*?)[ \t]*$")
+ALT = re.compile(r'\balt="([^"]*)"')
 ## the rel values of a link tag that only points somewhere, so the browser never fetches its href
 LINK_ONLY = {"alternate", "author", "canonical", "help", "license", "next", "prev", "search"}
 ## a URL in CSS, of url(...) or @import, whether quoted or not
@@ -368,6 +568,221 @@ def replace(target: Path, site: Path) -> None:
         shutil.rmtree(staging, ignore_errors=True)
 
 
+class Diagram(NamedTuple):
+    """A fenced code block of a Kroki diagram type: where it is and what it holds.
+
+    line is the opening fence's (counted from 1), start and end the indexes of the block's first
+    and last line. alt is "" when the info string names none."""
+
+    line: int
+    start: int
+    end: int
+    kind: str
+    alt: str
+    source: str
+    indent: str
+
+
+def closes(line: str, fence: str) -> bool:
+    """Whether line closes a code block opened by fence."""
+    stripped = line.strip()
+    return len(stripped) >= len(fence) and set(stripped) == {fence[0]}
+
+
+def diagrams(text: str) -> list[Diagram]:
+    """The fenced code blocks of a markdown text whose info string starts with a Kroki type.
+
+    A block of another language is skipped whole, so an example inside it does not count."""
+    lines = text.split("\n")
+    found = []
+    index = 0
+    while index < len(lines):
+        match = OPENING_FENCE.match(lines[index])
+        if not match:
+            index += 1
+            continue
+        indent, fence, info = match.groups()
+        end = index + 1
+        while end < len(lines) and not closes(lines[end], fence):
+            end += 1
+        words = info.split(maxsplit=1)
+        if words and words[0] in KROKI_TYPES:
+            alt = ALT.search(info)
+            body = [
+                line[len(indent) :] if line.startswith(indent) else line.lstrip()
+                for line in lines[index + 1 : end]
+            ]
+            found.append(
+                Diagram(
+                    line=index + 1,
+                    start=index,
+                    end=min(end, len(lines) - 1),
+                    kind=words[0],
+                    alt=alt.group(1).strip() if alt else "",
+                    source="\n".join(body) + "\n",
+                    indent=indent,
+                )
+            )
+        index = end + 1
+    return found
+
+
+def kroki_url(kind: str) -> str:
+    """The URL that renders a diagram of the kind as SVG, on the server BWTIDY_KROKI_URL names."""
+    base = os.environ.get(KROKI_URL, "").strip() or KROKI_DEFAULT
+    return f"{base.rstrip('/')}/{kind}/svg"
+
+
+def kroki_source(diagram: Diagram) -> str:
+    """The source as Kroki gets it: a Mermaid one with the init line that keeps its labels."""
+    if diagram.kind == "mermaid" and not MERMAID_HAS_INIT.match(diagram.source):
+        return f"{MERMAID_INIT}\n{diagram.source}"
+    return diagram.source
+
+
+def diagram_key(kind: str, source: str) -> str:
+    """The hash a picture is named and cached by: its type, its source and the converter."""
+    settings = [CONVERTER, GENERIC_FONTS]
+    return hashlib.sha256(json.dumps([kind, source, settings]).encode()).hexdigest()
+
+
+class KrokiError(Exception):
+    def __init__(self, message: str, reached: bool) -> None:
+        super().__init__(message)
+        self.reached = reached
+
+
+def fetch_svg(kind: str, source: str) -> bytes:
+    """The SVG Kroki renders of a source, a KrokiError when it cannot be reached or refuses."""
+    url = kroki_url(kind)
+    request = urllib.request.Request(
+        url,
+        data=source.encode("utf-8"),
+        method="POST",
+        headers={
+            "Content-Type": "text/plain",
+            "Accept": "image/svg+xml",
+            "User-Agent": "bwtidy-docs-site",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=KROKI_TIMEOUT) as response:
+            return response.read()
+    except urllib.error.HTTPError as error:
+        message = error.read().decode("utf-8", errors="replace").strip() or str(error.reason)
+        raise KrokiError(f"{url} answered {error.code}: {message}", reached=True) from None
+    except (OSError, http.client.HTTPException) as error:
+        reason = error.reason if isinstance(error, urllib.error.URLError) else error
+        raise KrokiError(f"{url} could not be reached: {reason}", reached=False) from None
+
+
+def convert(svgs: dict[str, bytes], cache: Path) -> dict[str, str]:
+    """Convert each SVG to a PNG in the cache under its key, why for each key that failed."""
+    cache.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="bwtidy-kroki-") as temp:
+        paths = []
+        for key, svg in svgs.items():
+            (Path(temp) / f"{key}.svg").write_bytes(svg)
+            paths += [str(Path(temp) / f"{key}.svg"), str(Path(temp) / f"{key}.png")]
+        result = subprocess.run(
+            [
+                *DOCS_GROUP,
+                "python",
+                "-c",
+                CONVERT,
+                str(ZOOM),
+                BACKGROUND,
+                str(DPI),
+                json.dumps(GENERIC_FONTS),
+                *paths,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        reasons = {}
+        for line in result.stderr.splitlines():
+            svg, tab, why = line.partition("\t")
+            if tab:
+                reasons[Path(svg).stem] = why
+        failed = {}
+        for key in svgs:
+            png = Path(temp) / f"{key}.png"
+            if png.is_file():
+                os.replace(png, cache / f"{key}.png")
+            else:
+                why = result.stderr.strip() or f"exit code {result.returncode}"
+                failed[key] = reasons.get(key, f"resvg could not convert the SVG of Kroki, {why}")
+        return failed
+
+
+def png_width(path: Path) -> int:
+    """The width of a PNG, from its IHDR chunk."""
+    return struct.unpack(">I", path.read_bytes()[16:20])[0]
+
+
+def picture(diagram: Diagram, name: str, width: int) -> str:
+    """The Markdown picture that stands in for a diagram's code block."""
+    alt = re.sub(r"([\\\[\]])", r"\\\1", diagram.alt)
+    return f'{diagram.indent}![{alt}]({name}){{ width="{width // 2}" }}'
+
+
+def render_diagrams(docs: Path) -> list[str]:
+    """Turn every diagram of the pages under docs into a PNG beside its page, the problems found.
+
+    A diagram without alt text stops it before any request. A PNG of the cache is used as it
+    is, the others come from Kroki as SVG and resvg converts them."""
+    pages = {}
+    for page in sorted(docs.rglob("*.md")):
+        found = diagrams(page.read_text(encoding="utf-8"))
+        if found:
+            pages[page] = found
+    if not pages:
+        return []
+
+    def where(page: Path, diagram: Diagram) -> str:
+        return f"{page.relative_to(docs.parent).as_posix()}:{diagram.line}"
+
+    problems = [
+        f'{where(page, d)}: diagram without alt text, write alt="WHAT IT SHOWS" after {d.kind}'
+        for page, found in pages.items()
+        for d in found
+        if not d.alt
+    ]
+    if problems:
+        return problems
+    cache = ROOT / KROKI_CACHE
+    wanted: dict[str, tuple[str, str, str]] = {}
+    for page, found in pages.items():
+        for d in found:
+            key = diagram_key(d.kind, kroki_source(d))
+            if not (cache / f"{key}.png").is_file() and key not in wanted:
+                wanted[key] = (d.kind, kroki_source(d), where(page, d))
+    svgs = {}
+    for key, (kind, source, place) in wanted.items():
+        try:
+            svgs[key] = fetch_svg(kind, source)
+        except KrokiError as error:
+            problems.append(f"{place}: Kroki could not render the {kind} diagram, {error}")
+            if not error.reached:
+                break
+    if problems:
+        return problems
+    failed = convert(svgs, cache) if svgs else {}
+    for key, why in failed.items():
+        problems.append(f"{wanted[key][2]}: {why}")
+    if problems:
+        return problems
+    for page, found in pages.items():
+        lines = page.read_text(encoding="utf-8").split("\n")
+        for d in reversed(found):
+            key = diagram_key(d.kind, kroki_source(d))
+            name = f"diagram-{key[:16]}.png"
+            shutil.copyfile(cache / f"{key}.png", page.parent / name)
+            lines[d.start : d.end + 1] = [picture(d, name, png_width(page.parent / name))]
+        page.write_text("\n".join(lines), encoding="utf-8")
+    return []
+
+
 def build(target: Path | None) -> int:
     if target is not None and (why := refusal(target)):
         print(f"docs-site: {why}, nothing was built", file=sys.stderr)
@@ -388,6 +803,11 @@ def build(target: Path | None) -> int:
                 f"docs-site: docs/{RESTORE_PAGE} has no line {RESTORE_DOC_COMMIT!r}",
                 file=sys.stderr,
             )
+            return 1
+        problems = render_diagrams(project / DOCS)
+        for problem in problems:
+            print(f"docs-site: {problem}", file=sys.stderr)
+        if problems:
             return 1
         built = subprocess.run([*ZENSICAL, "build", "--strict"], cwd=project)
         if built.returncode != 0:
