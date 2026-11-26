@@ -272,6 +272,32 @@ A start refused by a cap (429 from the gateway) or by the edge's rate limit
 gets the start page with "The demo is full right now. Try again in a few
 minutes."
 
+## Testing
+
+The demo's tests are in `demo/tests`, `scripts/ci` runs them:
+
+```sh
+cd demo && uv run --locked pytest tests/test_vaultwarden.py -q
+```
+
+`bwtidy_demo.vaultwarden` registers and deletes the users. Its module
+docstring says where in Vaultwarden's and the Bitwarden clients' source each
+field and each step of the crypto comes from. Its tests check the crypto
+with fixed inputs and the HTTP calls against a mock transport. One test
+registers a real user on the dev stack's Vaultwarden (it has
+`SIGNUPS_ALLOWED`) and logs bw in with it in the app container, in a state
+directory of its own. It skips without `BWTIDY_DEV_STACK=1`, like the
+backend's integration tests:
+
+```sh
+scripts/dev-vault up
+cd demo && BWTIDY_DEV_STACK=1 uv run --locked pytest tests/test_vaultwarden.py -q
+```
+
+`BWTIDY_STACK` picks another stack. The test leaves its user behind (the dev
+stack has no admin token), `scripts/dev-vault down` or `reset` removes it.
+The admin API's user deletion is tested against the mock only.
+
 ## Run it
 
 To be written with `compose.demo.yaml`.
