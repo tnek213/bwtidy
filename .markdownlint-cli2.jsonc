@@ -1,0 +1,54 @@
+// The Markdown style of every Markdown file of the repo. scripts/ci checks it with markdownlint-cli2
+// (tools/markdownlint), scripts/ci --fix fixes what markdownlint can, and the VS Code extension
+// markdownlint (DavidAnson.vscode-markdownlint) reads this file by itself and shows the same
+// findings in the editor.
+{
+  "config": {
+    "default": true,
+    "MD003": { "style": "atx" },
+    "MD004": { "style": "dash" },
+    // Zensical (Python-Markdown) nests a list only when it is indented by 4 spaces, a list
+    // indented by 2 renders as one flat list on the docs site
+    "MD007": { "indent": 4 },
+    // a code block, a table or a heading may be longer: it cannot wrap without changing what it
+    // shows. Text is wrapped by hand, as markdownlint --fix does not rewrap it
+    "MD013": { "line_length": 80, "code_blocks": false, "tables": false, "headings": false },
+    "MD024": { "siblings_only": true },
+    "MD029": { "style": "ordered" },
+    // the cards of a landing page (<div class="grid cards" markdown>) have no Markdown syntax
+    "MD033": { "allowed_elements": ["div"] },
+    "MD046": { "style": "fenced" },
+    "MD048": { "style": "backtick" },
+    "MD049": { "style": "underscore" },
+    "MD050": { "style": "asterisk" }
+  },
+  "overrides": [
+    {
+      // Docker Hub's overviews, like those of the official images, have a top-level heading per
+      // section
+      "filter": ["docker/hub-overview.md"],
+      "config": { "MD025": false },
+      "combine": "merge"
+    },
+    {
+      // GitHub puts the pull request template into the description of a pull request, under its
+      // title, and Claude Code reads CLAUDE.md as instructions that import AGENTS.md
+      "filter": [".github/pull_request_template.md", "CLAUDE.md"],
+      "config": { "MD041": false },
+      "combine": "merge"
+    }
+  ],
+  "globs": ["**/*.md"],
+  // what is not the repo's own text: installed packages, caches and the site's build output
+  "ignores": [
+    "**/node_modules/**",
+    "**/.venv/**",
+    "**/.pytest_cache/**",
+    "**/.ruff_cache/**",
+    ".cache/**",
+    "site/**",
+    "_site/**"
+  ],
+  // and whatever else git ignores, such as the dev stacks' directories
+  "gitignore": true
+}

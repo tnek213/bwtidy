@@ -9,7 +9,7 @@ is meant to grow in the open, so issues, ideas and changes are welcome. There
 is no promise of a review time or of a change going in.
 
 Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). Report
-behavior that breaks it to tnek213.recollect098@slmail.me.
+behavior that breaks it to <tnek213.recollect098@slmail.me>.
 
 ## Before you start on a feature
 
@@ -39,7 +39,12 @@ allows it.
   the page under `docs/` that covers it, in the same commit.
 - `scripts/ci`: runs the lint, type, build and unit checks. It must pass
   before a change goes in. The CI workflow (`.github/workflows/ci.yml`) runs
-  it on every push to main and every pull request.
+  it on every push to main and every pull request. `scripts/ci --fix` fixes
+  what markdownlint and ruff can.
+- Markdown: markdownlint checks every Markdown file with the settings in
+  `.markdownlint-cli2.jsonc`. Wrap text by hand at 80 characters outside code
+  blocks, tables and headings. The VS Code extension markdownlint
+  (`DavidAnson.vscode-markdownlint`) shows the same findings in the editor.
 - `scripts/install-hooks`: run it once after cloning. It installs a pre-push
   hook that runs `scripts/ci` on what you push to main (to any other branch
   only `scripts/ci --quick`, the pull request's CI runs the rest) and, for a
@@ -52,15 +57,17 @@ The pull request template (`.github/pull_request_template.md`) holds the
 checklist for a pull request.
 
 Dependencies change only through the lock files (`backend/uv.lock`, `demo/uv.lock`,
-`frontend/package-lock.json`, `docker/bitwarden-cli/package-lock.json`):
-`uv lock` or `uv add` in `backend/` or `demo/`, `npm install` in the npm folder, and the
-changed lock file goes into the change. Every build and test uses them locked
-and fails when one is out of date. `scripts/update-deps` updates every
-dependency within its declared range and lists the updates beyond it. [AGENTS.md](AGENTS.md) has the details.
+`frontend/package-lock.json`, `docker/bitwarden-cli/package-lock.json`,
+`tools/markdownlint/package-lock.json`):
+`uv lock` or `uv add` in `backend/` or `demo/`, `npm install` in the npm folder,
+and the changed lock file goes into the change. Every build and test uses them
+locked and fails when one is out of date. `scripts/update-deps` updates every
+dependency within its declared range and lists the updates beyond it.
+[AGENTS.md](AGENTS.md) has the details.
 
 ## Commits
 
-Write commit messages as https://cbea.ms/git-commit/ describes:
+Write commit messages as <https://cbea.ms/git-commit/> describes:
 
 - A subject line in the imperative mood ("Add", "Fix", "Explain"), capitalized,
   without a period at the end, about 50 characters and at most 72.
