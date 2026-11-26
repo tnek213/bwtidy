@@ -26,7 +26,8 @@ x-logging: &logging
 
 services:
   ## writes the stack's secrets (tokens, the CA and Vaultwarden's certificate) into the volume
-  ## unless it holds them already, then exits. The others wait for it.
+  ## unless it holds them already, gives them their owners and the ledger to the controller,
+  ## then exits. The others wait for it.
   init:
     <<: *demo-image
     command: ["bwtidy-demo-init"]
@@ -34,9 +35,13 @@ services:
     network_mode: none
     volumes:
       - secrets:/secrets
+      - ledger:/ledger
     read_only: true
     cap_drop:
       - ALL
+    ## root without CHOWN could not give a file the controller's group or the controller
+    cap_add:
+      - CHOWN
     security_opt:
       - no-new-privileges:true
     logging: *logging
@@ -107,6 +112,8 @@ services:
   controller:
     <<: *demo-image
     command: ["bwtidy-demo-controller"]
+    ## the controller's own user of the demo image (dev/demo.md, Controller), never root
+    user: "10100:10100"
     restart: unless-stopped
     init: true
     depends_on:
@@ -124,7 +131,7 @@ services:
       - secrets:/secrets:ro
       ## every id ever used, the one thing that outlives a restart
       - ledger:/ledger
-    ## bw's state directory of each vault it seeds
+    ## the user's home and bw's state directory of each vault it seeds
     tmpfs:
       - /tmp
     networks:

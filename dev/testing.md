@@ -707,8 +707,8 @@ it, so run it after a change to `demo/`, `compose.demo.yaml` or the gateway.
 `backend/tests/repo/test_demo_stack_files.py` reads `compose.demo.yaml` and
 `demo/Dockerfile` alone, in `scripts/ci`: the internal networks, the one
 published port, the one allowed server, the dropped capabilities, the
-Vaultwarden version of the dev stack and that the normal image holds no demo
-code.
+controller's own user, the Vaultwarden version of the dev stack and that the
+normal image holds no demo code.
 
 ## Smoke test on a real account
 
