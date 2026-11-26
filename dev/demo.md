@@ -441,6 +441,45 @@ The defaults, kept after measuring (Memory):
 | `/mcp`                         | per address: a burst of 40, then 10 a second | `DEMO_MCP_BURST`, `DEMO_MCP_RATE` (the edge) |
 | a request body                 | 1 MB, 1 kB for a start | the edge's `client_max_body_size`               |
 
+Every service also has a memory and a process limit, set in
+`compose.demo.yaml` (`mem_limit`, with `memswap_limit` equal to it so a
+container cannot swap past its limit, and `pids_limit`). A public demo shares
+its host with other services, so a visitor cannot be allowed to take all of
+its memory or start processes until it slows. The defaults rest on the
+visitor limits above and the measures of Memory, each with about 25 percent
+headroom, rounded up. The arithmetic stands in a comment above each limit in
+the compose file.
+
+| Service     | Memory (`DEMO_MEM_...`)    | Processes (`DEMO_PIDS_...`) | Why |
+| ----------- | -------------------------- | --------------------------- | --- |
+| init        | `DEMO_MEM_INIT` 128m       | `DEMO_PIDS_INIT` 64         | a Python process that writes a few files and exits |
+| vaultwarden | `DEMO_MEM_VAULTWARDEN` 384m | `DEMO_PIDS_VAULTWARDEN` 64 | 25 MiB peak plus a full data tmpfs (256m), 42 processes |
+| controller  | `DEMO_MEM_CONTROLLER` 320m | `DEMO_PIDS_CONTROLLER` 32   | the 226 MiB peak while it builds a vault, 16 processes |
+| demo        | `DEMO_MEM_DEMO` 2700m      | `DEMO_PIDS_DEMO` 128        | 6 visitors, 2 starts in flight and a full accounts tmpfs (512m), 101 processes |
+| edge        | `DEMO_MEM_EDGE` 32m        | `DEMO_PIDS_EDGE` 32         | 13 MiB peak, 14 processes |
+
+The Memory budget says which limit covers which row: the visitors, the
+gateway, the starts in flight and the accounts tmpfs are the demo's, the
+Vaultwarden row and the data tmpfs are Vaultwarden's, the controller's peak is
+the controller's and the idle row is each service's own.
+
+An operator who raises `DEMO_MAX` raises the demo's limits too, per added
+visitor: 275 MiB in `DEMO_MEM_DEMO` (220 MiB, plus 25 percent), 20 in
+`DEMO_PIDS_DEMO` (about 15 measured, plus 25 percent) and 5 MiB in
+`DEMO_MEM_VAULTWARDEN`. One who raises a tmpfs size adds 1.25 MiB per MiB to the
+limit of the service that owns it: `DEMO_ACCOUNTS_SIZE` to `DEMO_MEM_DEMO`,
+`DEMO_VAULTWARDEN_DATA_SIZE` to `DEMO_MEM_VAULTWARDEN`. The pages of a tmpfs
+count against the memory of the container that writes them.
+
+A container that hits a limit fails in a way that is easy to miss, so look for
+it when the demo misbehaves. Out of memory: the kernel kills a process or the
+container, and `docker inspect -f '{{.State.OOMKilled}}' CONTAINER` says
+`true` for the container itself. Out of processes: forks fail with errors
+such as "Resource temporarily unavailable" in the container's log, and
+`docker exec CONTAINER cat /sys/fs/cgroup/pids.current` is at the limit.
+Raise the matching variable of the table, never past what the Memory budget
+allows for the host.
+
 A start refused by a cap (429 from the gateway) or by the edge's rate limit
 gets the start page with "The demo is full right now. Try again in a few
 minutes." Any other request past a limit of the edge gets 429.
@@ -800,6 +839,12 @@ being `POST /demo/start` through the edge followed by `GET /api/session`.
 | 1        | 10   | 261  | 44         | 18          | 333   |
 | 2        | 11   | 486  | 44         | 19          | 560   |
 | 3        | 11   | 704  | 44         | 20          | 779   |
+
+Processes, `pids.current` in each container's cgroup, the peak of samples
+taken while 6 visitors started (2026-11-26, the same versions, a heartbeat
+sent for each so none ended): edge 14, demo 101 (about 15 per visitor), controller
+16, vaultwarden 42. The demo's peak memory was 1,311 MiB with the 6 visitors
+and the controller's 226 MiB.
 
 Each visitor costs about 220 MiB in the demo container and 2 to 3 MiB in
 Vaultwarden. The split of one visitor in the demo container (RSS, from
