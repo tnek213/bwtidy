@@ -78,10 +78,28 @@ Write commit messages as <https://cbea.ms/git-commit/> describes:
 bwtidy does not use Conventional Commits: no `feat:`, `fix:` or other prefixes
 in the subject.
 
-Sign your commits if you can (SSH or GPG, so GitHub shows them as
-Verified). A pull request whose commits are all signed and tidy may be merged
-with its commits kept. Otherwise it is squashed into one commit, which
-GitHub signs.
+Sign your commits if you can (SSH or GPG) so GitHub shows them as Verified.
+GitHub's guide
+[Signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
+shows how to set it up. Run this on your branch to sign the commits you
+already made, then push it again with `git push --force-with-lease`:
+
+```sh
+git rebase --exec 'git commit --amend --no-edit -S' origin/main
+```
+
+In a fork, name the remote that points to tnek213/bwtidy in place of
+`origin`.
+
+A pull request whose commits are all signed keeps them. It is merged with a
+merge commit, and your commits land on main unchanged with their own hashes.
+You may also squash your work into one signed commit yourself, which then
+lands as it is.
+
+Main accepts only signed commits, so a pull request with an unsigned commit
+cannot keep its commits. Its page shows "Merging is blocked" with "Commits
+must have verified signatures", which is expected. The maintainer squashes it
+into one commit instead, and GitHub signs that commit.
 
 ## License of your contribution
 
