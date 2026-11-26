@@ -37,6 +37,12 @@ COMMIT on its line "Written for bwtidy COMMIT." (RESTORE_DOC_COMMIT in backups/c
 backend/pyproject.toml spelled the semver way, then the commit, from BWTIDY_COMMIT (the
 Dockerfile passes it) or else the checkout's last commit, as `0.1.0-alpha.1 (261111 7db8830)`.
 It fails when the page lacks the line. `serve` shows the page as it is.
+
+Both `build` and `serve` hand the pages that version as extra.bwtidy_version (the link to the
+docs issue form), its semver alone as extra.bwtidy_release and the repo's star count from
+BWTIDY_STARS as extra.bwtidy_stars, left out when the variable is unset or not digits only (the
+docs and image workflows look it up). The header shows the last two beside the repository link
+(overrides/partials/source.html), so the pages fetch nothing from GitHub.
 """
 
 import importlib.util
@@ -263,8 +269,8 @@ def last_commit() -> str | None:
     return result.stdout.strip() or None
 
 
-def site_version() -> str:
-    """The version the site is built for, as /api/health spells it."""
+def release() -> str:
+    """The version of backend/pyproject.toml as semver spells it, as /api/health does."""
     with (ROOT / "backend" / "pyproject.toml").open("rb") as file:
         version = tomllib.load(file)["project"]["version"]
     ## stdlib only, so it loads by path without bwtidy's dependencies
@@ -273,14 +279,38 @@ def site_version() -> str:
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    semver = module.semver(version)
+    return module.semver(version)
+
+
+def site_version(semver: str) -> str:
+    """The version the site is built for: the semver, then the commit when there is one."""
     commit = os.environ.get("BWTIDY_COMMIT", "").strip() or last_commit()
     return f"{semver} ({commit})" if commit else semver
 
 
-def with_version(config: str, version: str) -> str:
-    """The config text with the version as extra.bwtidy_version, for the link on every page."""
-    return f'{config.rstrip()}\n\n[project.extra]\nbwtidy_version = "{version}"\n'
+def stars() -> int | None:
+    """The repo's star count from BWTIDY_STARS, None when it is unset or not digits only."""
+    value = os.environ.get("BWTIDY_STARS", "").strip()
+    return int(value) if re.fullmatch(r"[0-9]+", value) else None
+
+
+def with_extra(config: str) -> tuple[str, str]:
+    """The config text with what the pages show from extra, and the version the site is for.
+
+    extra.bwtidy_version is the full version, for the link to the docs issue form.
+    extra.bwtidy_release (the semver alone) and extra.bwtidy_stars (left out without a count)
+    are the facts in the header beside the repository link (overrides/partials/source.html)."""
+    semver = release()
+    version = site_version(semver)
+    lines = [
+        "[project.extra]",
+        f'bwtidy_version = "{version}"',
+        f'bwtidy_release = "{semver}"',
+    ]
+    count = stars()
+    if count is not None:
+        lines.append(f"bwtidy_stars = {count}")
+    return f"{config.rstrip()}\n\n" + "\n".join(lines) + "\n", version
 
 
 def fill_in_version(docs: Path, version: str) -> bool:
@@ -349,9 +379,8 @@ def build(target: Path | None) -> int:
         return 1
     with tempfile.TemporaryDirectory(prefix="bwtidy-docs-site-") as temp:
         project = Path(temp)
-        version = site_version()
-        config = ROOT.joinpath(CONFIG).read_text(encoding="utf-8")
-        (project / CONFIG).write_text(with_version(config, version), encoding="utf-8")
+        config, version = with_extra(ROOT.joinpath(CONFIG).read_text(encoding="utf-8"))
+        (project / CONFIG).write_text(config, encoding="utf-8")
         shutil.copytree(ROOT / DOCS, project / DOCS)
         shutil.copytree(ROOT / OVERRIDES, project / OVERRIDES)
         if not fill_in_version(project / DOCS, version):
@@ -390,12 +419,11 @@ def build(target: Path | None) -> int:
 
 
 def serve(args: list[str]) -> int:
-    ## a config beside zensical.toml that adds the version, as docs_dir and custom_dir are
-    ## relative to the config file
+    ## a config beside zensical.toml that adds the version and the star count, as docs_dir and
+    ## custom_dir are relative to the config file
     config = ROOT / SERVE_CONFIG
     config.write_text(
-        with_version(ROOT.joinpath(CONFIG).read_text(encoding="utf-8"), site_version()),
-        encoding="utf-8",
+        with_extra(ROOT.joinpath(CONFIG).read_text(encoding="utf-8"))[0], encoding="utf-8"
     )
     try:
         return subprocess.run([*ZENSICAL, "serve", "-f", str(config), *args], cwd=ROOT).returncode

@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -44,12 +45,14 @@ def repo(tmp_path: Path, monkeypatch, docs_site) -> Path:
 def fake_zensical(monkeypatch, pages: dict[str, str], docs_site) -> dict[str, str]:
     """Stand in for Zensical: write the given pages into site/ of the build directory.
 
-    Returns what it saw: the restore page it was handed, under "restore.md"."""
+    Returns what it saw: the restore page it was handed, under "restore.md", and the config,
+    under "zensical.toml"."""
     seen: dict[str, str] = {}
 
     def run(cmd, cwd):
         assert (Path(cwd) / "overrides" / "main.html").is_file()
         seen["restore.md"] = (Path(cwd) / "docs" / "restore.md").read_text()
+        seen["zensical.toml"] = (Path(cwd) / "zensical.toml").read_text()
         for name, text in pages.items():
             write(Path(cwd) / "site", name, text)
         return subprocess.CompletedProcess(cmd, 0)
@@ -174,6 +177,48 @@ def test_without_a_commit_the_restore_page_names_the_version_alone(repo, monkeyp
     seen = fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
     assert docs_site.build(None) == 0
     assert "Written for bwtidy 0.1.0-alpha.1. The project" in seen["restore.md"]
+
+
+def built_extra(monkeypatch, docs_site) -> dict:
+    """The table extra of the config that build hands Zensical."""
+    seen = fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 0
+    return tomllib.loads(seen["zensical.toml"])["project"]["extra"]
+
+
+def test_the_config_names_the_version_and_its_semver_alone(repo, monkeypatch, docs_site):
+    monkeypatch.delenv("BWTIDY_STARS", raising=False)
+    extra = built_extra(monkeypatch, docs_site)
+    assert extra["bwtidy_version"] == f"0.1.0-alpha.1 ({COMMIT})"
+    assert extra["bwtidy_release"] == "0.1.0-alpha.1"
+    assert "bwtidy_stars" not in extra
+
+
+def test_the_config_holds_the_star_count_from_the_environment(repo, monkeypatch, docs_site):
+    monkeypatch.setenv("BWTIDY_STARS", "42")
+    assert built_extra(monkeypatch, docs_site)["bwtidy_stars"] == 42
+
+
+@pytest.mark.parametrize("value", ["", "4x"])
+def test_the_config_leaves_out_a_star_count_that_is_not_digits(repo, monkeypatch, docs_site, value):
+    monkeypatch.setenv("BWTIDY_STARS", value)
+    assert "bwtidy_stars" not in built_extra(monkeypatch, docs_site)
+
+
+def test_serve_hands_zensical_the_same_extra(repo, monkeypatch, docs_site):
+    monkeypatch.setenv("BWTIDY_STARS", "42")
+    seen: dict[str, str] = {}
+
+    def run(cmd, cwd):
+        seen["config"] = Path(cmd[cmd.index("-f") + 1]).read_text()
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(docs_site.subprocess, "run", run)
+    assert docs_site.serve([]) == 0
+    extra = tomllib.loads(seen["config"])["project"]["extra"]
+    assert extra["bwtidy_release"] == "0.1.0-alpha.1"
+    assert extra["bwtidy_stars"] == 42
+    assert not (repo / docs_site.SERVE_CONFIG).exists()
 
 
 def test_build_fails_when_the_restore_page_lacks_the_line(repo, monkeypatch, capsys, docs_site):

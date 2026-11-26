@@ -4,6 +4,8 @@ CDN, as a running bwtidy serves the site offline. -#}
 {% extends "base.html" %}
 
 {% block extrahead %}
+  {#- Links and requests to other sites carry no Referer, so a self-hosted bwtidy's address stays private. -#}
+  <meta name="referrer" content="same-origin">
   <style>
     .md-banner {
       color: #1a1a1a;

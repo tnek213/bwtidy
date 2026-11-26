@@ -40,6 +40,9 @@ COPY overrides/ overrides/
 COPY docs/ docs/
 ## the build has no .git, so the commit comes in as an arg (scripts/docs-site reads it)
 ARG BWTIDY_COMMIT=""
+## the repo's star count for the header comes in as an arg too, as the docs ask GitHub for nothing
+## (the image workflow looks it up, scripts/docs-site leaves it out when empty)
+ARG BWTIDY_STARS=""
 RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
     scripts/docs-site build /site
 

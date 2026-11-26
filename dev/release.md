@@ -85,6 +85,22 @@ And it fails on a page that has the browser fetch anything from another host
 (a script, stylesheet, icon, picture, frame or CSS `url()`), naming the page,
 the line and the URL. A link to another host is fine.
 
+The docs fetch nothing from another site and send it nothing about the host
+they are served from, as the address of a self-hosted bwtidy stays private.
+The theme's repository link in the header (`partials/source.html`) would have
+its script ask `api.github.com` for the latest release and the star count on
+every page, so the override drops the attribute that starts it
+(`data-md-component="source"`) and writes the facts at build time instead: the
+version the site is built for (`extra.bwtidy_release`, the semver alone, so a
+self-hosted bwtidy shows the version it runs) and the star count
+(`extra.bwtidy_stars`), which `scripts/docs-site` takes from the environment
+variable `BWTIDY_STARS` when it holds only digits. The workflows "Docs" and
+"Image" look the count up with `gh api` before the build (the image passes it
+as the build arg `BWTIDY_STARS`), a failed lookup only leaves it out, and a
+build without it shows only the version. `main.html` also sets the referrer
+policy `same-origin` and the issue link has `rel="noopener noreferrer"`, so a
+click on a link to another site sends no `Referer`.
+
 `scripts/ci` runs `scripts/docs-site build` after the MCP reference check.
 It fails on a page of `docs/` that the nav of `zensical.toml` leaves out,
 and Zensical's strict mode on a nav entry, page link or `#anchor` that does
