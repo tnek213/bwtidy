@@ -92,24 +92,44 @@ def test_the_content_column_is_wide_and_keeps_inline_code_on_one_line(page: Page
     assert page.locator("article td code", has_text="bwtidy-backups").count() > 0
 
 
+## the width of 72ch and of 72 digits in an element's own font, measured on one line inside it
+WIDTH_72 = """e => {
+    const measure = (style, text) => {
+        const probe = document.createElement("span")
+        probe.style.cssText = "position: absolute; white-space: nowrap; " + style
+        probe.textContent = text
+        e.appendChild(probe)
+        const width = probe.getBoundingClientRect().width
+        probe.remove()
+        return width
+    }
+    return [measure("display: block; width: 72ch", ""), measure("", "0".repeat(72))]
+}"""
+
+
 def test_running_text_wraps_at_a_readable_length_while_pictures_use_the_column(page: Page):
     page.goto("/docs/tutorial/first-cleanup/")
     column = page.locator("article").evaluate("e => e.getBoundingClientRect().width")
-    ## the longest line a paragraph may hold, measured in the paragraph's own font
-    limit = page.locator("article p").first.evaluate(
-        "p => { const s = document.createElement('span'); s.textContent = '0'.repeat(80);"
-        " p.appendChild(s); const w = s.getBoundingClientRect().width; s.remove(); return w }"
-    )
+    ## the longest line a paragraph may hold: 72ch of the paragraph's own font, which is about
+    ## as wide as 72 digits in it
+    limit, digits = page.locator("article p").first.evaluate(WIDTH_72)
+    assert 0.95 < digits / limit < 1.05
     text = page.locator("article p:not(:has(img))")
     assert text.count() > 3
     widest = max(text.evaluate_all("ps => ps.map(p => p.getBoundingClientRect().width)"))
-    assert widest <= limit * 1.01
+    assert limit * 0.95 <= widest <= limit * 1.01
     assert widest < column - 150
     picture = page.locator("article p:has(img)").first
     assert picture.evaluate("p => p.getBoundingClientRect().width") > column - 50
     page.goto("/docs/reference/configuration/")
     table = page.locator("article table").first
     assert table.evaluate("t => t.getBoundingClientRect().width") > limit + 100
+    ## list items, headings and the alert boxes stop at 72 characters of their own font
+    page.goto("/docs/")
+    for selector in ("article li", "article h2", "article .admonition"):
+        element = page.locator(selector).first
+        max_width = element.evaluate("e => parseFloat(getComputedStyle(e).maxWidth)")
+        assert abs(max_width - element.evaluate(WIDTH_72)[0]) < 1, selector
 
 
 def test_the_disclaimer_banner_is_one_slim_line(page: Page):
@@ -297,3 +317,105 @@ def test_the_header_shows_the_version_without_asking_github(page: Page):
     source = page.locator(".md-header .md-source")
     expect(source).to_have_attribute("href", "https://github.com/tnek213/bwtidy")
     expect(source.locator(".md-source__fact--version")).to_have_text(VERSION)
+
+
+## the colors of an element as the browser computed them: its text, its outline and every
+## background from the page down to it, each as [r, g, b, alpha]
+COLORS = """e => {
+    const rgba = (value) => {
+        const parts = value.match(/[\\d.]+/g).map(Number)
+        return parts.length === 3 ? [...parts, 1] : parts
+    }
+    const layers = []
+    for (let node = e; node; node = node.parentElement) {
+        layers.unshift(rgba(getComputedStyle(node).backgroundColor))
+    }
+    const style = getComputedStyle(e)
+    return { text: rgba(style.color), outline: rgba(style.outlineColor), layers }
+}"""
+
+
+def composited(layers: list[list[float]]) -> list[float]:
+    color = [255.0, 255.0, 255.0]
+    for r, g, b, alpha in layers:
+        color = [alpha * c + (1 - alpha) * under for c, under in zip((r, g, b), color, strict=True)]
+    return color
+
+
+def luminance(color: list[float]) -> float:
+    def linear(channel: float) -> float:
+        channel /= 255
+        return channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (linear(channel) for channel in color[:3])
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast(foreground: list[float], layers: list[list[float]]) -> float:
+    background = composited(layers)
+    front = composited([*layers, foreground])
+    light, dark = sorted((luminance(front), luminance(background)), reverse=True)
+    return (light + 0.05) / (dark + 0.05)
+
+
+def test_text_links_and_the_selected_page_pass_wcag_aa_in_both_schemes(page: Page):
+    for scheme in ("light", "dark"):
+        page.emulate_media(color_scheme=scheme)
+        page.goto("/docs/how-to/run/")
+        selected = page.locator(".md-nav--primary .md-nav__link--active", has_text="Run bwtidy")
+        link = page.locator("article p a").first
+        for name, element in (
+            ("body text", page.locator("article p").first),
+            ("link", link),
+            ("selected nav item", selected.first),
+        ):
+            colors = element.evaluate(COLORS)
+            ratio = contrast(colors["text"], colors["layers"])
+            assert ratio >= 4.5, f"{scheme} {name}: {ratio:.2f}"
+        ## the focus ring shows from the keyboard, so the link is reached with Tab
+        link.focus()
+        page.keyboard.press("Shift+Tab")
+        page.keyboard.press("Tab")
+        assert link.evaluate("a => a === document.activeElement")
+        colors = link.evaluate(COLORS)
+        assert link.evaluate("a => getComputedStyle(a).outlineStyle") != "none"
+        ratio = contrast(colors["outline"], colors["layers"])
+        assert ratio >= 3, f"{scheme} focus outline: {ratio:.2f}"
+
+
+def test_code_is_drawn_in_ibm_plex_mono_from_the_site_itself(page: Page):
+    fonts: list[str] = []
+    page.on("request", lambda r: fonts.append(r.url) if r.resource_type == "font" else None)
+    page.goto("/docs/how-to/run/")
+    code = page.locator("article pre code").first
+    expect(code).to_be_visible()
+    family = code.evaluate("c => getComputedStyle(c).fontFamily")
+    assert family.startswith('"IBM Plex Mono",')
+    assert family.endswith("monospace")
+    loaded = page.evaluate(
+        "async () => { await document.fonts.ready; return [...document.fonts]"
+        ".filter(f => f.family.replaceAll('\"', '') === 'IBM Plex Mono' && f.status === 'loaded')"
+        ".map(f => f.weight) }"
+    )
+    assert "400" in loaded
+    own = urlsplit(page.url).netloc
+    assert fonts
+    assert all(
+        urlsplit(url).netloc == own and "/docs/assets/fonts/ibm-plex-mono/" in url for url in fonts
+    )
+
+
+def test_the_footer_credits_zensical_and_diataxis(page: Page):
+    page.goto("/docs/how-to/run/")
+    footer = page.locator(".md-footer .md-copyright")
+    expect(footer).to_have_text(
+        "Made with Zensical · Documentation organized with the Diátaxis framework."
+    )
+    for name, href in (
+        ("Zensical", "https://zensical.org"),
+        ("Diátaxis framework", "https://diataxis.fr"),
+    ):
+        link = footer.get_by_role("link", name=name, exact=True)
+        expect(link).to_have_attribute("href", href)
+        expect(link).to_have_attribute("target", "_blank")
+        assert set((link.get_attribute("rel") or "").split()) == {"noopener", "noreferrer"}

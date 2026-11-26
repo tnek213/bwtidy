@@ -9,6 +9,8 @@ repo_name = "tnek213/bwtidy"
 # the edit address of every page, which overrides/partials/improve-link.html reads the source path from
 edit_uri = "edit/main/docs/"
 # no site_url: the pages link to each other relatively, so the site works under /docs/ and /bwtidy/
+# the palette of both schemes and the code font, which the site bundles under docs/assets/fonts/
+extra_css = ["assets/stylesheets/theme.css"]
 
 nav = [
   { "Home" = "index.md" },
@@ -52,7 +54,8 @@ language = "en"
 # main.html there puts the beta disclaimer as a banner above every page, widens the content and
 # opens a picture larger on a click
 custom_dir = "overrides"
-# the system's fonts, so a page loads nothing from another host
+# no fonts from another host: the text uses the system's fonts, the code IBM Plex Mono from the
+# site itself (docs/assets/stylesheets/theme.css)
 font = false
 features = [
   "content.code.copy",
@@ -63,21 +66,28 @@ features = [
   "search.highlight",
 ]
 
-# the first palette follows the system, the toggle steps through light and dark
+# the first palette follows the system, the toggle steps through light and dark. Primary and accent
+# are custom, so the colors of both schemes come from docs/assets/stylesheets/theme.css
 [[project.theme.palette]]
 media = "(prefers-color-scheme)"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/sun-moon"
 toggle.name = "Switch to light mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 

@@ -1,0 +1,234 @@
+/* The site's palette and code font. Light (scheme default) and dark (scheme slate) each have a
+   palette of their own in cool slate and blue, set as the theme's custom properties with
+   primary and accent "custom" in zensical.toml. Every pair of text and background passes WCAG 2.2
+   AA, and backend/tests/e2e/test_docs_site.py checks body text, links and the selected nav item. */
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono/IBMPlexMono-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono/IBMPlexMono-Bold.woff2") format("woff2");
+}
+
+:root {
+  --md-code-font: "IBM Plex Mono";
+}
+
+/* Light: slate ink on a cool white, links in a deep blue and a dark slate header. */
+[data-md-color-scheme="default"] {
+  color-scheme: light;
+
+  --md-primary-fg-color: #1d4ed8;
+  --md-primary-fg-color--light: #3b6fe0;
+  --md-primary-fg-color--dark: #1e40af;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffffb3;
+  --md-accent-fg-color: #1e40af;
+  --md-accent-fg-color--transparent: #2563eb1a;
+  --md-accent-bg-color: #ffffff;
+  --md-accent-bg-color--light: #ffffffb3;
+
+  --md-default-fg-color: #1e293b;
+  --md-default-fg-color--light: #475569;
+  --md-default-fg-color--lighter: #94a3b8;
+  --md-default-fg-color--lightest: #1e293b14;
+  --md-default-bg-color: #f8fafc;
+  --md-default-bg-color--light: #f8fafcb3;
+  --md-default-bg-color--lighter: #f8fafc4d;
+  --md-default-bg-color--lightest: #f8fafc1f;
+
+  --md-code-fg-color: #1e293b;
+  --md-code-bg-color: #edf1f7;
+  --md-code-bg-color--light: #edf1f7b3;
+  --md-code-bg-color--lighter: #edf1f74d;
+  --md-code-hl-color: #2563eb;
+  --md-code-hl-color--light: #2563eb1a;
+  --md-code-hl-number-color: #b4232c;
+  --md-code-hl-special-color: #be185d;
+  --md-code-hl-function-color: #7e3bae;
+  --md-code-hl-constant-color: #5b3fc4;
+  --md-code-hl-keyword-color: #1d4ed8;
+  --md-code-hl-string-color: #166b45;
+
+  --md-typeset-color: var(--md-default-fg-color);
+  --md-typeset-a-color: #1d4ed8;
+  --md-typeset-mark-color: #fde68a99;
+  --md-typeset-table-color: #cfd8e3;
+  --md-typeset-table-color--light: #1e293b08;
+  --md-admonition-fg-color: var(--md-default-fg-color);
+  --md-admonition-bg-color: var(--md-default-bg-color);
+
+  /* the search dialog, drawn in a shadow root from these RGB triplets */
+  --color-foreground: 30 41 59;
+  --color-background: 248 250 252;
+  --color-background-subtle: 237 241 247;
+  --color-backdrop: 248 250 252;
+
+  --bwtidy-header-fg-color: #f1f5f9;
+  --bwtidy-header-bg-color: #1e293b;
+  --bwtidy-header-hover-color: #93c5fd;
+  --bwtidy-th-bg-color: #f1f5f9;
+  --bwtidy-note-bg-color: #2563eb12;
+  --bwtidy-note-icon-color: #1d4ed8;
+  --bwtidy-warning-bg-color: #fdf1d6;
+  --bwtidy-warning-icon-color: #b45309;
+}
+
+/* Dark: pale slate text on a deep blue slate, links in a soft sky blue that keeps its contrast,
+   a header one step lighter than the page. */
+[data-md-color-scheme="slate"] {
+  color-scheme: dark;
+
+  --md-primary-fg-color: #6ea8fe;
+  --md-primary-fg-color--light: #93c5fd;
+  --md-primary-fg-color--dark: #3b82f6;
+  --md-primary-bg-color: #0f172a;
+  --md-primary-bg-color--light: #0f172ab3;
+  --md-accent-fg-color: #93c5fd;
+  --md-accent-fg-color--transparent: #60a5fa24;
+  --md-accent-bg-color: #0f172a;
+  --md-accent-bg-color--light: #0f172ab3;
+
+  --md-default-fg-color: #dbe3ee;
+  --md-default-fg-color--light: #a3b1c6;
+  --md-default-fg-color--lighter: #64748b;
+  --md-default-fg-color--lightest: #dbe3ee1a;
+  --md-default-bg-color: #0f172a;
+  --md-default-bg-color--light: #0f172ab3;
+  --md-default-bg-color--lighter: #0f172a4d;
+  --md-default-bg-color--lightest: #0f172a1f;
+
+  --md-code-fg-color: #d6deea;
+  --md-code-bg-color: #1a2438;
+  --md-code-bg-color--light: #1a2438e6;
+  --md-code-bg-color--lighter: #1a24388a;
+  --md-code-hl-color: #60a5fa;
+  --md-code-hl-color--light: #60a5fa1f;
+  --md-code-hl-number-color: #f0907f;
+  --md-code-hl-special-color: #f27ba5;
+  --md-code-hl-function-color: #c89af0;
+  --md-code-hl-constant-color: #a99cf2;
+  --md-code-hl-keyword-color: #7fb0fb;
+  --md-code-hl-string-color: #5cc690;
+
+  --md-typeset-color: var(--md-default-fg-color);
+  --md-typeset-a-color: #6ea8fe;
+  --md-typeset-mark-color: #60a5fa4d;
+  --md-typeset-kbd-color: #dbe3ee1f;
+  --md-typeset-kbd-accent-color: #dbe3ee33;
+  --md-typeset-kbd-border-color: #0b1120;
+  --md-typeset-table-color: #2a3750;
+  --md-typeset-table-color--light: #dbe3ee0a;
+  --md-admonition-fg-color: var(--md-default-fg-color);
+  --md-admonition-bg-color: var(--md-default-bg-color);
+  --md-footer-bg-color: #162033;
+  --md-footer-bg-color--dark: #111a2b;
+
+  --color-foreground: 219 227 238;
+  --color-background: 22 32 51;
+  --color-background-subtle: 30 43 66;
+  --color-backdrop: 11 17 32;
+
+  --bwtidy-header-fg-color: #e2e8f0;
+  --bwtidy-header-bg-color: #162033;
+  --bwtidy-header-hover-color: #93c5fd;
+  --bwtidy-th-bg-color: #172236;
+  --bwtidy-note-bg-color: #60a5fa17;
+  --bwtidy-note-icon-color: #6ea8fe;
+  --bwtidy-warning-bg-color: #2b261c;
+  --bwtidy-warning-icon-color: #fbbf24;
+}
+
+[data-md-color-scheme="slate"] .md-header__title,
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3,
+[data-md-color-scheme="slate"] .md-typeset h4,
+[data-md-color-scheme="slate"] .md-typeset h5,
+[data-md-color-scheme="slate"] .md-typeset h6 {
+  color: #f1f5f9;
+}
+
+/* The header in the palette's slate, with the search button and the toggle drawn on it. */
+.md-header {
+  color: var(--bwtidy-header-fg-color);
+  background-color: var(--bwtidy-header-bg-color);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.md-header--shadow {
+  box-shadow: 0 .05rem 0 #0f172a33;
+}
+
+.md-header__button:hover,
+.md-header .md-source:hover {
+  color: var(--bwtidy-header-hover-color);
+  opacity: 1;
+}
+
+.md-header .md-search__button {
+  color: var(--bwtidy-header-fg-color);
+  background-color: #ffffff1a;
+}
+
+.md-header .md-search__button:focus,
+.md-header .md-search__button:hover {
+  color: var(--bwtidy-header-fg-color);
+  background-color: #ffffff2e;
+}
+
+.md-header .md-search__button::before {
+  background-color: var(--bwtidy-header-fg-color);
+}
+
+.md-header .md-search__button::after {
+  color: var(--bwtidy-header-fg-color);
+  background-color: #0f172a66;
+}
+
+/* A visible focus ring in the accent, on links in the text and in the navigation alike. */
+.md-typeset a:focus-visible,
+.md-nav__link:focus-visible,
+.md-header__button:focus-visible,
+.md-source:focus-visible,
+.md-footer a:focus-visible {
+  outline: .1rem solid var(--md-accent-fg-color);
+  outline-offset: .15rem;
+}
+
+.md-header__button:focus-visible,
+.md-header .md-source:focus-visible {
+  outline-color: var(--bwtidy-header-hover-color);
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--bwtidy-th-bg-color);
+}
+
+.md-typeset .admonition.note,
+.md-typeset .admonition.tip {
+  background-color: var(--bwtidy-note-bg-color);
+}
+
+.md-typeset .note > .admonition-title::before,
+.md-typeset .tip > .admonition-title::before {
+  background-color: var(--bwtidy-note-icon-color);
+}
+
+.md-typeset .admonition.warning {
+  background-color: var(--bwtidy-warning-bg-color);
+}
+
+.md-typeset .warning > .admonition-title::before {
+  background-color: var(--bwtidy-warning-icon-color);
+}

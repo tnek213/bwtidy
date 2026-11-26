@@ -105,8 +105,8 @@ built as pages). Its `main.html` fills the theme's `announce` block with the
 beta disclaimer banner on every page, one slim line with its text centered,
 which links to the disclaimer at the top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
 the theme's 61rem leaves tables little room), keeps paragraphs, list items,
-quotes and admonitions at most 80 characters wide unless they hold a picture,
-table or code block, keeps inline code on one line (in text and tables, except
+quotes, admonitions and headings at most 72 characters of their own font wide
+unless they hold a picture, table or code block, keeps inline code on one line (in text and tables, except
 on a narrow screen where it would not fit) and frames the pictures in the
 content (a 1 px border and a small shadow, so a white screenshot shows on a
 white page), and its inline script makes a picture shown smaller than it is
@@ -116,7 +116,26 @@ builds the link, `partials/toc.html` puts it in the right sidebar below the tabl
 contents and `main.html` at the end of the content on a narrow screen), with the
 page's source path, its address on the GitHub Pages site and the version, which
 `scripts/docs-site` hands over as `extra.bwtidy_version`. Both stay inline, as a
-running bwtidy serves the site offline: nothing comes from a CDN. Zensical's
+running bwtidy serves the site offline: nothing comes from a CDN.
+`partials/copyright.html` writes the footer's line, which credits Zensical and
+the Diátaxis framework.
+
+The site's palette and code font are in `docs/assets/stylesheets/theme.css`
+(`extra_css` in `zensical.toml`). The palette entries set primary and accent
+to `custom`, so the file sets the theme's custom properties for the light
+scheme (`default`) and the dark one (`slate`), each with colors of its own in
+cool slate and blue. Body text, links and the selected page keep a contrast of
+at least 4.5:1 and the focus ring 3:1 (WCAG 2.2 AA), which the e2e tests check
+in both schemes. The search dialog takes its colors from the RGB triplets
+`--color-foreground`, `--color-background`, `--color-background-subtle` and
+`--color-backdrop`. `zensical.toml` keeps `font = false`, so the text uses the
+system's fonts. The code uses IBM Plex Mono, IBM's complete regular and bold
+woff2 files from the npm package `@ibm/plex-mono` (2.5.0) with its
+`LICENSE.txt` in `docs/assets/fonts/ibm-plex-mono/`. They hold the
+box-drawing characters of the text trees. Only the files are taken, as the
+package's postinstall reports to IBM's telemetry. A font update replaces the
+files and the version in `BUNDLED` of `scripts/third-party`, which lists the
+package on the About page. Zensical's
 own lightbox (its glightbox extension) loads GLightbox from unpkg.com, so it
 stays off. For the same reason the Markdown extensions in `zensical.toml` are
 those whose output needs nothing from another host: GitHub's alerts as boxes

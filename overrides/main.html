@@ -1,6 +1,7 @@
 {#- The beta disclaimer as a banner above every page, without a button to close it. A wider content
 column than the theme's, and a picture that opens larger on a click. All of it inline, from no
-CDN, as a running bwtidy serves the site offline. -#}
+CDN, as a running bwtidy serves the site offline. The palette and the code font are in
+docs/assets/stylesheets/theme.css. -#}
 {% extends "base.html" %}
 
 {% block extrahead %}
@@ -39,13 +40,15 @@ CDN, as a running bwtidy serves the site offline. -#}
     .md-grid {
       max-width: 80rem;
     }
-    /* running text keeps a readable line length, while pictures, tables and code keep the whole column */
+    /* running text keeps a readable line length, about 72 characters of its own font, while
+       pictures, tables and code keep the whole column */
+    .md-typeset :is(h1, h2, h3, h4, h5, h6),
     .md-typeset p:not(:has(img)),
     .md-typeset li:not(:has(img, table, pre)),
     .md-typeset blockquote:not(:has(img, table, pre)),
     .md-typeset .admonition:not(:has(img, table, pre)),
     .md-typeset details:not(:has(img, table, pre)) {
-      max-width: 80ch;
+      max-width: 72ch;
     }
     .md-typeset table p,
     .md-typeset table li {
