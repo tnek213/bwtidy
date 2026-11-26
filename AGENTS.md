@@ -150,6 +150,16 @@ the introduction (between the comments `<!-- intro: ... -->` and
 `<!-- end of intro -->`), the beta caution (the warning box "Made
 with AI" under the heading Beta software) and the list under "At a glance". A
 change to one changes the other.
+`docker/hub-overview.md` is the image's overview on Docker Hub
+(dev/release.md, "The Docker Hub overview"). It shares three texts with
+`README.md`: the introduction, the beta caution and the paragraph that starts
+"bwtidy is an independent project". Its caution is a plain quote without the
+`> [!WARNING]` line, as Docker Hub shows an alert's text without formatting.
+Every link in it is absolute (`https://`). It describes the tags, the port,
+the volumes and the settings of the image. A change to one of them updates it
+too. `backend/tests/repo/test_docker_hub_overview.py` checks the shared texts,
+the links and the size. It also checks that every variable the overview names
+is in the configuration reference.
 The banner on every page of the site (`overrides/main.html`) links to the one
 in `docs/index.md`.
 A new page gets its line in the nav of `zensical.toml`, and a page links only

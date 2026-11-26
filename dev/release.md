@@ -215,8 +215,8 @@ in the build stages. The app stage also removes pip, which comes with the base i
 in the image runs it, and a scanner would report on its vendored packages.
 
 A push to main that changes only files the image never copies (the `paths-ignore` list in
-the workflow: `README.md`, the other top-level docs, the compose files, `dev/`, the tests,
-the other workflows, `scripts/prune-tags`) builds nothing. Keep that list in step with the Dockerfile's `COPY`
+the workflow: `README.md`, the other top-level docs, the Docker Hub overview, the
+compose files, `dev/`, the tests, the other workflows, `scripts/prune-tags`) builds nothing. Keep that list in step with the Dockerfile's `COPY`
 lines: a file the image copies must never be on it. A push to main never moves `latest`. The workflow fails, saying why, when the
 release tag is not `v` plus the version in `frontend/package.json`, when it is run
 by hand on another branch, or when the repository secret `DOCKERHUB_TOKEN` is
@@ -318,11 +318,30 @@ with actionlint, as for the docs workflow above.
 ## The Docker Hub overview
 
 The workflow "Docker Hub README" (`.github/workflows/docker-readme.yml`) copies
-`README.md` to the repository's overview on Docker Hub and the GitHub repository's
-description to its short description, so Docker Hub says what GitHub says. It runs on
-every push to main that changes `README.md` or the workflow, and by hand. Relative
-links and images in the README become links into the GitHub repository. Docker Hub
-takes at most 25,000 bytes of README.
+`docker/hub-overview.md` to the repository's overview on Docker Hub and the GitHub
+repository's description to its short description. It runs on every push to main that
+changes the overview or the workflow, and by hand. Docker Hub takes at most 25,000
+bytes of overview and 100 of short description.
+
+The overview is a file of its own and follows the overviews of Docker Official Images
+such as `httpd` and `mariadb`. A reader on Docker Hub looks for the tags and how to run
+the image first. `README.md` also leads a reader on GitHub to the contributing files and
+the developer guide. The overview starts with a quick reference and the tags. The
+introduction and the caution follow, then how to run the image with its port and volumes
+and its main settings. The license comes last. For everything else it links to the docs
+site.
+
+Docker Hub draws Markdown its own way. It hides HTML comments. Tables, code blocks and
+plain quotes look as they do on GitHub. It shows a GitHub alert (`> [!WARNING]`) as a
+quote titled Warning but prints the Markdown inside as plain text, so the overview
+holds the caution as a plain quote. It resolves no relative link. Every link in the
+overview is therefore absolute and the workflow needs no URL completion.
+
+The overview shares the introduction, the caution and the trademark note with
+`README.md`. AGENTS.md (Writing docs) says which texts must stay the same, and
+`backend/tests/repo/test_docker_hub_overview.py` checks them. It also checks the links,
+the size and that every variable the overview names is in the configuration reference.
+The workflow "Image" ignores a push that changes only the overview.
 
 The description API refuses a token with only Read and Write, so this workflow has a
 secret of its own, which it shares with the pruning of the short-commit tags
