@@ -102,9 +102,20 @@ one stack) and take about 20 minutes (e2e) and 15 minutes (integration).
 
 Each page of the user docs (in the four folders, and `docs/restore.md`) is
 one of the four kinds of https://diataxis.fr: a tutorial, a how-to, a
-reference or an explanation. Keep pages succinct: a fact lives on one page
-and others link to it. Be helpful and professional, with a relaxed tone that
-speaks to the reader as "you". The docs describe what happens, in the present
+reference or an explanation. Keep pages succinct. A fact lives on one page
+and others link to it.
+
+Write without semicolons. A colon only introduces a list block. A sentence has
+at most one comma and a paragraph at most two.
+
+A sequence is prose, not a numbered list, because a page already runs from top
+to bottom. Numbers stay only in a tutorial or a how-to, where the reader keeps
+their place while clicking through the app.
+
+A complicated section gets a diagram when a picture makes it easier to follow,
+of the type that fits the content best.
+
+Be helpful and professional, with a relaxed tone that speaks to the reader as "you". The docs describe what happens, in the present
 or future tense, never what happened in one run. A bullet list is for parallel
 items that can be read in any order, while sentences that follow from each
 other are paragraphs, so new text follows both. UI that is used often gets a screenshot from
@@ -139,6 +150,7 @@ the site's strict build in `scripts/ci` fails (`scripts/docs-site`).
 - No semicolons or em dashes (nor ` -- ` as a dash) in text aimed at humans:
   comments, docstrings, strings, log messages, UI text, docs. Split the
   sentence or use a comma, colon or parentheses. Code syntax is fine.
+  Docs pages follow the stricter rules under Writing docs.
 - The architecture (`docs/architecture.md` and the contracts its section
   "Changing the architecture" lists) changes only when the maintainers change
   it. A change fits into it. An agent whose change does not fit stops and says
