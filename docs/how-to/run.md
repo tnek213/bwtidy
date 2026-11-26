@@ -70,10 +70,11 @@ time. Several accounts can use the same URL, each kept apart from the others
 When the session ends, and what happens to your unsaved changes then, is in
 [Logging in](../explanation/login.md#the-session).
 
-Do not run `bw unlock`, `bw lock` or `bw logout` in the container while you
-are logged in to the web UI. Each of them invalidates the session key bwtidy
-uses for backups (see
-[How bwtidy uses the Bitwarden CLI](../explanation/bw-cli.md)).
+> [!WARNING]
+> Do not run `bw unlock`, `bw lock` or `bw logout` in the container while you
+> are logged in to the web UI. Each of them invalidates the session key
+> bwtidy uses for backups (see
+> [How bwtidy uses the Bitwarden CLI](../explanation/bw-cli.md)).
 
 ## Build the image yourself
 

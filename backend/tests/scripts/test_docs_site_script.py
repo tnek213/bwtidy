@@ -244,3 +244,49 @@ def test_build_fails_naming_the_page_and_line_of_a_broken_list(
     assert (
         "docs-site: how-to/run/index.html:4: an ordered list starts at 1" in capsys.readouterr().err
     )
+
+
+def test_external_loads_names_each_fetch_from_another_host(tmp_path, docs_site):
+    html = page(
+        '<script src="https://cdn.example/x.js"></script>',
+        '<link rel="stylesheet" href="//fonts.example/a.css">',
+        '<p><img alt="x" src="https://cdn.example/e.svg"></p>',
+        '<picture><source srcset="a.png 1x, https://cdn.example/b.png 2x"></picture>',
+        "<style>.x { background: url('https://cdn.example/c.png') }</style>",
+        '<p style="background: url(https://cdn.example/d.png)">x</p>',
+        '<object data="https://cdn.example/f.svg"></object>',
+    )
+    write(tmp_path, "a/index.html", html)
+    assert docs_site.external_loads(tmp_path) == [
+        "a/index.html:2: loads https://cdn.example/x.js from another host",
+        "a/index.html:3: loads //fonts.example/a.css from another host",
+        "a/index.html:4: loads https://cdn.example/e.svg from another host",
+        "a/index.html:5: loads https://cdn.example/b.png from another host",
+        "a/index.html:6: loads https://cdn.example/c.png from another host",
+        "a/index.html:7: loads https://cdn.example/d.png from another host",
+        "a/index.html:8: loads https://cdn.example/f.svg from another host",
+    ]
+
+
+def test_external_loads_passes_links_out_and_the_sites_own_files(tmp_path, docs_site):
+    html = page(
+        '<a href="https://github.com/tnek213/bwtidy">repo</a>',
+        '<link rel="next" href="https://other.example/next/">',
+        '<link rel="stylesheet" href="../assets/main.css">',
+        '<script src="/docs/assets/bundle.js"></script>',
+        PICTURE,
+        '<img alt="" src="data:image/png;base64,AAAA">',
+        "<style>.x { background: url(../a.png) }</style>",
+    )
+    write(tmp_path, "a/index.html", html)
+    assert docs_site.external_loads(tmp_path) == []
+
+
+def test_build_fails_naming_a_page_that_loads_from_another_host(
+    repo, monkeypatch, capsys, docs_site
+):
+    remote = page(BANNER, '<script src="https://cdn.example/x.js"></script>')
+    fake_zensical(monkeypatch, {"index.html": remote}, docs_site)
+    assert docs_site.build(None) == 1
+    err = capsys.readouterr().err
+    assert "docs-site: index.html:3: loads https://cdn.example/x.js from another host" in err

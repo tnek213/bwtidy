@@ -23,7 +23,10 @@ on a page of docs/ that the nav leaves out, as Zensical builds it without a way 
 after Zensical, on a built HTML page without the banner's marker (the attribute data-disclaimer),
 naming each such page, and on a numbered list that starts at 1 again right after another one with
 only a picture or code block between them (a step's continuation not indented enough), naming the
-page and the line of its HTML. Zensical writes its output and its cache inside the project, so
+page and the line of its HTML, and on a page that has the browser fetch anything from another host
+(a script, stylesheet, icon, picture, frame or CSS url() with a host of its own: a running bwtidy
+serves the site offline), naming the page, the line and the URL. A link to another host is fine.
+Zensical writes its output and its cache inside the project, so
 `build` copies zensical.toml, docs/ and overrides/ into a temp directory and builds there: nothing
 in the checkout changes and two builds never meet. `serve` runs in the checkout and leaves site/ and
 .cache/ there, both git-ignored.
@@ -38,6 +41,7 @@ It fails when the page lacks the line. `serve` shows the page as it is.
 
 import importlib.util
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -47,6 +51,7 @@ from collections.abc import Iterator
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 ## the Dockerfile's docs stage copies this script alone, so it stays free of scripts/devlib
 ROOT = Path(__file__).resolve().parent.parent
@@ -73,6 +78,10 @@ ZENSICAL = [
     "docs",
     "zensical",
 ]
+## the rel values of a link tag that only points somewhere, so the browser never fetches its href
+LINK_ONLY = {"alternate", "author", "canonical", "help", "license", "next", "prev", "search"}
+## a URL in CSS, of url(...) or @import, whether quoted or not
+CSS_URL = re.compile(r"""(?:url\(|@import)\s*['"]?\s*([^'")\s]+)""", re.IGNORECASE)
 VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source"}
 
 
@@ -160,6 +169,60 @@ def broken_lists(site: Path) -> list[str]:
         found.extend(
             f"{name}:{line}: an ordered list starts at 1 again after a picture or code block"
             for line in split_lists(tree.root)
+        )
+    return found
+
+
+class Loads(HTMLParser):
+    """What an HTML page has the browser fetch: each URL with its line."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.found: list[tuple[int, str]] = []
+        self.in_style = False
+
+    def note(self, url: str) -> None:
+        self.found.append((self.getpos()[0], url.strip()))
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = {name: value or "" for name, value in attrs}
+        for name in ("src", "poster"):
+            if values.get(name):
+                self.note(values[name])
+        if tag == "object" and values.get("data"):
+            self.note(values["data"])
+        for candidate in values.get("srcset", "").split(","):
+            if candidate.strip():
+                self.note(candidate.split()[0])
+        if tag == "link" and values.get("href"):
+            rel = set(values.get("rel", "").lower().split())
+            if not rel or not rel <= LINK_ONLY:
+                self.note(values["href"])
+        for url in CSS_URL.findall(values.get("style", "")):
+            self.note(url)
+        self.in_style = tag == "style"
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "style":
+            self.in_style = False
+
+    def handle_data(self, data: str) -> None:
+        if self.in_style:
+            for url in CSS_URL.findall(data):
+                self.note(url)
+
+
+def external_loads(site: Path) -> list[str]:
+    """One message per page, line and URL of the built site that is fetched from another host."""
+    found = []
+    for page in sorted(site.rglob("*.html")):
+        loads = Loads()
+        loads.feed(page.read_text(encoding="utf-8"))
+        name = page.relative_to(site).as_posix()
+        found.extend(
+            f"{name}:{line}: loads {url} from another host"
+            for line, url in loads.found
+            if urlsplit(url).netloc
         )
     return found
 
@@ -312,6 +375,13 @@ def build(target: Path | None) -> int:
                 file=sys.stderr,
             )
         if split:
+            return 1
+        external = external_loads(project / "site")
+        for message in external:
+            print(
+                f"docs-site: {message}, a running bwtidy serves the site offline", file=sys.stderr
+            )
+        if external:
             return 1
         if target is not None:
             replace(target, project / "site")

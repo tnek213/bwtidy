@@ -110,12 +110,28 @@ What a new login needs while a session runs is in
 
 ## Files and volumes
 
-| Path in the container | What it holds |
-| --- | --- |
-| `/data/accounts/HOST/EMAIL` | One account's data, in the volume `bwtidy-accounts`. Only the account's uid can read it (mode 0700). |
-| `/data/accounts/HOST/EMAIL/app/bwtidy.sqlite` | The queue, the change log and the settings. Not encrypted: a secret value is in it only age-encrypted, but names, notes and URIs are plain in the queue's diffs, and the change log names the fields each write changed. |
-| `/data/accounts/HOST/EMAIL/worker.log` | The account worker's log. |
-| `/backups/HOST/EMAIL/TIMESTAMP.zip.age` | A backup (UTC timestamp), in the volume `bwtidy-backups` or the directory `BWTIDY_BACKUPS` names. |
+The paths in the container:
+
+```text
+/data/accounts/                   the volume bwtidy-accounts
+└── HOST/
+    └── EMAIL/                    one account's data, only its uid can read it (mode 0700)
+        ├── app/
+        │   ├── bwtidy.sqlite     the queue, the change log and the settings
+        │   └── mcp-token.sha256  the hash of the MCP token
+        ├── bw/                   the Bitwarden CLI's login and state
+        ├── home/                 the worker's home directory
+        ├── run/                  the sockets of the worker and of its bw serve
+        └── worker.log            the account worker's log
+/backups/                         the volume bwtidy-backups, or the directory BWTIDY_BACKUPS names
+└── HOST/
+    └── EMAIL/
+        └── TIMESTAMP.zip.age     a backup, named by its time in UTC
+```
+
+`bwtidy.sqlite` is not encrypted: a secret value is in it only
+age-encrypted, but names, notes and URIs are plain in the queue's diffs, and
+the change log names the fields each write changed.
 
 Decrypt a backup with `age -d -o backup.zip FILE`, the passphrase is the
 master password. Every backup holds `RESTORE.md`, the steps that bring a lost
