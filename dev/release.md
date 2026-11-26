@@ -103,20 +103,39 @@ preview or a build shows the picture.
 The theme overrides are in `overrides/` (outside `docs/`, so they are not
 built as pages). Its `main.html` fills the theme's `announce` block with the
 beta disclaimer banner on every page, one slim line with its text centered,
-which links to the disclaimer at the top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
-the theme's 61rem leaves tables little room), keeps paragraphs, list items,
-quotes and admonitions at most 80 characters wide unless they hold a picture,
-table or code block, keeps inline code on one line (in text and tables, except
-on a narrow screen where it would not fit) and frames the pictures in the
-content (a 1 px border and a small shadow, so a white screenshot shows on a
-white page), and its inline script makes a picture shown smaller than it is
-open larger in a dialog on a click (`data-zoom`). It also links every page to the
+which links to the disclaimer at the top of `docs/index.md`, and its inline
+script makes a picture shown smaller than it is open larger in a dialog on a
+click (`data-zoom`). It also links every page to the
 issue form `.github/ISSUE_TEMPLATE/docs_improvement.yml` (`partials/improve-link.html`
 builds the link, `partials/toc.html` puts it in the right sidebar below the table of
 contents and `main.html` at the end of the content on a narrow screen), with the
 page's source path, its address on the GitHub Pages site and the version, which
-`scripts/docs-site` hands over as `extra.bwtidy_version`. Both stay inline, as a
-running bwtidy serves the site offline: nothing comes from a CDN. Zensical's
+`scripts/docs-site` hands over as `extra.bwtidy_version`. `partials/copyright.html`
+writes the footer's line "Made with Zensical · Documentation organized with the
+Diátaxis framework.", both names linked.
+
+The site's own stylesheet is `docs/assets/stylesheets/bwtidy.css` (`extra_css`
+in `zensical.toml`). It holds a palette for each scheme of the toggle, in the
+way the theme takes custom colors (`primary` and `accent` set to `custom`, the
+theme's custom properties set under `[data-md-color-scheme="default"]` and
+`[data-md-color-scheme="slate"]`): warm neutrals with plum for the light one, a
+deep aubergine charcoal with soft orchid for the dark one. Body text, links and
+the selected navigation item keep at least 4.5:1 against their background and
+a focused link's ring at least 3:1 (WCAG 2.2 AA). The search dialog draws in a
+shadow root of its own from the `--color-*` properties the stylesheet sets.
+The stylesheet also widens the content column (`.md-grid`, the theme's 61rem
+leaves tables little room) and keeps paragraphs, headings, list items, quotes
+and alert boxes at most 72 characters wide (72ch in the paragraph's own font)
+unless they hold a picture, table or code block. It keeps inline code on one
+line (in text and tables, except on a narrow screen where it would not fit)
+and frames the pictures in the content (a 1 px border and a small shadow, so a
+light screenshot shows on a light page). Code is set in IBM Plex Mono (SIL Open
+Font License 1.1), whose regular and bold woff2 files and license sit in
+`docs/assets/fonts/ibm-plex-mono/`, copied from the npm package
+`@ibm/plex-mono` at the version `scripts/third-party` lists (`BUNDLED`). The
+About page lists the font with the other packages bwtidy ships. The stylesheet,
+the font and the script all come from the site itself, as a running bwtidy
+serves the site offline: nothing comes from a CDN. Zensical's
 own lightbox (its glightbox extension) loads GLightbox from unpkg.com, so it
 stays off. For the same reason the Markdown extensions in `zensical.toml` are
 those whose output needs nothing from another host: GitHub's alerts as boxes

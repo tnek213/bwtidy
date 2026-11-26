@@ -197,7 +197,8 @@ the theme's `md-content__inner` article (right after `<body>` if a page has
 none). It says that every visitor gets a fresh sample vault, deleted when the
 session ends (`DEMO_SESSION_MAX` at most, the idle timeout idle), and that
 where a tutorial says to log in the reader uses Start demo. Its inline style
-copies the colors of the site's own banner (`overrides/main.html`). On
+copies the colors of the site's own banner in the light scheme
+(`docs/assets/stylesheets/bwtidy.css`). On
 `tutorial/mcp/` it also names the MCP address and that a token lives at most
 1 day: `https://DEMO_HOST/mcp` when `DEMO_SECURE_COOKIES` is on (the host from
 `BWTIDY_MCP_HOSTS`, which compose fills from `DEMO_HOST`), else

@@ -9,6 +9,8 @@ repo_name = "tnek213/bwtidy"
 # the edit address of every page, which overrides/partials/improve-link.html reads the source path from
 edit_uri = "edit/main/docs/"
 # no site_url: the pages link to each other relatively, so the site works under /docs/ and /bwtidy/
+# the site's own styles over the theme's: its palette, the code font it bundles and its layout
+extra_css = ["assets/stylesheets/bwtidy.css"]
 
 nav = [
   { "Home" = "index.md" },
@@ -49,10 +51,11 @@ nav = [
 
 [project.theme]
 language = "en"
-# main.html there puts the beta disclaimer as a banner above every page, widens the content and
-# opens a picture larger on a click
+# main.html there puts the beta disclaimer as a banner above every page and opens a picture larger
+# on a click, partials/copyright.html writes the footer's credit line
 custom_dir = "overrides"
-# the system's fonts, so a page loads nothing from another host
+# no font from Google: the text takes the system's fonts and the code IBM Plex Mono, which the site
+# bundles (docs/assets/stylesheets/bwtidy.css), so a page loads nothing from another host
 font = false
 features = [
   "content.code.copy",
@@ -63,21 +66,28 @@ features = [
   "search.highlight",
 ]
 
-# the first palette follows the system, the toggle steps through light and dark
+# the first palette follows the system, the toggle steps through light and dark. The colors of
+# both schemes are the site's own (primary and accent "custom", set in its stylesheet).
 [[project.theme.palette]]
 media = "(prefers-color-scheme)"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/sun-moon"
 toggle.name = "Switch to light mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 

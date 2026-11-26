@@ -1,0 +1,417 @@
+/* The site's own styles over the theme's: a warm neutral and plum palette for each scheme, the
+   code font, the layout and the pictures. The file and the font come from the site itself, as a
+   running bwtidy serves the docs offline. */
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono/IBMPlexMono-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono/IBMPlexMono-Bold.woff2") format("woff2");
+}
+
+/* the theme puts its monospace fallbacks after this one */
+:root {
+  --md-code-font: "IBM Plex Mono";
+}
+
+/* Light: warm paper and stone with plum ink and plum links. Every text color holds at least
+   4.5:1 against the background it sits on. */
+[data-md-color-scheme="default"] {
+  --bwtidy-surface: #f2ede8;
+  --bwtidy-line: #e3dad3;
+  --bwtidy-heading: #231b21;
+  --bwtidy-header-bg: rgba(242, 237, 232, .88);
+  --bwtidy-header-rule: #7b2d6b;
+  --bwtidy-nav-active-fg: #6e2860;
+  --bwtidy-nav-active-bg: #f0e4ec;
+  --bwtidy-banner-fg: #1a1a1a;
+  --bwtidy-banner-bg: #ffc400;
+  --bwtidy-warning-fg: #8f5300;
+  --bwtidy-warning-bg: #fbeedb;
+  --bwtidy-tip-fg: #7b2d6b;
+  --bwtidy-tip-bg: #f3e9f0;
+  --bwtidy-shadow: rgba(43, 35, 41, .15);
+
+  --md-primary-fg-color: #7b2d6b;
+  --md-primary-fg-color--light: #9a4a8a;
+  --md-primary-fg-color--dark: #5c1f50;
+  --md-primary-bg-color: #faf7f4;
+  --md-primary-bg-color--light: rgba(250, 247, 244, .7);
+  --md-accent-fg-color: #9a3b86;
+  --md-accent-fg-color--transparent: rgba(154, 59, 134, .1);
+  --md-accent-bg-color: #faf7f4;
+  --md-accent-bg-color--light: rgba(250, 247, 244, .7);
+
+  --md-default-fg-color: #2b2329;
+  --md-default-fg-color--light: #6b5d66;
+  --md-default-fg-color--lighter: rgba(43, 35, 41, .32);
+  --md-default-fg-color--lightest: rgba(43, 35, 41, .07);
+  --md-default-bg-color: #faf7f4;
+  --md-default-bg-color--light: rgba(250, 247, 244, .7);
+  --md-default-bg-color--lighter: rgba(250, 247, 244, .3);
+  --md-default-bg-color--lightest: rgba(250, 247, 244, .12);
+
+  --md-code-fg-color: #3d3039;
+  --md-code-bg-color: #f2ede8;
+  --md-code-bg-color--light: rgba(242, 237, 232, .7);
+  --md-code-bg-color--lighter: rgba(242, 237, 232, .3);
+  --md-code-hl-color: #9a3b86;
+  --md-code-hl-color--light: rgba(154, 59, 134, .1);
+  --md-code-hl-number-color: #a3401c;
+  --md-code-hl-special-color: #a12b5c;
+  --md-code-hl-function-color: #5b3f99;
+  --md-code-hl-constant-color: #8a4f00;
+  --md-code-hl-keyword-color: #7b2d6b;
+  --md-code-hl-string-color: #3f6a2b;
+  --md-code-hl-comment-color: #74666e;
+  --md-code-hl-generic-color: #6b5d66;
+  --md-code-hl-variable-color: #6b5d66;
+  --md-code-hl-operator-color: #6b5d66;
+  --md-code-hl-punctuation-color: #6b5d66;
+
+  --md-typeset-color: var(--md-default-fg-color);
+  --md-typeset-a-color: var(--md-primary-fg-color);
+  --md-typeset-mark-color: rgba(255, 196, 0, .35);
+  --md-typeset-table-color: #e3dad3;
+  --md-typeset-table-color--light: rgba(123, 45, 107, .04);
+  --md-typeset-kbd-color: #faf7f4;
+  --md-typeset-kbd-accent-color: #fff;
+  --md-typeset-kbd-border-color: #cfc3bb;
+  --md-admonition-fg-color: var(--md-default-fg-color);
+  --md-admonition-bg-color: var(--md-default-bg-color);
+
+  /* the search dialog draws inside its own shadow root from these, as R G B */
+  --color-foreground: 43 35 41;
+  --color-background: 250 247 244;
+  --color-background-subtle: 242 237 232;
+  --color-backdrop: 250 247 244;
+}
+
+/* Dark: a deep aubergine charcoal with warm off-white text and soft orchid links, lighter on
+   hover. Not the light palette inverted: the plum lightens to stay readable on the dark. */
+[data-md-color-scheme="slate"] {
+  --bwtidy-surface: #252024;
+  --bwtidy-line: #3a3238;
+  --bwtidy-heading: #f6f0f3;
+  --bwtidy-header-bg: rgba(37, 32, 36, .88);
+  --bwtidy-header-rule: #8f5583;
+  --bwtidy-nav-active-fg: #e7b3db;
+  --bwtidy-nav-active-bg: #3b2a37;
+  --bwtidy-banner-fg: #1f1710;
+  --bwtidy-banner-bg: #d9a441;
+  --bwtidy-warning-fg: #f0b45a;
+  --bwtidy-warning-bg: #3a2c18;
+  --bwtidy-tip-fg: #dfa6d2;
+  --bwtidy-tip-bg: #33242f;
+  --bwtidy-shadow: rgba(0, 0, 0, .6);
+
+  --md-primary-fg-color: #dfa6d2;
+  --md-primary-fg-color--light: #ebc3e1;
+  --md-primary-fg-color--dark: #c78bb8;
+  --md-primary-bg-color: #1c181b;
+  --md-primary-bg-color--light: rgba(28, 24, 27, .7);
+  --md-accent-fg-color: #efc6e5;
+  --md-accent-fg-color--transparent: rgba(223, 166, 210, .12);
+  --md-accent-bg-color: #1c181b;
+  --md-accent-bg-color--light: rgba(28, 24, 27, .7);
+
+  --md-default-fg-color: #ece5e9;
+  --md-default-fg-color--light: #b5a8b0;
+  --md-default-fg-color--lighter: rgba(236, 229, 233, .32);
+  --md-default-fg-color--lightest: rgba(236, 229, 233, .08);
+  --md-default-bg-color: #1c181b;
+  --md-default-bg-color--light: rgba(28, 24, 27, .7);
+  --md-default-bg-color--lighter: rgba(28, 24, 27, .3);
+  --md-default-bg-color--lightest: rgba(28, 24, 27, .12);
+
+  --md-code-fg-color: #e6dde3;
+  --md-code-bg-color: #252024;
+  --md-code-bg-color--light: rgba(37, 32, 36, .9);
+  --md-code-bg-color--lighter: rgba(37, 32, 36, .54);
+  --md-code-hl-color: #dfa6d2;
+  --md-code-hl-color--light: rgba(223, 166, 210, .12);
+  --md-code-hl-number-color: #f2a07b;
+  --md-code-hl-special-color: #f291b4;
+  --md-code-hl-function-color: #c5b2f2;
+  --md-code-hl-constant-color: #e9c27c;
+  --md-code-hl-keyword-color: #e3a3d4;
+  --md-code-hl-string-color: #b4cf8b;
+  --md-code-hl-comment-color: #a3959d;
+  --md-code-hl-generic-color: #b5a8b0;
+  --md-code-hl-variable-color: #b5a8b0;
+  --md-code-hl-operator-color: #b5a8b0;
+  --md-code-hl-punctuation-color: #b5a8b0;
+
+  --md-typeset-color: var(--md-default-fg-color);
+  --md-typeset-a-color: var(--md-primary-fg-color);
+  --md-typeset-mark-color: rgba(217, 164, 65, .35);
+  --md-typeset-table-color: #3a3238;
+  --md-typeset-table-color--light: rgba(223, 166, 210, .05);
+  --md-typeset-kbd-color: #2e272c;
+  --md-typeset-kbd-accent-color: #3a3238;
+  --md-typeset-kbd-border-color: #120f11;
+  --md-admonition-fg-color: var(--md-default-fg-color);
+  --md-admonition-bg-color: var(--md-default-bg-color);
+  --md-footer-bg-color: #252024;
+  --md-footer-bg-color--dark: #1c181b;
+
+  --color-foreground: 236 229 233;
+  --color-background: 28 24 27;
+  --color-background-subtle: 37 32 36;
+  --color-backdrop: 14 12 13;
+}
+
+body {
+  background-color: var(--md-default-bg-color);
+}
+
+/* the dark scheme of the theme draws headings and the site name in pure white */
+.md-header__title,
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+[data-md-color-scheme="slate"] .md-header__title,
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3,
+[data-md-color-scheme="slate"] .md-typeset h4 {
+  color: var(--bwtidy-heading);
+}
+
+.md-header {
+  background-color: var(--bwtidy-header-bg);
+  box-shadow: 0 .1rem 0 var(--bwtidy-header-rule);
+}
+
+.md-tabs {
+  background-color: var(--bwtidy-header-bg);
+  box-shadow: 0 -.05rem 0 inset var(--bwtidy-line);
+}
+
+.md-nav--primary .md-nav__item .md-nav__link--active,
+.md-nav--primary .md-nav__item .md-nav__link--active code {
+  color: var(--bwtidy-nav-active-fg);
+  background-color: var(--bwtidy-nav-active-bg);
+}
+
+.md-typeset a:hover,
+.md-typeset a:focus {
+  color: var(--md-accent-fg-color);
+}
+
+/* one visible ring of the accent color on every focused link, not the browser's own */
+.md-typeset a:focus-visible,
+.md-nav__link:focus-visible,
+.md-footer a:focus-visible,
+.md-header a:focus-visible,
+.md-typeset img[data-zoom]:focus-visible {
+  outline: .1rem solid var(--md-accent-fg-color);
+  outline-offset: .1rem;
+  border-radius: .1rem;
+}
+
+.md-typeset pre > code {
+  box-shadow: inset 0 0 0 .05rem var(--bwtidy-line);
+}
+
+.md-typeset table:not([class]) {
+  border-color: var(--bwtidy-line);
+  border-radius: .2rem;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--bwtidy-surface);
+}
+
+/* GitHub's alerts: the warning keeps its amber, the tip takes the plum */
+.md-typeset .admonition.warning,
+.md-typeset details.warning {
+  background-color: var(--bwtidy-warning-bg);
+  box-shadow: inset .2rem 0 0 var(--bwtidy-warning-fg);
+}
+
+.md-typeset .warning > .admonition-title:before,
+.md-typeset .warning > summary:before {
+  background-color: var(--bwtidy-warning-fg);
+}
+
+.md-typeset .admonition.tip,
+.md-typeset details.tip {
+  background-color: var(--bwtidy-tip-bg);
+  box-shadow: inset .2rem 0 0 var(--bwtidy-tip-fg);
+}
+
+.md-typeset .tip > .admonition-title:before,
+.md-typeset .tip > summary:before {
+  background-color: var(--bwtidy-tip-fg);
+}
+
+.md-typeset .admonition.note,
+.md-typeset details.note {
+  background-color: var(--bwtidy-surface);
+  box-shadow: inset .2rem 0 0 var(--md-default-fg-color--light);
+}
+
+.md-typeset .note > .admonition-title:before,
+.md-typeset .note > summary:before {
+  background-color: var(--md-default-fg-color--light);
+}
+
+.md-footer-meta {
+  background-color: var(--bwtidy-surface);
+}
+
+.md-banner {
+  color: var(--bwtidy-banner-fg);
+  background-color: var(--bwtidy-banner-bg);
+}
+
+/* one slim line: the colour draws the eye, the size need not */
+.md-banner .md-banner__inner {
+  margin-top: .15rem;
+  margin-bottom: .15rem;
+  font-size: .6rem;
+  font-weight: 700;
+}
+
+.md-banner .md-banner__inner p[data-disclaimer] {
+  max-width: none;
+  margin: 0;
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.md-banner .md-banner__inner a,
+.md-banner .md-banner__inner a:hover,
+.md-banner .md-banner__inner a:focus {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.md-banner .md-banner__inner a:focus-visible {
+  outline-color: currentcolor;
+}
+
+/* the theme's 61rem leaves a narrow column between the two sidebars */
+.md-grid {
+  max-width: 80rem;
+}
+
+/* A registered length is computed where it is set, so 72ch is measured in the paragraph's own
+   font (the article's) and stays the same width in a heading or a box with a font of its own. */
+@property --bwtidy-prose-width {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+.md-typeset {
+  --bwtidy-prose-width: 72ch;
+}
+
+/* running text keeps a readable line length, while pictures, tables and code keep the whole column */
+.md-typeset p:not(:has(img)),
+.md-typeset :is(h1, h2, h3, h4, h5, h6),
+.md-typeset li:not(:has(img, table, pre)),
+.md-typeset blockquote:not(:has(img, table, pre)),
+.md-typeset .admonition:not(:has(img, table, pre)),
+.md-typeset details:not(:has(img, table, pre)) {
+  max-width: var(--bwtidy-prose-width);
+}
+
+.md-typeset table p,
+.md-typeset table li {
+  max-width: none;
+}
+
+/* inline code stays on one line, in text and tables alike (the theme breaks it anywhere, even
+   at a hyphen), and may break only on a narrow screen where it would not fit at all */
+.md-typeset :not(pre) > code {
+  white-space: nowrap;
+  word-break: normal;
+}
+
+@media screen and (max-width: 44.9375em) {
+  .md-typeset :not(pre) > code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* a screenshot of a light UI on a light page needs an edge */
+.md-typeset img:not(.twemoji):not(.emojione):not(.gemoji) {
+  border: 1px solid var(--md-default-fg-color--lighter);
+  box-shadow: 0 1px 4px var(--bwtidy-shadow);
+}
+
+.md-typeset img[data-zoom] {
+  cursor: zoom-in;
+}
+
+/* the link to the issue form for docs improvements: in the right sidebar below the table of
+   contents, and at the end of the content where that sidebar is hidden (the theme shows it
+   from 76.25em), never both */
+.md-improve--sidebar {
+  display: none;
+}
+
+.md-improve--content {
+  margin-top: 2rem;
+  padding-top: .6rem;
+  border-top: .05rem solid var(--md-default-fg-color--lightest);
+  font-size: .7rem;
+}
+
+.md-improve--content .md-improve__title {
+  font-weight: 700;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-improve__link {
+  display: inline-block;
+  padding: .35rem 0;
+}
+
+@media screen and (min-width: 76.25em) {
+  .md-improve--sidebar {
+    display: block;
+    margin-top: 1rem;
+  }
+
+  .md-improve--content {
+    display: none;
+  }
+}
+
+dialog[data-zoom] {
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-out;
+}
+
+dialog[data-zoom]::backdrop {
+  background-color: rgba(0, 0, 0, .8);
+}
+
+dialog[data-zoom] img {
+  display: block;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 2rem);
+  box-shadow: none;
+}

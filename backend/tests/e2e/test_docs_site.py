@@ -3,9 +3,11 @@
 import re
 import tomllib
 from pathlib import Path
+from typing import Literal
 from urllib.parse import parse_qs, urlsplit
 
-from playwright.sync_api import Page, Request, Response, expect
+import pytest
+from playwright.sync_api import Locator, Page, Request, Response, expect
 
 from bwtidy.version import semver
 
@@ -95,16 +97,23 @@ def test_the_content_column_is_wide_and_keeps_inline_code_on_one_line(page: Page
 def test_running_text_wraps_at_a_readable_length_while_pictures_use_the_column(page: Page):
     page.goto("/docs/tutorial/first-cleanup/")
     column = page.locator("article").evaluate("e => e.getBoundingClientRect().width")
-    ## the longest line a paragraph may hold, measured in the paragraph's own font
+    ## the longest line a paragraph may hold (72 characters), measured in the paragraph's own font
+    ## without its letter spacing, as the unit ch is the width of a 0 alone
     limit = page.locator("article p").first.evaluate(
-        "p => { const s = document.createElement('span'); s.textContent = '0'.repeat(80);"
-        " p.appendChild(s); const w = s.getBoundingClientRect().width; s.remove(); return w }"
+        "p => { const s = document.createElement('span'); s.textContent = '0'.repeat(72);"
+        " s.style.letterSpacing = 'normal'; p.appendChild(s);"
+        " const w = s.getBoundingClientRect().width; s.remove(); return w }"
     )
     text = page.locator("article p:not(:has(img))")
     assert text.count() > 3
     widest = max(text.evaluate_all("ps => ps.map(p => p.getBoundingClientRect().width)"))
-    assert widest <= limit * 1.01
+    assert limit * 0.97 <= widest <= limit * 1.01
     assert widest < column - 150
+    headings = page.locator("article h2")
+    assert headings.count() > 0
+    assert max(headings.evaluate_all("hs => hs.map(h => h.getBoundingClientRect().width)")) <= (
+        limit * 1.01
+    )
     picture = page.locator("article p:has(img)").first
     assert picture.evaluate("p => p.getBoundingClientRect().width") > column - 50
     page.goto("/docs/reference/configuration/")
@@ -297,3 +306,113 @@ def test_the_header_shows_the_version_without_asking_github(page: Page):
     source = page.locator(".md-header .md-source")
     expect(source).to_have_attribute("href", "https://github.com/tnek213/bwtidy")
     expect(source.locator(".md-source__fact--version")).to_have_text(VERSION)
+
+
+## the background behind an element: its own and its ancestors' colors, innermost first
+BACKGROUNDS = """e => {
+    const colors = []
+    for (let node = e; node; node = node.parentElement) {
+        colors.push(getComputedStyle(node).backgroundColor)
+    }
+    return colors
+}"""
+
+RGBA = tuple[float, float, float, float]
+
+
+def rgba(text: str) -> RGBA:
+    numbers = [float(n) for n in re.findall(r"[\d.]+", text)]
+    assert text.startswith("rgb") and len(numbers) in (3, 4), text
+    return (numbers[0], numbers[1], numbers[2], numbers[3] if len(numbers) == 4 else 1.0)
+
+
+def over(top: RGBA, below: RGBA) -> RGBA:
+    alpha = top[3]
+    return (
+        top[0] * alpha + below[0] * (1 - alpha),
+        top[1] * alpha + below[1] * (1 - alpha),
+        top[2] * alpha + below[2] * (1 - alpha),
+        1.0,
+    )
+
+
+def background(element: Locator) -> RGBA:
+    ## the canvas is white where nothing paints
+    color: RGBA = (255, 255, 255, 1.0)
+    for layer in reversed(element.evaluate(BACKGROUNDS)):
+        color = over(rgba(layer), color)
+    return color
+
+
+def luminance(color: RGBA) -> float:
+    def channel(value: float) -> float:
+        value /= 255
+        return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
+    return 0.2126 * channel(color[0]) + 0.7152 * channel(color[1]) + 0.0722 * channel(color[2])
+
+
+def contrast(element: Locator, prop: str = "color") -> float:
+    behind = background(element)
+    front = over(rgba(element.evaluate(f"e => getComputedStyle(e).{prop}")), behind)
+    lighter, darker = sorted((luminance(front), luminance(behind)), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+@pytest.mark.parametrize(("scheme", "attribute"), [("light", "default"), ("dark", "slate")])
+def test_text_links_and_the_selected_page_meet_wcag_aa_contrast(
+    page: Page, scheme: Literal["light", "dark"], attribute: str
+):
+    """WCAG 2.2 AA: 4.5:1 for text and links, 3:1 for the focus indicator."""
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.emulate_media(color_scheme=scheme)
+    page.goto("/docs/how-to/run/")
+    expect(page.locator("body")).to_have_attribute("data-md-color-scheme", attribute)
+    text = page.locator("article p").first
+    link = page.locator("article p a[href]").first
+    selected = page.locator(".md-nav--primary .md-nav__link--active").locator("visible=true")
+    expect(selected).to_have_count(1)
+    expect(selected).to_contain_text("Run bwtidy")
+    for element in (text, link, selected):
+        assert contrast(element) >= 4.5
+    page.keyboard.press("Tab")
+    link.focus()
+    assert link.evaluate("a => a.matches(':focus-visible')")
+    expect(link).not_to_have_css("outline-style", "none")
+    assert float(link.evaluate("a => parseFloat(getComputedStyle(a).outlineWidth)")) >= 2
+    assert contrast(link, "outlineColor") >= 3
+
+
+def test_code_is_drawn_in_ibm_plex_mono_from_the_site_itself(page: Page):
+    fonts: list[Response] = []
+    page.on("response", lambda r: fonts.append(r) if r.request.resource_type == "font" else None)
+    page.goto("/docs/how-to/run/")
+    family = page.locator("article pre code").first.evaluate("c => getComputedStyle(c).fontFamily")
+    assert family.split(",")[0].strip().strip('"') == "IBM Plex Mono"
+    assert family.rstrip().endswith("monospace")
+    page.wait_for_function(
+        "[...document.fonts].some(f => f.family.replaceAll('\"', '') === 'IBM Plex Mono'"
+        " && f.status === 'loaded')"
+    )
+    assert fonts
+    for response in fonts:
+        assert response.ok
+        assert urlsplit(response.url).netloc == urlsplit(page.url).netloc
+        assert "/docs/assets/fonts/ibm-plex-mono/" in response.url
+
+
+FOOTER = "Made with Zensical · Documentation organized with the Diátaxis framework."
+
+
+def test_the_footer_credits_zensical_and_diataxis(page: Page):
+    page.goto("/docs/how-to/run/")
+    credit = page.locator(".md-footer .md-copyright")
+    assert " ".join(credit.inner_text().split()) == FOOTER
+    for name, href in (
+        ("Zensical", "https://zensical.org"),
+        ("Diátaxis framework", "https://diataxis.fr"),
+    ):
+        link = credit.get_by_role("link", name=name, exact=True)
+        expect(link).to_have_attribute("href", href)
+        expect(link).to_have_attribute("target", "_blank")
+        assert set((link.get_attribute("rel") or "").split()) >= {"noopener", "noreferrer"}
