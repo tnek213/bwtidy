@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from bwtidy.backups.collect import RESTORE_DOC_COMMIT
 
@@ -500,17 +501,35 @@ def test_an_svg_resvg_cannot_read_fails_the_build(repo, monkeypatch, capsys, kro
     )
 
 
-def generic_families(docs_site, installed: set[str]) -> dict[str, str]:
-    """What the converter picks with only the installed families drawing any text."""
+def converter(docs_site) -> dict[str, Any]:
     namespace: dict[str, Any] = {"__name__": "convert"}
     exec(docs_site.CONVERT, namespace)
+    return namespace
 
-    def render(svg_string: str) -> bytes:
+
+def fake_render(installed: set[str]):
+    """A stand-in for resvg that draws a text only in an installed family, as resvg does.
+
+    A family list draws in its first installed family, a generic name in the font it is mapped
+    to, and a list without any of them in the serif one, resvg's fallback."""
+
+    def render(svg_string: str, **fonts: str) -> bytes:
         match = re.search(r'font-family="([^"]*)">(\w*)<', svg_string)
         assert match
-        return b"text" if match[2] and match[1] in installed else b"empty"
+        names = [name.strip().strip("'\"") for name in match[1].split(",") if name.strip()]
+        generic = {"serif": "serif_family", "sans-serif": "sans_serif_family"}
+        generic["monospace"] = "monospace_family"
+        mapped = [fonts.get(generic[name], name) if name in generic else name for name in names]
+        mapped.append(fonts.get("serif_family", "Times New Roman"))
+        return b"text" if match[2] and any(name in installed for name in mapped) else b"empty"
 
-    return namespace["generic_families"](render, docs_site.GENERIC_FONTS)
+    return render
+
+
+def generic_families(docs_site, installed: set[str]) -> dict[str, str]:
+    """What the converter picks with only the installed families drawing any text."""
+    convert = converter(docs_site)
+    return convert["generic_families"](fake_render(installed), docs_site.GENERIC_FONTS)
 
 
 def test_the_converter_takes_the_first_installed_font_of_each_generic_family(docs_site):
@@ -523,8 +542,97 @@ def test_the_converter_takes_the_first_installed_font_of_each_generic_family(doc
     }
 
 
-def test_a_generic_family_without_an_installed_font_keeps_resvgs_default(docs_site):
-    assert generic_families(docs_site, {"Arial"}) == {"sans_serif_family": "Arial"}
+def test_a_generic_family_without_an_installed_font_gets_a_font_no_system_has(docs_site):
+    nowhere = converter(docs_site)["NOWHERE"]
+    assert generic_families(docs_site, {"Arial"}) == {
+        "serif_family": nowhere,
+        "sans_serif_family": "Arial",
+        "monospace_family": nowhere,
+        "font_family": nowhere,
+    }
+
+
+def test_a_serif_font_does_not_stand_in_for_a_missing_sans_serif_one(docs_site):
+    """resvg draws a family it cannot find in the serif font, the probe must not count that."""
+    fonts = generic_families(docs_site, {"Times New Roman"})
+    assert fonts["serif_family"] == "Times New Roman"
+    assert fonts["sans_serif_family"] == converter(docs_site)["NOWHERE"]
+
+
+def missing_font(docs_site, installed: set[str], svg: str) -> str | None:
+    convert = converter(docs_site)
+    render = fake_render(installed)
+    fonts = convert["generic_families"](render, docs_site.GENERIC_FONTS)
+    return convert["missing_font"](render, svg.encode(), fonts, docs_site.GENERIC_FONTS)
+
+
+def svg_with(text: str, style: str = "") -> str:
+    return f'<svg xmlns="http://www.w3.org/2000/svg"><style>{style}</style>{text}</svg>'
+
+
+def test_text_in_a_generic_family_without_a_font_is_missing_one(docs_site):
+    svg = svg_with('<text font-family="sans-serif">A</text>')
+    assert missing_font(docs_site, {"DejaVu Serif"}, svg) == (
+        "no installed font draws its sans-serif text, "
+        "tried Arial, Helvetica, Liberation Sans, DejaVu Sans, Noto Sans"
+    )
+    assert missing_font(docs_site, {"DejaVu Sans"}, svg) is None
+
+
+def test_text_without_a_family_needs_a_serif_font(docs_site):
+    svg = svg_with("<text>A</text>")
+    assert "draws its serif text" in (missing_font(docs_site, {"DejaVu Sans"}, svg) or "")
+    assert missing_font(docs_site, {"Noto Serif"}, svg) is None
+
+
+def test_a_family_of_a_style_sheet_counts_as_well(docs_site):
+    """As Mermaid names its fonts, in CSS with a generic family at the end."""
+    svg = svg_with("<text>A</text>", '#m{font-family:"trebuchet ms",verdana,monospace;}')
+    assert "draws its monospace text" in (missing_font(docs_site, {"DejaVu Sans"}, svg) or "")
+    assert missing_font(docs_site, {"verdana"}, svg) is None
+    assert missing_font(docs_site, {"DejaVu Sans Mono"}, svg) is None
+
+
+def test_an_svg_without_text_needs_no_font(docs_site):
+    svg = svg_with('<rect width="1" height="1"/><text font-family="serif"> </text>')
+    assert missing_font(docs_site, set(), svg) is None
+
+
+def test_a_diagram_whose_text_no_font_draws_fails_the_build(
+    repo, monkeypatch, capsys, kroki, docs_site
+):
+    fonts = {**docs_site.GENERIC_FONTS, "sans_serif": ["No Such Sans", "No Such Sans Either"]}
+    monkeypatch.setattr(docs_site, "GENERIC_FONTS", fonts)
+    write(repo, "docs/how-to/run.md", GRAPHVIZ_PAGE)
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 1
+    err = capsys.readouterr().err
+    assert (
+        "docs-site: docs/how-to/run.md:5: no installed font draws its sans-serif text, "
+        "tried No Such Sans, No Such Sans Either\n"
+    ) in err
+    assert not (repo / ".cache" / "kroki").exists() or not any(
+        (repo / ".cache" / "kroki").iterdir()
+    )
+
+
+@pytest.mark.parametrize(
+    ("workflow", "build"), [("ci.yml", "scripts/ci"), ("docs.yml", "scripts/docs-site build")]
+)
+def test_a_workflow_that_builds_docs_installs_the_font_of_the_image_first(workflow, build):
+    """A GitHub runner has no font resvg finds, so without it the build fails on a diagram."""
+    dockerfile = (REAL_ROOT / "Dockerfile").read_text()
+    [package] = re.findall(r"--no-install-recommends (fonts-\S+)", dockerfile)
+    jobs = yaml.safe_load((REAL_ROOT / ".github" / "workflows" / workflow).read_text())["jobs"]
+    [steps] = [
+        job["steps"]
+        for job in jobs.values()
+        if any(build in s.get("run", "") for s in job["steps"])
+    ]
+    runs = [step.get("run", "") for step in steps]
+    at = next(i for i, run in enumerate(runs) if build in run)
+    install = f"sudo apt-get install -y --no-install-recommends {package}"
+    assert any(install in run for run in runs[:at]), runs
 
 
 def test_a_diagram_in_a_list_step_keeps_its_indent(repo, monkeypatch, tmp_path, kroki, docs_site):

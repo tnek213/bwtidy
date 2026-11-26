@@ -71,8 +71,20 @@ docs stage installs `fonts-dejavu-core` (in that stage only). For serif,
 sans-serif and monospace it takes the first installed font of the lists in
 `GENERIC_FONTS` of the script, as resvg's own choices (Times New Roman, Arial,
 Courier New) are missing on many Linux systems and resvg leaves out a label
-whose font it cannot find. A Graphviz or PlantUML picture sized in `pt` is
-drawn at 96 dpi, the CSS pixel's.
+whose font it cannot find.
+
+Building docs with a diagram therefore needs one of those fonts for each
+generic family its text uses, and DejaVu covers all three. Without one the
+build fails before it writes the picture and names the page, the line, the
+family and the fonts it tried. The docs stage and the workflows `ci.yml` and
+`docs.yml` install `fonts-dejavu-core` with apt-get, which is also what you
+install on Debian or Ubuntu. Fedora has `dejavu-sans-fonts`,
+`dejavu-serif-fonts` and `dejavu-sans-mono-fonts`, Alpine `font-dejavu` and
+Arch `ttf-dejavu`. macOS and Windows have Times New Roman, Arial and Courier
+New already.
+
+A Graphviz or PlantUML picture sized in `pt` is drawn at 96 dpi, the CSS
+pixel's.
 
 Each PNG is kept in `.cache/kroki/` at the repo root (git-ignored), named
 after a hash of the type, the source and the converter's settings, and a

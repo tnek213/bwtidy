@@ -53,11 +53,13 @@ source to BWTIDY_KROKI_URL (https://kroki.io when unset or empty) as TYPE/svg, a
 with MERMAID_INIT as its first line unless it starts with an init directive of its own, and resvg
 (resvg-py of the group docs, run through uv) converts the SVG at ZOOM and DPI on BACKGROUND,
 drawing the text with the system's fonts (GENERIC_FONTS: the first installed one of each list
-stands in for serif, sans-serif and monospace). The PNG is named after a hash of the type, the
-source and the converter's settings, and kept under that hash in .cache/kroki/ at the repo root,
-so a later build finds it there and makes no request. A server that cannot be reached or answers
-with an error fails the build, naming the page, the line and the server's message. Docs without
-a diagram build without any request. `serve` shows a diagram as its code block.
+stands in for serif, sans-serif and monospace). A diagram with a text that none of them draws
+(resvg would leave it out without a word) fails the build, naming the page, the line, the generic
+family and the fonts it tried. The PNG is named after a hash of the type, the source and the
+converter's settings, and kept under that hash in .cache/kroki/ at the repo root, so a later build
+finds it there and makes no request. A server that cannot be reached or answers with an error fails
+the build, naming the page, the line and the server's message. Docs without a diagram build without
+any request. `serve` shows a diagram as its code block.
 """
 
 import hashlib
@@ -166,21 +168,30 @@ GENERIC_FONTS = {
     "monospace": ["Courier New", "Liberation Mono", "DejaVu Sans Mono", "Noto Sans Mono"],
 }
 ## run in the group docs with ZOOM, BACKGROUND, DPI, the JSON of GENERIC_FONTS and then pairs of
-## an SVG and a PNG path. It converts what it can and names each SVG it cannot convert.
+## an SVG and a PNG path. It converts what it can and prints a line "SVG<tab>WHY" for each SVG it
+## cannot convert or whose text no installed font draws.
 CONVERT = """
+import html
 import json
+import re
 import sys
+import xml.etree.ElementTree as ElementTree
 
 PROBE = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20">'
     '<text x="2" y="16" font-size="16" font-family="{family}">{text}</text></svg>'
 )
+## a family no system has. resvg draws a text whose families it cannot find in the serif one,
+## so a probe with this as serif finds only the family it names.
+NOWHERE = "bwtidy no such font"
+CSS_FAMILY = re.compile(r"font-family\\s*:\\s*([^;}]+)")
+GENERIC_NAMES = {"serif": "serif", "sans-serif": "sans_serif", "monospace": "monospace"}
 
 
-def draws(render, family):
+def draws(render, family, fonts):
     try:
-        text = render(svg_string=PROBE.format(family=family, text="Mg"))
-        empty = render(svg_string=PROBE.format(family=family, text=""))
+        text = render(svg_string=PROBE.format(family=html.escape(family), text="Mg"), **fonts)
+        empty = render(svg_string=PROBE.format(family=html.escape(family), text=""), **fonts)
     except ValueError:
         return False
     return bytes(text) != bytes(empty)
@@ -189,27 +200,78 @@ def draws(render, family):
 def generic_families(render, candidates):
     chosen = {}
     for generic, families in candidates.items():
-        found = next((family for family in families if draws(render, family)), None)
-        if found:
-            chosen[f"{generic}_family"] = found
-    if "serif_family" in chosen:
-        chosen["font_family"] = chosen["serif_family"]
+        probe = {"serif_family": NOWHERE}
+        found = next((family for family in families if draws(render, family, probe)), None)
+        chosen[f"{generic}_family"] = found or NOWHERE
+    chosen["font_family"] = chosen.get("serif_family", NOWHERE)
     return chosen
+
+
+## the font-family lists of an SVG that holds text, "" for resvg's default, else none.
+def text_families(svg):
+    try:
+        root = ElementTree.fromstring(svg)
+    except ElementTree.ParseError:
+        return []
+    elements = list(root.iter())
+    texts = [e for e in elements if e.tag.rsplit("}", 1)[-1] == "text"]
+    if not any("".join(text.itertext()).strip() for text in texts):
+        return []
+    found = []
+    for element in elements:
+        if element.get("font-family"):
+            found.append(element.get("font-family"))
+        css = element.get("style") or ""
+        if element.tag.rsplit("}", 1)[-1] == "style":
+            css += " " + "".join(element.itertext())
+        found += CSS_FAMILY.findall(css)
+    return list(dict.fromkeys(family.strip() for family in found)) or [""]
+
+
+## the generic family a font-family list falls back on, serif as resvg's when it names none.
+def generic_of(family):
+    for name in family.split(","):
+        name = name.strip().strip("'\\"").lower()
+        if name in GENERIC_NAMES:
+            return name
+    return "serif"
+
+
+## why a text of the SVG would be left out for want of a font, or None when all draw.
+def missing_font(render, svg, fonts, candidates):
+    for family in text_families(svg):
+        generic = generic_of(family)
+        key = GENERIC_NAMES[generic]
+        ## the text has to draw in a font of its own list, not in resvg's serif fallback
+        probe = {**fonts, "serif_family": fonts.get(f"{key}_family", NOWHERE)}
+        if not draws(render, family, probe):
+            tried = ", ".join(candidates.get(key, []))
+            return f"no installed font draws its {generic} text, tried {tried}"
+    return None
 
 
 def main(args):
     import resvg_py
 
     zoom, background, dpi, candidates, *paths = args
-    fonts = generic_families(resvg_py.svg_to_bytes, json.loads(candidates))
+    candidates = json.loads(candidates)
+    render = resvg_py.svg_to_bytes
+    fonts = generic_families(render, candidates)
     failed = False
     for svg, png in zip(paths[::2], paths[1::2]):
+        with open(svg, "rb") as file:
+            source = file.read()
+        why = missing_font(render, source, fonts, candidates)
+        if why:
+            print(f"{svg}\\t{why}", file=sys.stderr)
+            failed = True
+            continue
         try:
-            data = resvg_py.svg_to_bytes(
+            data = render(
                 svg_path=svg, zoom=float(zoom), background=background, dpi=float(dpi), **fonts
             )
         except Exception as error:
-            print(f"{svg}: {error}", file=sys.stderr)
+            print(f"{svg}\\tresvg could not convert the SVG of Kroki, {error}", file=sys.stderr)
             failed = True
             continue
         with open(png, "wb") as file:
@@ -614,8 +676,8 @@ def fetch_svg(kind: str, source: str) -> bytes:
         raise KrokiError(f"{url} could not be reached: {reason}", reached=False) from None
 
 
-def convert(svgs: dict[str, bytes], cache: Path) -> list[str]:
-    """Convert each SVG to a PNG in the cache under its key, the keys that failed with why."""
+def convert(svgs: dict[str, bytes], cache: Path) -> dict[str, str]:
+    """Convert each SVG to a PNG in the cache under its key, why for each key that failed."""
     cache.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="bwtidy-kroki-") as temp:
         paths = []
@@ -637,14 +699,19 @@ def convert(svgs: dict[str, bytes], cache: Path) -> list[str]:
             capture_output=True,
             text=True,
         )
-        failed = []
+        reasons = {}
+        for line in result.stderr.splitlines():
+            svg, tab, why = line.partition("\t")
+            if tab:
+                reasons[Path(svg).stem] = why
+        failed = {}
         for key in svgs:
             png = Path(temp) / f"{key}.png"
             if png.is_file():
                 os.replace(png, cache / f"{key}.png")
             else:
                 why = result.stderr.strip() or f"exit code {result.returncode}"
-                failed.append(f"{key}: {why}")
+                failed[key] = reasons.get(key, f"resvg could not convert the SVG of Kroki, {why}")
         return failed
 
 
@@ -700,10 +767,9 @@ def render_diagrams(docs: Path) -> list[str]:
                 break
     if problems:
         return problems
-    failed = convert(svgs, cache) if svgs else []
-    for line in failed:
-        key, _, why = line.partition(": ")
-        problems.append(f"{wanted[key][2]}: resvg could not convert the SVG of Kroki, {why}")
+    failed = convert(svgs, cache) if svgs else {}
+    for key, why in failed.items():
+        problems.append(f"{wanted[key][2]}: {why}")
     if problems:
         return problems
     for page, found in pages.items():

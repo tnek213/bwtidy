@@ -82,6 +82,13 @@ The tests of `tests/scripts` load a script by name with the fixture
 `load_script` (`load_script("dev-vault")`), and `backend/tests/conftest.py`
 puts `scripts/` on the import path so they import `devlib` too.
 
+The tests of `scripts/docs-site` (`tests/scripts/test_docs_site_script.py`)
+convert a diagram with the real resvg, so they need one of the fonts that
+[Releasing](release.md#diagrams) lists, as a docs build does. Without one
+they fail with the build's message that no installed font draws the text.
+On Debian or Ubuntu `fonts-dejavu-core` is enough, which the CI workflow
+installs before `scripts/ci`. Releasing names the packages of other systems.
+
 ### Workers and timeouts
 
 `scripts/ci` runs the backend tests of `tests/unit`, `tests/scripts` and

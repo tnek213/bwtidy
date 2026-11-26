@@ -29,4 +29,7 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      # the labels of the docs' diagrams need a font of GENERIC_FONTS (scripts/docs-site), and the
+      # runner has none
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-dejavu-core
       - run: scripts/ci
