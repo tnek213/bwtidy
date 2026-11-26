@@ -638,7 +638,8 @@ check) reads every markdown file of the repo (`git ls-files -co
 --exclude-standard`) and checks that each local image link (`![alt](path)`,
 `![alt][ref]`, an `img` tag's `src`, outside code) points to a file, and that
 every file in `docs/images/` is linked from some markdown file, whichever
-one. An empty alt text is fine. It also checks that each other local link
+one. Every picture, also one that points to a URL, needs a non-empty alt text (an `img`
+tag needs a non-empty `alt` attribute). It also checks that each other local link
 (`[text](path)`, reference style, an `a` tag's `href`) points to a file, and
 that a `#anchor` on a link to a markdown file (or a bare `#anchor`) matches a
 heading of that file by GitHub's slug rules. Finally it applies the prose

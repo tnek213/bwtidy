@@ -78,7 +78,8 @@ commits the changed images as "Take the docs screenshots again" and stops the
 push, which then goes through when pushed again (dev/testing.md, "The
 pre-push hook"). A new or renamed image keeps
 `scripts/docs-lint` passing: every image is linked from some markdown file
-and every image link points to a file.
+and every image link points to a file. Every picture has a non-empty alt text that
+says what it shows.
 
 A change to an MCP tool (its name, annotations, parameters or description)
 reruns `scripts/mcp-reference` and commits the `docs/reference/mcp-tools.md`
