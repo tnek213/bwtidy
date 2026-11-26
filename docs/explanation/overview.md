@@ -33,8 +33,9 @@ flowchart LR
 - The gateway serves the web page and the account form as well as these
   docs at `/docs/`. It answers a few requests itself and passes the API and
   MCP requests on to the worker of your account. It never logs or stores the
-  content that passes through it. An MCP client finds its account by its
-  token.
+  content that passes through it unless you turn on the
+  [usage stats](../reference/configuration.md#usage-stats), which keep counts
+  and never your data. An MCP client finds its account by its token.
 - A worker is bwtidy itself for one account, with the grid's data and the
   queue as well as the backups and the MCP tools. The gateway starts it when
   you click Unlock or Log in. It exits when your session ends and takes the
@@ -58,7 +59,8 @@ flowchart LR
   [The bwtidy note](tool-note.md).
 - bwtidy has no telemetry. It sends nothing to its author or anyone else.
   The only connection out of the container is the one from the Bitwarden CLI
-  to your Bitwarden server.
+  to your Bitwarden server. The usage stats you can turn on stay in a file on
+  your machine.
 
 ## What happens when you use it
 

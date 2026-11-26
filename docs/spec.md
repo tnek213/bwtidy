@@ -232,10 +232,11 @@ what status it got. A frozen login or end then shows where it stopped.
 
 The gateway (`backend/src/bwtidy/gateway/` with the entry point
 `bwtidy-gateway`) is the one process that listens. It starts the workers and
-proxies to them. It never parses, logs or stores anything that passes through
-the proxy. It logs account keys and uids as well as worker starts and exits.
-It also logs the session requests (see Logs) and a request that a worker did
-not answer.
+proxies to them. Unless the usage stats are on it never parses, logs or
+stores anything that passes through the proxy. With them on it reads and
+keeps only what Usage stats names. It logs account keys and uids as well as
+worker starts and exits. It also logs the session requests (see Logs) and a
+request that a worker did not answer.
 
 The gateway runs as root (`USER 0`) because it starts each worker as the
 account's uid. `compose.yaml` drops every capability but six. It keeps
@@ -484,7 +485,7 @@ gets SIGTERM and is killed when it still runs 120 seconds later.
 The gateway decides where a request goes by its path and then by its routing
 cookie or its token. The sections below give the details.
 
-```graphviz alt="The gateway answers a health check, its own account routes, the documentation site and the static files itself. A request to /mcp or below goes to the worker of the account whose unexpired token it carries when that worker runs, or else gets a 401 or a 503. A request under /api/ needs a routing cookie that names an account, or it gets 401 No account. An unlock or a Bitwarden login first makes sure the account's worker runs and answers, starting or replacing it, and may be refused with 401, 422, 429 or 503. Any other request goes to the running worker, or gets 401 No account when none runs."
+```graphviz alt="The gateway answers a health check, its own account routes, the routers a wrapper passes in, the documentation site and the static files itself. A request to /mcp or below goes to the worker of the account whose unexpired token it carries when that worker runs, or else gets a 401 or a 503. A request under /api/ needs a routing cookie that names an account, or it gets 401 No account. An unlock or a Bitwarden login first makes sure the account's worker runs and answers, starting or replacing it, and may be refused with 401, 422, 429 or 503. Any other request goes to the running worker, or gets 401 No account when none runs."
 digraph {
   nodesep=0.35
   ranksep=0.35
@@ -493,7 +494,7 @@ digraph {
   edge [fontname="sans-serif" fontsize=12 color="#455a64"]
   request [label="A request" fillcolor="#e8eaf6"]
   path [label="Which path?"]
-  own [label="The gateway answers:\nhealth, account routes,\nthe docs site, the static files" fillcolor="#e8eaf6"]
+  own [label="The gateway answers:\nhealth, account routes,\nextra routers if any,\nthe docs site, the static files" fillcolor="#e8eaf6"]
   token [label="Does the bearer token\nmatch an unexpired token?"]
   mcprun [label="Does that account's\nworker run?"]
   cookie [label="Does the routing cookie\nname an account?"]
@@ -551,8 +552,9 @@ digraph {
 - Those paths answer 401 `{"detail": "No account"}` without a routing cookie.
   They answer the same without a running worker for anything but the two
   clicks above. The frontend then opens the account again.
-- Every other path belongs to the gateway. Its own routes come first, then
-  the documentation site and then the static files (mounted last). The
+- Every other path belongs to the gateway. Its own routes come first and the
+  routes passed in `routers` next (see Extra routes and the exit hook). Then
+  come the documentation site and the static files (mounted last). The
   workers get no static directory, so the frontend always comes from the
   gateway.
 
@@ -575,6 +577,28 @@ address of a self-hosted bwtidy stays private. No page requests anything from
 another host. The header's version and star count are written at build time
 rather than fetched from GitHub. The referrer policy `same-origin` keeps the
 `Referer` off every link to another site.
+
+### Extra routes and the exit hook
+
+`create_gateway_app` also takes `routers` and `on_worker_exit`. With them an
+outside package that wraps the gateway (such as the demo) can add pages of
+its own and learn when a worker exits. bwtidy itself knows nothing of such a
+package. `bwtidy-gateway` passes neither, so the gateway then behaves as
+described above.
+
+- `routers` are FastAPI `APIRouter`s, included in their order after the
+  gateway's own routes. They come before the documentation site and the
+  static files. So a router's path wins over a static file of the same path
+  (`/` or `/index.html`) but not over a route of the gateway. Paths the proxy
+  takes (under `/api/` and `/mcp`) never reach a router because the proxy
+  runs first.
+- `on_worker_exit` is an async callable awaited once with every `Worker` that
+  exited. It runs after the gateway's own cleanup (the delete marker and the
+  `.pending` directory) and outside the account's lock, so it may take the
+  lock itself. It also runs when that cleanup failed. The gateway logs an
+  exception in it as `The worker exit hook failed for ACCOUNT: TYPE` with the
+  exception's type only, as its text could hold a value. The exception never
+  propagates. The gateway keeps serving and still forgets the worker.
 
 ### MCP
 
@@ -604,6 +628,115 @@ routed by its `Authorization: Bearer TOKEN` alone.
 - A match with a running worker is proxied unchanged with the `Authorization`
   header. The worker checks the token again.
 
+## Usage stats
+
+The usage stats are off unless `BWTIDY_STATS=1`.
+[Configuration](reference/configuration.md#usage-stats) has the variables and
+what is kept as well as the command that shows it. The reason is that a
+public demo needs to know whether it is used and what fails. It also needs to
+know when it was full, and an operator may want the same of their own
+install. With the stats
+off nothing changes. There is no file and no table and no work per request.
+
+The gateway records the stats and a worker never does. Each worker runs as
+its account's uid and cannot write a file the gateway owns. Only the gateway
+sees the requests of every account and the workers' cap.
+`GatewaySettings.stats` and `GatewaySettings.stats_db` hold the two
+variables. Nothing leaves the machine because bwtidy never sends the stats
+anywhere.
+
+Only what comes from the code is kept. That is the route templates and the
+MCP tool and method names as well as the exception types and code locations.
+Nothing that a person typed or a vault holds is kept, and none of these is
+ever in the file:
+
+- item names, values and ids
+- folder and field names
+- search text and request bodies
+- JSON-RPC ids and arguments
+- exception messages and arguments
+- IP addresses and user agents
+
+A unit test sends markers in all of these and finds none in the file.
+
+- An event is one request that reaches a worker. It holds the UTC time and
+  the account's id as well as the channel (`ui` or `mcp`) and the operation.
+  It also holds ok with the HTTP status and the duration in milliseconds
+  along with the gateway's version. A request the gateway answers itself is
+  no event. Examples are `/api/health` and the account form as well as a
+  refused MCP token and a 401 without a routing cookie.
+- A UI operation is `METHOD TEMPLATE` with the template of the first worker
+  route that takes the request (`PUT /api/items/{item_id}`). It never holds
+  the path. A path that no route takes is `other`.
+- An MCP `POST /mcp` counts each JSON-RPC message of its body, and a batch
+  counts each call. A `tools/call` counts by its `params.name` and any other
+  message by its method. Each counts so only when the worker registers that
+  tool or its MCP SDK knows that method, and else it is `other`. `GET /mcp`
+  and `DELETE /mcp` count as themselves. A body that is no JSON or is over 2
+  MiB is one `other`.
+- ok means a status of 2xx or 3xx. For an MCP call with an id it also means
+  an answer with a result that is no tool error (`isError`) and no `error`
+  object. An answer over 2 MiB is not read, so its calls count by the status
+  alone. The bodies go on unchanged and a streamed answer keeps streaming,
+  because the gateway reads a copy.
+- The account id is the first 16 hex characters of the HMAC-SHA256 of the
+  account key (server and email). The HMAC's key is a random salt that the
+  file makes at its first open. So the same account counts as one without its
+  email. `create_gateway_app(stats_account=...)` lets a wrapper of the gateway
+  (the demo) store its own label instead.
+- An exception that a worker did not handle reaches the gateway only as a
+  500. A worker that the gateway started with the stats on (it sets
+  `BWTIDY_STATS_REPORT=1`) adds the header `X-Bwtidy-Stats-Error` to that
+  500. The header holds the exception's type and its frames inside the bwtidy
+  package. A frame is its path relative to the package with the function and
+  the line. The header never holds the exception's text, arguments or locals
+  and never a log line.
+- The gateway strips that header from every answer whether the stats are on
+  or off. It keeps an error only when the header holds nothing else. The
+  error is kept under a fingerprint, the sha256 of the type and the frames.
+  With it go its first and last time and its count as well as the channel
+  and operation of its event. A 500 that a route answers itself (a failed
+  backup or a write that failed midway) is a failed event without an error.
+- The gateway asks a worker once for `GET /stats/names`, a path it never
+  proxies. The answer holds the templates of the worker's `/api/` routes and
+  its tool names as well as its MCP SDK's client methods. Every worker runs
+  the same code, so the first one that answers serves all. Until then every
+  operation is `other`.
+- Every 60 seconds the gateway takes a capacity sample of the workers that
+  run or start and of `BWTIDY_MAX_WORKERS`. The sample also counts the starts
+  refused with 429 `Too many accounts are open at once. Try again later.`
+  since the sample before. `create_gateway_app(stats_extra=...)` gives a
+  wrapper's own numbers as JSON in the sample's `extra`. A wrapper that counts
+  sessions gives the sessions started since the last sample as `sessions`.
+  The summary adds them up.
+- A request only notes itself in RAM. At most every 5 seconds the notes
+  become rows, written in one transaction in a thread. A write that fails
+  drops its rows and logs one line until a write succeeds again. That line
+  holds the error's type and SQLite's text but no request data. A request
+  never waits for a write or fails with it. Past 10000 notes between two
+  writes the rest are dropped.
+- At the gateway's start and then every day the events of the days before
+  the last 200 are counted into `daily` and deleted. A row of `daily` counts
+  the events of one day with the same channel, operation and ok. The capacity
+  samples of those days are deleted too. Only whole days roll up, so a day is
+  either in the events or in `daily`. `daily` and `errors` are kept for good.
+  An error keeps its count and its last time.
+- The file is `BWTIDY_STATS_DB` or else `stats.db` in the parent of
+  `BWTIDY_ACCOUNTS_DIR` (`/data/stats.db`). The gateway makes it in WAL mode
+  with mode 0600 and its own uid as the owner. It must lie outside the
+  accounts directory and the backups root, whose directories the account uids
+  own. A link stops the start, and so does a file that is not regular or that
+  another uid owns.
+- The summary (`summary` in `stats/summary.py`) is the one plain dict that a
+  page or `bwtidy stats` shows. It holds the totals of the accounts and of
+  the UI and MCP operations with how many were ok and failed. The totals
+  include the sessions when a wrapper gives them. Each operation's ok and
+  failed per channel follow and then the errors by operation and type. The
+  capacity per hour comes last. For the days whose events were rolled up the
+  summary reads `daily`, which counts no accounts. It never answers an
+  account id or a frame or a fingerprint. The command adds the top errors
+  with their frames for the operator where the gateway runs.
+
 ## Schema versions
 
 - Each account's `app/bwtidy.sqlite` holds its schema version in SQLite's
@@ -618,6 +751,20 @@ routed by its `Authorization: Bearer TOKEN` alone.
   with a log line that names the file and its version as well as version 1.
   Nothing in such a file changes. The browser sees that the worker could not
   start, as it does for any other reason.
+- The gateway's `stats.db` (see Usage stats) has versions of its own in
+  `PRAGMA user_version`. `MIGRATIONS` in `stats/db.py` moves them up. It is
+  an ordered list of numbered steps and each step is a tuple of SQL
+  statements. Opening the file runs every step above its version, each in one
+  transaction that also sets its version. A file at a newer version than the
+  code knows stops the gateway's start. A log line then names the file and
+  its version as well as the newest version the code knows. Nothing in the
+  file changes.
+- Version 1 of `stats.db` (step 1) makes the tables `events` and `capacity`
+  with their indexes `events_at` and `capacity_at`. It also makes `errors`
+  and `daily` as well as `settings`, which holds the salt. The reason for the
+  steps is that the rolled-up days and the errors are kept for good. So a
+  release that keeps a new number migrates the file instead of starting it
+  over. The next step is one more tuple in the list.
 
 ## Session and access
 

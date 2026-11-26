@@ -1,0 +1,17 @@
+## The sidecar pattern of dev/demo.md (Behind a reverse proxy), with a busybox stand-in for the
+## VPN sidecar. A test checks that docker compose accepts it on top of compose.demo.yaml.
+services:
+  sidecar:
+    image: busybox:1.37
+    command: ["sleep", "infinity"]
+    networks:
+      - front
+      - public
+
+  edge:
+    network_mode: service:sidecar
+    ports: !reset []
+    networks: !reset {}
+    depends_on:
+      sidecar:
+        condition: service_started

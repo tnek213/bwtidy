@@ -69,8 +69,11 @@ and starts one worker for each open account (see
 | `BWTIDY_BACKUP_KEEP_DAYS` | `90` | A backup older than this many days is deleted. |
 | `BWTIDY_BACKUP_KEEP_ALWAYS` | `5` | The newest this many backups are kept whatever their age. |
 | `BWTIDY_FAILED_KEEP_HOURS` | `30` | Hours after which a failed queue entry is deleted. |
+| `BWTIDY_STATS` | `0` | `1` turns on the [usage stats](#usage-stats), which stay on this machine. |
+| `BWTIDY_STATS_DB` | `/data/stats.db` | The usage stats file, by default `stats.db` next to the accounts directory. It must be outside the accounts directory and the backups. |
 
-The gateway checks the last six when it starts and passes them on to every
+The gateway checks the six from `BWTIDY_HEARTBEAT_TIMEOUT` to
+`BWTIDY_FAILED_KEEP_HOURS` when it starts and passes them on to every
 worker. They take effect there. The retention never deletes a backup that is
 still in use. The gateway passes `BWTIDY_MCP_HOSTS` on as well.
 
@@ -107,6 +110,7 @@ and the ones below. You never set them.
 | `BWTIDY_EXIT_AFTER_SESSION` | `0` | With `1` the worker serves one session and exits when it ends. It then also exits when no session starts within `BWTIDY_IDLE_EXIT`. |
 | `BWTIDY_PENDING_MARKER` | | The file that marks a new account. The first unlock deletes it and so keeps the account. |
 | `BWTIDY_SECURE_COOKIES` | `0` | The gateway's own value. |
+| `BWTIDY_STATS_REPORT` | `0` | `1` when the gateway's usage stats are on. The worker then tells the gateway its route templates and tool names as well as the type and code locations of an unhandled error. |
 
 The gateway also gives a worker its own `PATH` (or the system default) and
 its `NODE_EXTRA_CA_CERTS` (for the Bitwarden CLI) when it has one. It sets
@@ -131,6 +135,75 @@ Only the environment of that one `bw` process holds it.
 
 The developer guide lists the variables of the dev stack in
 `dev/dev-vault.md` of the repository.
+
+## Usage stats
+
+bwtidy keeps no usage stats unless you set `BWTIDY_STATS=1`. The gateway then
+counts what is used and what fails in a SQLite file of its own
+(`BWTIDY_STATS_DB`). bwtidy never sends that file anywhere. With the stats
+off there is no file and nothing is counted.
+
+What the file keeps comes only from bwtidy's code:
+
+- A request that reaches an account's worker is kept with its time and an
+  opaque id of the account (never its email). It also has the channel (web
+  UI or MCP) and the route it took (such as `PUT /api/items/{item_id}`
+  without the item's id). An MCP request has the tool or method it called in
+  place of the route but never its arguments. Whether it succeeded is kept
+  too, with its status and how long it took.
+- An error the worker did not expect is kept as its type and the places in
+  bwtidy's code where it happened. Its message is never kept.
+- A sample every minute holds how many accounts are open and how many may be
+  open at once. It also holds how many were turned away since the sample
+  before.
+
+The file never keeps any of these:
+
+- item names and values
+- folder and field names
+- what you searched for and the bodies of requests
+- error messages
+- IP addresses and browsers
+
+After 200 days the requests are kept only as counts per day.
+
+`compose.yaml` mounts only the accounts and the backups. Its root file system
+is read-only, so the stats file needs a volume of its own. These two lines in
+`.env` put the file in `/stats`.
+
+```sh
+BWTIDY_STATS=1
+BWTIDY_STATS_DB=/stats/stats.db
+```
+
+Then mount the volume in a `compose.override.yaml` next to `compose.yaml`,
+which Compose reads by itself.
+
+```yaml
+services:
+  bwtidy:
+    volumes:
+      - bwtidy-stats:/stats
+
+volumes:
+  bwtidy-stats:
+```
+
+The gateway does not start when it has no place where it can write the file.
+
+`bwtidy stats` sums up the last 14 days. It prints the accounts and the UI
+and MCP operations with how many of each succeeded and failed. It adds the
+busiest hour and the most frequent errors with the places where they
+happened. Run it where the gateway runs.
+
+```sh
+docker compose exec bwtidy bwtidy stats
+docker compose exec bwtidy bwtidy stats --days 60 --json
+```
+
+`--days N` picks another number of days and `--json` prints the summary and
+the errors as JSON. Without a stats file the command says that the stats are
+off.
 
 ## Sessions and limits
 

@@ -14,8 +14,9 @@ from bwtidy.config import (
     version_text,
 )
 from bwtidy.gateway.accounts import normalize_server
+from bwtidy.protocol import ACCOUNTS_DIR, STATS_FILE
 
-DEFAULT_ACCOUNTS_DIR = Path("/data/accounts")
+DEFAULT_ACCOUNTS_DIR = Path(ACCOUNTS_DIR)
 ## service uids below this are left to the host's own services, so no worker shares a uid with one
 DEFAULT_UID_BASE = 70000
 ## how long the gateway waits for a started worker's /api/health before it kills it
@@ -75,6 +76,14 @@ class GatewaySettings:
     max_pending: int = DEFAULT_MAX_PENDING
     max_workers: int = DEFAULT_MAX_WORKERS
     passed_on: dict[str, str] = field(default_factory=passed_on_from_env)
+    ## the usage stats (docs/spec.md, Usage stats), off unless BWTIDY_STATS=1. stats_db None
+    ## means stats.db in the parent of accounts_dir, see stats_path
+    stats: bool = False
+    stats_db: Path | None = None
+
+    @property
+    def stats_path(self) -> Path:
+        return self.stats_db or self.accounts_dir.parent / STATS_FILE
 
     @classmethod
     def from_env(cls) -> "GatewaySettings":
@@ -104,4 +113,6 @@ class GatewaySettings:
             switch_uid=os.environ.get("BWTIDY_GATEWAY_SWITCH_UID", "1").strip() != "0",
             max_pending=int(os.environ.get("BWTIDY_MAX_PENDING") or DEFAULT_MAX_PENDING),
             max_workers=int(os.environ.get("BWTIDY_MAX_WORKERS") or DEFAULT_MAX_WORKERS),
+            stats=env_flag("BWTIDY_STATS"),
+            stats_db=env_path("BWTIDY_STATS_DB"),
         )

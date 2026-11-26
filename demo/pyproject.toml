@@ -1,0 +1,44 @@
+[project]
+name = "bwtidy-demo"
+version = "0.1.0"
+description = "The public demo of bwtidy: a gateway, a controller and an init step around a Vaultwarden of its own"
+license = "AGPL-3.0-only"
+requires-python = ">=3.13"
+dependencies = [
+    "bwtidy",
+]
+
+[project.scripts]
+bwtidy-demo-gateway = "bwtidy_demo.gateway:run"
+bwtidy-demo-controller = "bwtidy_demo.controller:run"
+bwtidy-demo-init = "bwtidy_demo.init:run"
+
+[build-system]
+requires = ["uv_build>=0.11.14,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0,<10",
+    "ruff>=0.17,<0.18",
+    "ty>=0.0.1,<0.1",
+]
+
+[tool.uv.sources]
+bwtidy = { path = "../backend" }
+
+[tool.ty.environment]
+## the stubs of the backend for the packages that ship none
+extra-paths = ["../backend/typings"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"

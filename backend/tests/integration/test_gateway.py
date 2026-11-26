@@ -2,8 +2,10 @@
 
 Two accounts log in through the gateway, each worker runs as its own uid, and nothing of one
 account is reachable from the other. The backups are under a root of their own
-(BWTIDY_BACKUPS_ROOT). Runs as root only, since the gateway switches uids:
-scripts/integration --root tests/integration/test_gateway.py. Without root the tests skip.
+(BWTIDY_BACKUPS_ROOT). The tests run twice, with the usage stats off and on
+(BWTIDY_STATS, docs/spec.md, Usage stats), and behave the same. Runs as root only, since the
+gateway switches uids: scripts/integration --root tests/integration/test_gateway.py. Without
+root the tests skip.
 """
 
 import asyncio
@@ -13,6 +15,8 @@ import os
 import shutil
 import signal
 import socket
+import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
@@ -41,6 +45,7 @@ from bwtidy.protocol import (
     PENDING_MARKER,
     REQUEST_HEADER,
     SESSION_COOKIE,
+    STATS_FILE,
     SUBDIRS,
 )
 
@@ -102,12 +107,20 @@ class Browser:
 
 class GatewayProcess:
     def __init__(
-        self, url: str, accounts_dir: Path, backups_root: Path, proc: subprocess.Popen[bytes]
+        self,
+        url: str,
+        accounts_dir: Path,
+        backups_root: Path,
+        proc: subprocess.Popen[bytes],
+        stats: bool = False,
     ) -> None:
         self.url = url
         self.accounts_dir = accounts_dir
         self.backups_root = backups_root
         self.proc = proc
+        self.stats = stats
+        ## the default place, next to the accounts directory
+        self.stats_db = accounts_dir.parent / STATS_FILE
         self.browsers: dict[str, Browser] = {}
 
     def browser(self, email: str) -> Browser:
@@ -141,10 +154,10 @@ def health(url: str) -> bool:
 
 
 @contextlib.contextmanager
-def running_gateway(base: Path) -> Generator[GatewayProcess]:
+def running_gateway(base: Path, stats: bool = False) -> Generator[GatewayProcess]:
     """The real gateway on a free port with its directories in base, its output in gateway.log.
 
-    The dev stack's Vaultwarden is allowed as a server.
+    The dev stack's Vaultwarden is allowed as a server. stats turns the usage stats on.
     """
     accounts_dir = base / "accounts"
     backups_root = base / "backups"
@@ -158,7 +171,9 @@ def running_gateway(base: Path) -> Generator[GatewayProcess]:
         "BWTIDY_ALLOWED_SERVERS": SERVER,
         "BWTIDY_UID_BASE": str(UID_BASE),
         "BWTIDY_IDLE_EXIT": IDLE_EXIT,
+        "BWTIDY_STATS": "1" if stats else "0",
     }
+    env.pop("BWTIDY_STATS_DB", None)
     entry = Path(sys.executable).parent / "bwtidy-gateway"
     assert entry.exists()
     url = f"http://127.0.0.1:{port}"
@@ -169,7 +184,7 @@ def running_gateway(base: Path) -> Generator[GatewayProcess]:
     try:
         wait_for(lambda: health(url) or proc.poll() is not None, "the gateway's health")
         assert proc.poll() is None, "the gateway exited at its start"
-        yield GatewayProcess(url, accounts_dir, backups_root, proc)
+        yield GatewayProcess(url, accounts_dir, backups_root, proc, stats)
     finally:
         if proc.poll() is None:
             proc.terminate()
@@ -192,14 +207,15 @@ def skip_unless_root() -> None:
         )
 
 
-@pytest.fixture(scope="module")
-def gateway(bw_cli: BwCli) -> Iterator[GatewayProcess]:
-    """The real gateway, for the tests that log accounts in."""
+@pytest.fixture(scope="module", params=[False, True], ids=["stats-off", "stats-on"])
+def gateway(bw_cli: BwCli, request: pytest.FixtureRequest) -> Iterator[GatewayProcess]:
+    """The real gateway, for the tests that log accounts in, once with the stats off and once
+    on."""
     skip_unless_root()
     purge_tool_notes(bw_cli)
     base = short_base()
     try:
-        with running_gateway(base) as gateway:
+        with running_gateway(base, stats=request.param) as gateway:
             yield gateway
     finally:
         shutil.rmtree(base, ignore_errors=True)
@@ -563,6 +579,55 @@ def test_delete_my_account_removes_its_directories_as_root(gateway: GatewayProce
     ## the other account is untouched
     assert gateway.directory(EMAIL).is_dir()
     assert any(gateway.backups(EMAIL).glob("*.zip.age"))
+
+
+def stats_rows(path: Path, query: str) -> list[tuple[Any, ...]]:
+    with contextlib.closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as conn:
+        return conn.execute(query).fetchall()
+
+
+def test_the_usage_stats_keep_names_only_and_only_when_on(gateway: GatewayProcess):
+    """Off, there is no file. On, the file is the gateway's, the requests of the tests above
+    count by their route templates and tool names, and nothing of the accounts or their
+    vaults is in it (docs/spec.md, Usage stats)."""
+    path = gateway.stats_db
+    if not gateway.stats:
+        assert not path.exists()
+        assert list(path.parent.glob(f"{STATS_FILE}*")) == []
+        return
+    info = path.stat()
+    assert (info.st_uid, stat.S_IMODE(info.st_mode)) == (0, 0o600)
+    browser = gateway.browser(EMAIL)
+    unlocked = browser.request("POST", "/api/session", json={"password": PASSWORD})
+    assert unlocked.status_code == 200, unlocked.text
+    grid = browser.request("GET", "/api/grid").json()
+    rows = [row for row in grid["rows"] if row["id"] != grid["toolNoteId"]]
+    assert rows
+    names = {row["cells"]["name"] for row in rows if row["cells"].get("name")}
+    assert names
+    secrets = {EMAIL, RESTORE_EMAIL, "vaultwarden"} | {row["id"] for row in rows} | names
+    search = max(names, key=len)
+    assert browser.request("GET", "/api/grid", params={"search": search}).status_code == 200
+    assert browser.request("GET", f"/api/items/{rows[0]['id']}").status_code < 500
+    pids = worker_pids(gateway, EMAIL)
+    assert browser.request("DELETE", "/api/session").status_code == 204
+    ## gone before the next test, which counts the processes of this account's uid
+    wait_for(
+        lambda: not any(Path(f"/proc/{pid}").exists() for pid in pids),
+        "the worker's processes to be reaped",
+    )
+    wanted = {("ui", "POST /api/session"), ("ui", "GET /api/grid"), ("mcp", "list_items")}
+
+    def counted() -> set[tuple[str, str]]:
+        return set(stats_rows(path, "SELECT DISTINCT channel, operation FROM events"))
+
+    wait_for(lambda: wanted <= counted(), "the requests in the stats")
+    for _channel, operation in counted():
+        assert operation == "other" or "@" not in operation, operation
+    with contextlib.closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as conn:
+        dump = "\n".join(conn.iterdump())
+    found = sorted(secret for secret in secrets if secret in dump)
+    assert not found, f"{len(found)} values of the accounts are in the stats file"
 
 
 def uid_pids(uid: int) -> list[int]:

@@ -1,0 +1,76 @@
+## The demo's edge (dev/demo.md): the only container with a published port. It proxies to the
+## demo gateway and limits how often one address may start a demo or call MCP.
+## The nginx image fills in the ${DEMO_...} values from the container's environment
+## (compose.demo.yaml) and leaves every other $name to nginx.
+
+limit_req_zone $binary_remote_addr zone=start:1m rate=${DEMO_START_RATE};
+limit_req_zone $binary_remote_addr zone=mcp:1m rate=${DEMO_MCP_RATE};
+limit_req_status 429;
+
+upstream demo {
+    server demo:8000;
+    keepalive 16;
+}
+
+server {
+    listen ${DEMO_EDGE_PORT} default_server;
+    server_tokens off;
+    ## the usage stats replace an access log (dev/demo.md, Usage stats), the error log stays
+    access_log off;
+    ## a redirect of nginx's own names the path alone: nginx knows neither the published port
+    ## nor the scheme a proxy in front of it speaks
+    absolute_redirect off;
+
+    ## bwtidy's requests are small JSON bodies, nothing uploads a file
+    client_max_body_size 1m;
+    client_body_timeout 30s;
+    client_header_timeout 30s;
+
+    proxy_http_version 1.1;
+    ## an empty Connection header keeps the connections to the upstream alive
+    proxy_set_header Connection "";
+    ## the name the browser used: the cookies, the redirects and MCP's host check go by it
+    proxy_set_header Host $http_host;
+    proxy_connect_timeout 5s;
+    ## a start logs the visitor in before it answers, and a commit can take a while
+    proxy_read_timeout 300s;
+    proxy_send_timeout 60s;
+
+    ## a request to stay away, not a lock: every answer says so, error pages included
+    add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+
+    location = /robots.txt {
+        default_type text/plain;
+        return 200 "User-agent: *\nDisallow: /\n";
+    }
+
+    location / {
+        proxy_pass http://demo;
+    }
+
+    ## a start past the limit gets the start page's "full" note, as a start refused by a cap does
+    location = /demo/start {
+        limit_req zone=start burst=${DEMO_START_BURST} nodelay;
+        error_page 429 = @full;
+        ## the start page's form sends no fields
+        client_max_body_size 1k;
+        proxy_pass http://demo;
+    }
+
+    location @full {
+        return 303 /demo?note=full;
+    }
+
+    ## MCP over streamable HTTP: an answer may be a stream of events that stays open, so nothing
+    ## is buffered in either direction and a quiet stream is not cut after a minute
+    location /mcp {
+        limit_req zone=mcp burst=${DEMO_MCP_BURST} nodelay;
+        client_max_body_size 1m;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_pass http://demo;
+    }
+}

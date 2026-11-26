@@ -25,6 +25,14 @@ starts the account's worker. Before a worker runs it answers from the account
 directory whether the account exists and whether it is pending and has its CLI
 logged in.
 
+With `BWTIDY_STATS=1` the gateway also records the usage stats of the requests
+it proxies in a file of its own. The code for that is in `stats/`
+([spec.md, Usage stats](spec.md#usage-stats)). `create_gateway_app` takes
+extra routers and an `on_worker_exit` hook as well. The routers come before
+the docs site and the static files. So an outside package such as the demo
+can wrap the gateway without bwtidy knowing about it
+([spec.md, Extra routes and the exit hook](spec.md#extra-routes-and-the-exit-hook)).
+
 A worker (`main.py`, entry point `bwtidy`) serves one account for one
 session. It runs as the account's own uid on a unix socket in the account's
 directory. It starts its own `bw serve` as a child on a second socket and
@@ -57,7 +65,7 @@ block-beta
   sections["sections/, the tool note's sections"]:2 space
   items["items/, the vocabulary"]:2 space
   bw["bw/, talking to the Bitwarden CLI"]:2 space
-  config["config.py and login_state.py"]:2 gateway["gateway/"]
+  config["config.py, login_state.py and stats/"]:2 gateway["gateway/"]
   basics["the basics, eight flat modules"]:2 space
   gateway --> config
   gateway --> basics
@@ -65,9 +73,10 @@ block-beta
 
 At the bottom lie the basics. They are eight flat modules that import nothing
 of bwtidy and nothing of each other ([Backend packages](#backend-packages)
-names them). Above them `config.py` and `login_state.py` form a layer of
-their own. They are basics too but read other basics, as `config.py` reads the
-version and `login_state.py` the names of `protocol.py`.
+names them). Above them `config.py` and `login_state.py` as well as `stats/`
+form a layer of their own. They are basics too but read other basics, as
+`config.py` reads the version and `login_state.py` the names of
+`protocol.py`. `stats/` holds the usage stats and reads those names too.
 
 Next comes `bw/`, which talks to the Bitwarden CLI. It covers HTTP to bw serve
 as well as bw's processes and its JSON. The vocabulary follows. `items/` holds
@@ -92,10 +101,12 @@ resource. At the top `main.py` is the composition root. Its `create_app`
 builds every object and passes the hooks at construction.
 
 The gateway stands beside the layers. Of the worker's code it imports only the
-basics (`config.py` and `login_state.py` among them) and never `db.py`. What
-the gateway, the worker and the frontend all read lives in `protocol.py`. That
-covers the cookie names and the headers as well as the file names of the
-account directory and the backup file name.
+basics (`config.py` and `login_state.py` as well as `stats/` among them). It
+never imports `db.py` or `stats/report.py`. That module is the worker's side
+of the stats and brings the MCP SDK along. What the gateway, the worker and
+the frontend all read lives in `protocol.py`. That covers the cookie names
+and the headers as well as the file names of the account directory and the
+backup file name.
 
 A lower layer calls up only through a hook. `main.create_app` passes each hook
 when it builds the object, which makes it the one place where the flow of a
@@ -139,7 +150,8 @@ other modules breaks it just like a direct import. The contracts are these:
   the basics. The modules of a package may import each other but the flat
   modules that share a layer never do.
 - "The gateway takes only basics from the worker" lets `gateway/` import no
-  layer but the basics and of those never `db.py`.
+  layer but the basics (`stats/` among them). Of those it never imports
+  `db.py` or `stats/report.py`.
 - "Route modules are independent" means that no route module of `api/`
   imports another. Of `api/` they import only `api/deps.py` and
   `api/app_state.py` as well as `api/errors.py` and `api/sections.py`.
@@ -275,6 +287,7 @@ table says why.
 | The pending marker `.pending` | `Accounts.create` | `gateway/accounts.py` | `WorkerLifetime.unlocked` (`worker.py`) deletes it after the first unlock, which only the worker sees |
 | The account directories | `Accounts.create` (under a temporary name that it renames into place last) as well as `Accounts.delete` and `sweep_pending` | `gateway/accounts.py` | None |
 | An account's directory under the backups root | `BackupsRoot.make` and `remove` | `gateway/backups.py` | None |
+| `stats.db`, the usage stats | `Recorder.write` in batches from what `StatsMiddleware` notes and from the samples of `Recorder.capacity`, both through `stats/db.py` | `stats/recorder.py`, `gateway/stats.py` | `open_stats` (`stats/db.py`) runs the migrations at the gateway's start and `roll_up` runs the retention |
 | `worker.log` | `Accounts.create` makes it and `open_log` opens it for the worker without following a link or blocking | `gateway/accounts.py`, `gateway/workers.py` | None |
 | The CLI state `bw/` of an account | bw itself, run by `BwLogin` and `BwServeProcess` as well as `run_cli` | `bw/` | None |
 | The vault in RAM | `VaultCache.load` | `vault/cache.py` | `replace_item` puts a tool note just written in at once (from `WritePath` and `set_backup_passwords`), so a save reads as saved before the next load |
@@ -355,6 +368,15 @@ The basics, with the two above the others first:
 - `mcp_token.py` the MCP token's record and its checks, which the gateway and the worker share.
 - `protocol.py` the strings the gateway, the worker and the frontend agree on.
 - `db.py` `Database`, the SQLite file at its one schema. It holds the change log and the queue as well as the settings and the backup fingerprints.
+
+The usage stats in `stats/`, beside `config.py` and kept only with
+`BWTIDY_STATS=1`:
+
+- `stats/db.py` the gateway's stats file with `MIGRATIONS` as well as the writes and the retention.
+- `stats/parse.py` what the gateway reads of a request and checks against the worker's names. That is the route templates and the JSON-RPC methods and tool names as well as the outcomes and the error report.
+- `stats/recorder.py` `Recorder`, which holds what was seen in RAM and writes it in batches off the request path. It also takes the capacity samples.
+- `stats/report.py` the worker's side with its names at `/stats/names` and the error header of its 500.
+- `stats/summary.py` `summary` (the one dict that a page or `bwtidy stats` shows) and the top errors.
 
 Talking to bw in `bw/`:
 
@@ -469,7 +491,7 @@ The browser's door in `api/`:
 
 The composition root:
 
-- `main.py` `create_app` and the `bwtidy` entry point.
+- `main.py` `create_app` and the `bwtidy` entry point with its command `bwtidy stats`.
 
 The gateway in `gateway/`:
 
@@ -479,6 +501,7 @@ The gateway in `gateway/`:
 - `gateway/accounts.py` account keys, directories and uids.
 - `gateway/backups.py` `BackupsRoot`, each account's directory under the backups root.
 - `gateway/workers.py` start, watch and stop one worker per account.
+- `gateway/stats.py` `StatsMiddleware` around the proxy, which notes each request that reaches a worker for the recorder and learns the workers' names.
 
 ## Frontend
 
@@ -625,6 +648,10 @@ The other ways in:
   the format results and the pattern counters.
 - Gateway RAM holds the routing cookie's account and the running workers. A
   restart forgets both, and the browser logs in again.
+- The usage stats exist only with `BWTIDY_STATS=1`. The gateway keeps them in
+  `stats.db` (`stats/db.py`), which lies next to the accounts directory
+  unless `BWTIDY_STATS_DB` names another place. The file survives restarts
+  and updates through its migrations.
 - SQLite in `app/bwtidy.sqlite` (`db.py`) survives a restart and a deploy. At
   a worker's start the queue fails what a killed commit left approved and
   deletes the hidden values of failed entries (`queue/entries.py`). Pending UI
@@ -684,6 +711,9 @@ places keep them:
 - `writes/path.py` passes on only the text of `BwError` and `ValueError`.
 - `db.py` keeps kinds, ids and coordinates in the change log but never values
   or error messages.
+- `stats/parse.py` keeps of a request only the names that the worker gives
+  (`stats/report.py`). It never keeps a path or an id and never an argument
+  or a message.
 - `validation.py` never quotes a refused value in a validation error in
   either app. `logs.py` keeps other libraries at WARNING.
 - `bw/login.py` masks the password and the session key in the CLI's output.
