@@ -269,7 +269,9 @@ site at `/app/site`. The `docs` stage builds that site from `zensical.toml`,
 page) with `scripts/docs-site build`, using the Zensical of the backend's
 dependency group `docs`, which stays out of the app's venv. The workflow
 `.github/workflows/docs.yml` builds the same site and publishes it on GitHub
-Pages.
+Pages. The user docs follow Diátaxis (https://diataxis.fr) with one folder per kind
+of page under `docs/` and the rules for writing them are in AGENTS.md
+(Writing docs).
 
 The `dev` stage is the app container of the dev stack (`compose.dev.yaml`). It
 runs the tests from a mount of `backend/` and mounts the worktree's `docs/` at
