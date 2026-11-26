@@ -10,7 +10,7 @@ import contextlib
 import logging
 import os
 import secrets
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from pathlib import Path
 from typing import Any
 
@@ -25,10 +25,12 @@ from bwtidy.gateway.accounts import AccountError, AccountKey, Accounts, LimitErr
 from bwtidy.gateway.backups import BackupsError
 from bwtidy.gateway.proxy import ProxyMiddleware
 from bwtidy.gateway.settings import GatewaySettings
+from bwtidy.gateway.stats import AccountLabel, StatsMiddleware
 from bwtidy.gateway.workers import EXIT_WAIT, Worker, Workers, WorkerStartError
 from bwtidy.logs import setup_logging, uvicorn_log_config
 from bwtidy.mcp_token import Check, token_refusal, utc_now
 from bwtidy.protocol import ACCOUNT_COOKIE
+from bwtidy.stats.recorder import Capacity, Recorder
 from bwtidy.validation import never_echo_a_refused_body
 
 log = logging.getLogger(__name__)
@@ -45,7 +47,9 @@ REQUEST_DRAIN = 10
 class Gateway:
     """The state behind the routes: the routing cookies, the account locks, the workers."""
 
-    def __init__(self, settings: GatewaySettings) -> None:
+    def __init__(
+        self, settings: GatewaySettings, stats_extra: Callable[[], Any] | None = None
+    ) -> None:
         self.settings = settings
         self.accounts = Accounts(
             settings.accounts_dir,
@@ -54,8 +58,22 @@ class Gateway:
             backups_root=settings.backups_root,
         )
         self.workers = Workers(settings, on_exit=self.worker_exited)
+        ## the usage stats, None unless BWTIDY_STATS=1 (docs/spec.md, Usage stats)
+        self.recorder = (
+            Recorder(
+                settings.stats_path, settings.version, capacity=self.capacity, extra=stats_extra
+            )
+            if settings.stats
+            else None
+        )
         self._routes: dict[str, AccountKey] = {}
         self._locks: dict[AccountKey, asyncio.Lock] = {}
+
+    def capacity(self) -> Capacity:
+        """The workers now, their cap and the starts it refused since the last sample."""
+        return Capacity(
+            self.workers.count(), self.settings.max_workers, self.workers.take_turned_away()
+        )
 
     def lock(self, key: AccountKey) -> asyncio.Lock:
         return self._locks.setdefault(key, asyncio.Lock())
@@ -252,6 +270,18 @@ class AccountRequest(BaseModel):
     create: bool = False
 
 
+def stats_outside_accounts(settings: GatewaySettings) -> None:
+    """The stats file lies outside the accounts directory and the backups root, whose
+    directories belong to the account uids."""
+    folder = settings.stats_path.parent
+    for name, root in (
+        ("BWTIDY_ACCOUNTS_DIR", settings.accounts_dir),
+        ("BWTIDY_BACKUPS_ROOT", settings.backups_root),
+    ):
+        if root is not None and folder.resolve().is_relative_to(root.resolve()):
+            raise SettingsError(f"BWTIDY_STATS_DB must be outside {name}")
+
+
 def overlap(first: Path, second: Path) -> bool:
     """Whether one directory is the other or inside it, symlinks resolved."""
     a, b = first.resolve(), second.resolve()
@@ -268,7 +298,15 @@ NO_ROUTE = {
 }
 
 
-def create_gateway_app(settings: GatewaySettings | None = None) -> FastAPI:
+def create_gateway_app(
+    settings: GatewaySettings | None = None,
+    *,
+    stats_account: AccountLabel | None = None,
+    stats_extra: Callable[[], Any] | None = None,
+) -> FastAPI:
+    """The gateway's app. With the usage stats on, stats_account gives the label an account's
+    events get instead of its opaque id, and stats_extra the JSON a capacity sample keeps in
+    extra: both are for a wrapper around the gateway (docs/spec.md, Usage stats)."""
     settings = settings or GatewaySettings.from_env()
     if settings.switch_uid and os.geteuid() != 0:
         raise SettingsError(
@@ -279,7 +317,10 @@ def create_gateway_app(settings: GatewaySettings | None = None) -> FastAPI:
         raise SettingsError(
             "BWTIDY_BACKUPS_ROOT and BWTIDY_ACCOUNTS_DIR must not be one inside the other"
         )
-    gateway = Gateway(settings)
+    if settings.stats:
+        stats_outside_accounts(settings)
+    gateway = Gateway(settings, stats_extra)
+    recorder = gateway.recorder
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -287,10 +328,17 @@ def create_gateway_app(settings: GatewaySettings | None = None) -> FastAPI:
         gateway.accounts.sweep_pending()
         ## logged now, so an operator sees a directory no login can use before anyone tries
         gateway.accounts.unusable_directories()
+        ## a stats file it cannot use (a newer version among them) stops the start
+        runner = None
+        if recorder is not None:
+            recorder.open()
+            runner = asyncio.create_task(recorder.run())
         try:
             yield
         finally:
             await gateway.workers.stop_all()
+            if recorder is not None:
+                await recorder.stop(runner)
 
     ## FastAPI's own API pages are off: /docs is the documentation site
     app = FastAPI(title="bwtidy gateway", lifespan=lifespan, docs_url=None, redoc_url=None)
@@ -346,6 +394,9 @@ def create_gateway_app(settings: GatewaySettings | None = None) -> FastAPI:
         return response
 
     app.add_middleware(ProxyMiddleware, gateway=gateway)
+    ## added after the proxy, so it wraps it
+    if recorder is not None:
+        app.add_middleware(StatsMiddleware, recorder=recorder, account=stats_account)
 
     ## the documentation site, before the frontend at / so that never answers its paths. It
     ## needs no cookie, and as it is no worker's path no request under /docs reaches a worker.

@@ -117,6 +117,12 @@ def test_the_worker_gets_an_environment_built_from_scratch(env: GatewayEnv):
     }
 
 
+def test_with_the_usage_stats_on_the_worker_is_told_to_report(tmp_path: Path):
+    for env in make_env(tmp_path, stats=True):
+        environment = env.session(env.started()).json()["env"]
+        assert environment["BWTIDY_STATS_REPORT"] == "1"
+
+
 def test_a_worker_that_never_answers_is_killed_and_503(tmp_path: Path):
     sleeping = write_script(tmp_path / "sleeping", SLEEPING_WORKER)
     for env in make_env(tmp_path, worker_bin=sleeping, start_timeout=0.3):

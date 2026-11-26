@@ -233,7 +233,8 @@ stacks). The package `integration/support` holds the helpers the files share, im
 
 `test_gateway.py` starts the real gateway (docs/spec.md, Gateway) on a
 free port and logs two accounts in through it, each worker as its own uid.
-That needs root in the container, so the test skips in a plain run:
+Its tests run twice, with the usage stats off and on (`stats-off` and
+`stats-on` in their ids). That needs root in the container, so the test skips in a plain run:
 
 ```sh
 scripts/integration --root tests/integration/test_gateway.py

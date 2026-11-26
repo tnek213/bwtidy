@@ -10,7 +10,7 @@ from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parents[2] / "src" / "bwtidy"
 SURFACES = ("bw", "vault", "backups", "writes", "mcp")
-BY_MODULE = ("items", "queue", "api", "gateway")
+BY_MODULE = ("items", "queue", "api", "gateway", "stats")
 ## defines Section, SECTIONS and SectionChange, its section modules are imported by module
 SECTIONS = "sections"
 

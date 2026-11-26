@@ -27,6 +27,18 @@ MORE_HEADER = "X-Bwtidy-More"
 ## which the frontend reads as "start the account's worker again and repeat the request"
 WORKER_GONE = "The account's worker does not answer"
 
+## where the gateway keeps the account directories unless BWTIDY_ACCOUNTS_DIR names another
+ACCOUNTS_DIR = "/data/accounts"
+
+## the usage stats (docs/spec.md, Usage stats): the file in the parent of the accounts
+## directory, the variable the gateway sets for a worker it starts with stats on, the worker's
+## path (never proxied) that lists its route templates and tool names, and the header of a
+## worker's 500 that carries the exception's type and frames, which the gateway always strips
+STATS_FILE = "stats.db"
+STATS_REPORT_ENV = "BWTIDY_STATS_REPORT"
+STATS_NAMES_PATH = "/stats/names"
+STATS_ERROR_HEADER = "X-Bwtidy-Stats-Error"
+
 ## the account directory: its subdirectories, the pending marker of an account whose first
 ## unlock has not happened and the worker's log
 SUBDIRS = ("app", "bw", "run", "home")

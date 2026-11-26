@@ -73,7 +73,7 @@ DURATIONS = {
     "test_normalize.py": 81,
     "test_to_fill.py": 78,
     "test_set_uris.py": 75,
-    "test_gateway.py --root": 220,
+    "test_gateway.py --root": 440,
     "test_mcp.py": 53,
     "test_queued_edits.py": 50,
     "test_worker_mode.py": 48,

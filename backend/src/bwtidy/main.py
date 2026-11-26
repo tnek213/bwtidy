@@ -1,8 +1,10 @@
 """FastAPI app factory and the `bwtidy` entry point."""
 
+import argparse
 import asyncio
 import contextlib
 import functools
+import json
 import logging
 import sqlite3
 import sys
@@ -45,6 +47,9 @@ from bwtidy.queue.review import ReviewQueue
 from bwtidy.queue.to_fill import ToFill
 from bwtidy.queue.wipe import backup_in_use
 from bwtidy.session import CHECK_INTERVAL, SessionHooks, SessionManager
+from bwtidy.stats import summary as stats_summary
+from bwtidy.stats.db import StatsError, read_stats, stats_path
+from bwtidy.stats.report import report_to_gateway
 from bwtidy.validation import never_echo_a_refused_body
 from bwtidy.vault import Formats, HiddenValues, ToolNoteId, VaultCache, refresh_formats
 from bwtidy.worker import WorkerLifetime, stop_by_signal
@@ -254,6 +259,13 @@ def create_app(
         assert isinstance(route, Route)
         app.router.routes.append(Route(route.path, RequireMcpToken(route.endpoint, mcp_token)))
 
+    if settings.stats_report:
+
+        async def tool_names() -> list[str]:
+            return [tool.name for tool in await mcp.list_tools()]
+
+        report_to_gateway(app, tool_names)
+
     ## mounted last so every /api route above wins over the static files
     if settings.static_dir is not None:
         app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="static")
@@ -307,7 +319,92 @@ def server_config(app: FastAPI, settings: Settings) -> uvicorn.Config:
     )
 
 
+def stats_command(argv: list[str]) -> int:
+    """`bwtidy stats`: the usage stats of the last days, run where the gateway runs."""
+    parser = argparse.ArgumentParser(
+        prog="bwtidy stats",
+        description="Print the usage stats the gateway keeps with BWTIDY_STATS=1.",
+    )
+    parser.add_argument("--days", type=positive_days, default=STATS_DAYS, help="default 14")
+    parser.add_argument("--json", action="store_true", help="the summary and errors as JSON")
+    args = parser.parse_args(argv)
+    path = stats_path()
+    if not path.is_file():
+        print(f"Usage stats are off: there is no {path}. BWTIDY_STATS=1 turns them on.")
+        return 1
+    try:
+        conn = read_stats(path)
+    except (StatsError, sqlite3.Error) as error:
+        print(error, file=sys.stderr)
+        return 1
+    try:
+        found = stats_summary.summary(conn, args.days)
+        errors = stats_summary.errors(conn, args.days)
+    finally:
+        conn.close()
+    if args.json:
+        print(json.dumps({**found, "top_errors": errors}, indent=2))
+    else:
+        print(stats_text(found, errors))
+    return 0
+
+
+## the days `bwtidy stats` sums up unless --days names others
+STATS_DAYS = 14
+
+
+def positive_days(value: str) -> int:
+    days = int(value)
+    if days < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return days
+
+
+def stats_text(found: dict[str, Any], errors: list[dict[str, Any]]) -> str:
+    totals = found["totals"]
+    lines = [
+        f"Usage stats of the last {found['days']} days (since {found['since']})",
+        f"Accounts: {totals['accounts']}",
+    ]
+    if totals["sessions"] is not None:
+        lines.append(f"Sessions: {totals['sessions']}")
+    lines += [
+        f"UI operations: {totals['ui_operations']}",
+        f"MCP operations: {totals['mcp_operations']}",
+        f"OK: {totals['ok']}, failed: {totals['failed']}",
+        "",
+        "Operations (channel, operation, ok, failed):",
+    ]
+    lines += [
+        f"  {op['channel']:<4} {op['operation']:<48} {op['ok']:>7} {op['failed']:>7}"
+        for op in found["operations"]
+    ] or ["  none"]
+    busiest = max(found["capacity"], key=lambda hour: hour["active"], default=None)
+    turned_away = sum(hour["turned_away"] for hour in found["capacity"])
+    lines += ["", "Capacity:"]
+    if busiest is None:
+        lines.append("  no samples")
+    else:
+        lines.append(
+            f"  busiest hour {busiest['hour']}: {busiest['active']} of {busiest['limit']}"
+            f" workers, {turned_away} turned away in all"
+        )
+    lines += ["", "Top errors (type, channel, operation, count, top frame):"]
+    for error in errors:
+        frames = error["frames"]
+        top = f"{frames[-1][0]}:{frames[-1][2]} in {frames[-1][1]}" if frames else "no frame"
+        lines.append(
+            f"  {error['type']}, {error['channel']} {error['operation']},"
+            f" {error['count']} times, at {top}"
+        )
+    if not errors:
+        lines.append("  none")
+    return "\n".join(lines)
+
+
 def run() -> None:
+    if sys.argv[1:2] == ["stats"]:
+        sys.exit(stats_command(sys.argv[2:]))
     setup_logging()
     settings = Settings.from_env()
     server: uvicorn.Server | None = None
