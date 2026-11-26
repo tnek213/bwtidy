@@ -118,6 +118,8 @@ text from the request:
 | `?note=full`   | a cap of the gateway (`LimitError`)    | "The demo is full right now. Try again in a few minutes." |
 | `?note=failed` | anything else: the controller, the worker, the login | "The demo could not start. Try again in a minute." |
 
+Below the button the start page shows the demo's usage (see Usage stats).
+
 `GET /` and `GET /index.html` without a routing cookie of a live demo
 account answer 303 to `/demo`, so a visitor whose demo ended lands on the
 start page, never on the account form.
@@ -318,7 +320,7 @@ starts empty and fills at every start.
 | --------------- | --------- | ------------------------------------------------------------------------------ |
 | `POST /take`    |           | `{server, email, password}` of a ready vault, now taken. 409 with a text when none is ready |
 | `POST /release` | `{email}` | 204 once the user is deleted and forgotten. 400 for an email outside `demo.bwtidy.test`. 502 when Vaultwarden refused: the vault stays taken and the caller releases it again |
-| `GET /status`   |           | `{ready, taken, building, failed}`, counts only, `failed` since the start      |
+| `GET /status`   |           | `{ready, taken, building, failed, max}`, counts only, `failed` since the start, `max` is `DEMO_MAX` |
 
 A release of a user the controller does not know (one from before a
 restart) deletes it all the same, which is what the wrapper's cleanup at its
@@ -355,7 +357,7 @@ file (the first start, or a write that was cut off: the server certificate
 is written last) gets all five anew. For new secrets, stop the stack and
 remove the volume (`docker volume rm PROJECT_secrets`, `PROJECT` being
 `bwtidy-demo` unless `-p` names another), never `down --volumes`, which
-removes the ledger too.
+removes the ledger and the usage stats too.
 
 No secret ever leaves the stack, and none comes from outside: nothing is
 configured by hand and nothing is shown. The tokens are readable by root
@@ -366,7 +368,8 @@ Vaultwarden's data is temporary (a tmpfs of `DEMO_VAULTWARDEN_DATA_SIZE`,
 256 MB by default): a restart starts it empty. The account directories are a
 tmpfs too (`DEMO_ACCOUNTS_SIZE`, 512 MB by default), and the wrapper deletes
 what it finds at its start. Both sizes are all the visitors together can
-fill. The id ledger and the secrets are the two volumes that stay.
+fill. The id ledger, the secrets and the usage stats are the three volumes
+that stay.
 
 A restart of the controller alone forgets its ready vaults while Vaultwarden
 keeps their users, unused, until Vaultwarden restarts. Restart the stack
@@ -456,7 +459,9 @@ proxies everything to `demo:8000` with the `Host` header the browser sent
 limits above with `limit_req`, keyed by the client's address. `/mcp` is not
 buffered in either direction and may stay open for an hour, as MCP over
 streamable HTTP answers with a stream of events. bwtidy uses no WebSocket.
-The template is mounted from the checkout, so a change to it takes a
+The edge keeps no access log (`access_log off`): the usage stats count what
+the demo needs to know without an address or a path of anyone's. Its error log
+stays. The template is mounted from the checkout, so a change to it takes a
 `docker compose restart edge`.
 
 The edge asks crawlers and bots to stay away: `GET /robots.txt` answers
@@ -561,6 +566,14 @@ header or the log), the three notes, End demo and Switch account, the
 release once and its retries, the hard maximum, the start sweep, the banner
 and the MCP token rewrite.
 
+`test_stats.py` runs the wrapper the same way with the usage stats on: the
+events carry the vault id, a sample holds the demo's numbers and the
+controller's counts, a turned away visitor counts, `stats.json` holds no
+vault id or password and the database is read at most once a minute, a
+failing read fails no visitor, the start page renders its numbers and tables
+in the HTML, the static files are served and nothing else, and the vendored
+uPlot files match the sums in `VENDORED.md`.
+
 `bwtidy_demo.vaultwarden` registers and deletes the users. Its module
 docstring says where in Vaultwarden's and the Bitwarden clients' source each
 field and each step of the crypto comes from. Its tests check the crypto
@@ -609,6 +622,9 @@ checks:
   start answers both cookies, the session is unlocked on
   `https://vaultwarden` with a four word id, the grid and MCP's
   `list_items` (with a token capped to one day) list the fixture's items.
+- The usage stats: `/demo/stats.json` shows the vault start, the grid and
+  `list_items` without the vault's id, and a dump of the stats database holds
+  no password of the fixture and nothing shaped like a vault's password.
 - Every refused route answers 403 with the wrapper's text, for a stranger
   and for a visitor, with a real server in the body and in other spellings
   of the path (sent raw). Afterwards the accounts root holds the one
@@ -694,7 +710,7 @@ and set `BWTIDY_IMAGE=bwtidy:demo-base`.
 
 After a changed setting, `up -d` again makes the containers it concerns
 anew. `docker compose -f compose.demo.yaml down` stops the stack and keeps
-the ledger and the secrets. `down --volumes` removes both, and with the
+the ledger and the secrets. `down --volumes` removes them and the usage stats, and with the
 ledger the promise that an id is never used twice, so use it for a test
 stack only.
 
@@ -706,6 +722,69 @@ import urllib.request
 token = open('/secrets/controller-token').read().strip()
 request = urllib.request.Request('http://127.0.0.1:8100/status', headers={'Authorization': 'Bearer ' + token})
 print(urllib.request.urlopen(request).read().decode())"
+```
+
+## Usage stats
+
+The demo runs with bwtidy's opt-in usage stats on (docs/spec.md, Usage
+stats): `compose.demo.yaml` sets `BWTIDY_STATS=1` and keeps the file in a
+volume of its own, `BWTIDY_STATS_DB=/stats/stats.db` on the `stats` volume,
+since the root file system is read-only and the accounts are a tmpfs. The
+stats are public by design: anyone can see whether the demo is used, which
+operations work and when it was full.
+
+What the demo adds to bwtidy's stats (`bwtidy_demo/stats.py`):
+
+- The account of an event is the vault's four-word id
+  (`create_gateway_app(stats_account=...)`), not bwtidy's opaque id. The id
+  names a vault that is gone once its demo ended.
+- Each capacity sample's `extra` (`stats_extra`) holds what the demo saw since
+  the last sample: `sessions` (the demo vaults started), `turned_away` (starts
+  that got the "free" or the "full" note from the wrapper, a start the edge
+  limits never reaches it), `wait_ms_total` and `wait_ms_max` (how long the
+  start page made a visitor wait for their vault, from the click until the
+  vault was logged in), and the controller's `ready`, `building` and `max`
+  (`DEMO_MAX`). The wrapper asks the controller's `GET /status` every 20
+  seconds and leaves the three out while it does not answer.
+
+The public panel is the Usage section under the start button, made in the
+HTML itself, so it works without JavaScript:
+
+- The plain numbers of the last 200 days and of today (from midnight UTC):
+  the demo vaults used, the UI operations, the MCP calls and the share that
+  succeeded. Below them the visitors turned away and how long a start took.
+- A chart of the active demo sessions per hour over the last 14 days, with
+  the capacity (`DEMO_MAX`) as a dashed line and a marker in each hour when a
+  visitor was turned away. uPlot draws it from `/demo/stats.json`, and a table
+  of the same hours follows it for screen readers, collapsed by default.
+- A table of the operations by channel (Web UI, MCP) with their succeeded and
+  failed counts, and the errors: per operation the exception's type and how
+  often, never its frames.
+- The line "The demo counts anonymous usage (sessions, operations, errors)
+  and shows it here. It stores no addresses and nothing you type."
+
+`GET /demo/stats.json` answers what the panel shows: `summary(conn, 200)` of
+`bwtidy.stats.summary` plus the key `demo` with the demo's totals (`vaults_started`,
+`turned_away`, the waits), `today` and the `hours` of the chart. Both read one
+summary that the wrapper keeps for 60 seconds, so reloads never reach the
+database more than once a minute. Neither holds a vault id, a visitor's own
+timeline, a frame or a fingerprint. A read that fails shows "The usage numbers
+cannot be shown right now." on the start page and answers 503, a start still
+works. With `BWTIDY_STATS` off the page has no Usage section and the route
+answers 404.
+
+uPlot (MIT) is vendored in `bwtidy_demo/static/uplot/`, the two files of its
+npm package as they are, with `VENDORED.md` naming the version, the source and
+the sums. The wrapper serves them and `usage.js` under `/demo/static/` (only
+those three names), so the page loads nothing from another host. The page
+keeps the start page's colors and font.
+
+The full stats, with the top errors and their frames, are for the operator
+where the demo runs:
+
+```sh
+docker compose -f compose.demo.yaml exec demo bwtidy stats --days 30
+docker compose -f compose.demo.yaml exec demo bwtidy stats --json
 ```
 
 ## Memory

@@ -15,6 +15,7 @@ import asyncio
 import http.client
 import json
 import os
+import re
 import subprocess
 import time
 from collections.abc import Callable, Iterator
@@ -45,6 +46,8 @@ ACCOUNTS = "/data/accounts"
 ## a start logs bw in, a new vault registers and imports: both take seconds, never minutes
 REQUEST_TIMEOUT = 120.0
 POOL_TIMEOUT = 240.0
+## a capacity sample comes every minute and stats.json is cached for one
+STATS_TIMEOUT = 180.0
 ## real public servers, by name and by address: none may be reachable from a bwtidy container
 OUTSIDE = [
     "vault.bitwarden.com:443",
@@ -82,6 +85,16 @@ request = urllib.request.Request(
 )
 print(urllib.request.urlopen(request, timeout=10).read().decode())
 """
+
+## runs in the demo container: every row of the usage stats as SQL
+DUMP = """
+import sqlite3
+conn = sqlite3.connect("file:/stats/stats.db?mode=ro", uri=True)
+print("\\n".join(conn.iterdump()))
+"""
+## the shape of a vault's master password (the controller's secrets.token_urlsafe(24)) with an
+## upper case letter or a digit, which neither a vault id nor an operation has
+VAULT_PASSWORD = re.compile(r"(?<![\w-])(?=[\w-]*[A-Z0-9])[\w-]{32}(?![\w-])")
 
 ## runs in the controller: whether Vaultwarden has a user for each argument, by its admin API
 USERS = """
@@ -222,6 +235,19 @@ def second(first: Visitor) -> Iterator[Visitor]:
 def fixture_names() -> set[str]:
     fixture = json.loads((ROOT / "dev" / "fixture-personal.json").read_text())
     return {item["name"] for item in fixture["items"]}
+
+
+def fixture_secrets() -> set[str]:
+    """The fixture's passwords and hidden fields, those long enough to mean something."""
+    fixture = json.loads((ROOT / "dev" / "fixture-personal.json").read_text())
+    found = {(item.get("login") or {}).get("password") or "" for item in fixture["items"]}
+    found |= {
+        field.get("value") or ""
+        for item in fixture["items"]
+        for field in item.get("fields") or []
+        if field.get("type") == 1
+    }
+    return {value for value in found if len(value) >= 8}
 
 
 def raw(method: str, path: str, headers: dict[str, str], body: bytes = b"") -> tuple[int, str]:
@@ -415,6 +441,45 @@ def test_mcp_lists_the_items_of_the_visitors_vault(mcp_token: str):
     assert fixture_names() <= names
 
 
+def test_the_stats_show_the_start_the_operation_and_the_mcp_tool(first: Visitor, mcp_token: str):
+    ## the grid and list_items ran in the tests above
+    deadline = time.monotonic() + STATS_TIMEOUT
+    with browser() as client:
+        while True:
+            answer = client.get("/demo/stats.json")
+            assert answer.status_code == 200
+            usage = answer.json()
+            done = {(op["channel"], op["operation"]) for op in usage["operations"] if op["ok"]}
+            wanted = {("ui", "GET /api/grid"), ("mcp", "list_items")}
+            if usage["demo"]["vaults_started"] >= 1 and wanted <= done:
+                break
+            assert time.monotonic() < deadline, (usage["totals"], usage["demo"]["vaults_started"])
+            ## the wait is longer than a heartbeat's timeout
+            for visitor in LIVE:
+                assert visitor.client.post("/api/session/heartbeat").status_code == 204
+            time.sleep(5)
+        page = client.get("/demo").text
+    assert usage["totals"]["ui_operations"] >= 1
+    assert usage["totals"]["mcp_operations"] >= 1
+    assert usage["capacity"], usage
+    for text in (answer.text, page):
+        assert first.id not in text
+        assert first.email not in text
+        assert mcp_token not in text
+    assert "demo vaults used" in page
+
+
+def test_the_stats_database_holds_no_password(first: Visitor, mcp_token: str):
+    dump = python_in("demo", DUMP)
+    ## the events carry the vault id, so the dump is the real one
+    assert first.id in dump
+    assert VAULT_PASSWORD.findall(dump) == []
+    assert mcp_token not in dump
+    for secret in fixture_secrets():
+        assert secret not in dump
+    assert set(fixture_secrets()), "the fixture has passwords to look for"
+
+
 def test_mcp_without_the_token_is_refused():
     headers = {"Accept": "application/json, text/event-stream"}
     body = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
@@ -550,7 +615,7 @@ def test_the_end_deletes_the_account_and_the_vaultwarden_user(
 
 def test_the_pool_refills_after_the_end(second: Visitor):
     counts = wait_status(lambda counts: counts["ready"] == 2 and counts["building"] == 0)
-    assert counts == {"ready": 2, "taken": 1, "building": 0, "failed": 0}
+    assert counts == {"ready": 2, "taken": 1, "building": 0, "failed": 0, "max": 6}
 
 
 def test_switch_account_ends_the_demo_too(second: Visitor):
@@ -559,7 +624,7 @@ def test_switch_account_ends_the_demo_too(second: Visitor):
     assert account_dirs() == []
     assert users(second.email) == {second.email: False}
     counts = wait_status(lambda counts: counts["taken"] == 0 and counts["building"] == 0)
-    assert counts == {"ready": 2, "taken": 0, "building": 0, "failed": 0}
+    assert counts == {"ready": 2, "taken": 0, "building": 0, "failed": 0, "max": 6}
 
 
 ## --- the limits
@@ -620,6 +685,7 @@ def test_a_start_past_demo_max_gets_the_busy_note(one_vault: None):
             "taken": 1,
             "building": 0,
             "failed": 0,
+            "max": 1,
         }
         refused = two.post("/demo/start")
         assert refused.status_code == 303

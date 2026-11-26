@@ -337,6 +337,7 @@ def test_take_hands_out_a_ready_vault_once(api, stack: Stack):
         "taken": 2,
         "building": 0,
         "failed": 0,
+        "max": 3,
     }
 
 
@@ -430,7 +431,7 @@ def test_status_names_no_id_or_secret(api, stack: Stack):
     client, _ = api
     vault = client.post("/take", headers=auth()).json()
     answer = client.get("/status", headers=auth())
-    assert set(answer.json()) == {"ready", "taken", "building", "failed"}
+    assert set(answer.json()) == {"ready", "taken", "building", "failed", "max"}
     ledger = stack.ledger_path.read_text().splitlines()
     assert ledger
     for value in [*ledger, vault["password"], *stack.bw.passwords, TOKEN, "@"]:

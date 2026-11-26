@@ -8,7 +8,7 @@ secrets volume as a bearer token on every request:
   when none is ready.
 - `POST /release` with `{email}` deletes that Vaultwarden user and forgets it, 204. A user the
   controller does not know (one from before a restart) is deleted all the same.
-- `GET /status` answers the counts: ready, taken, building and failed.
+- `GET /status` answers the counts: ready, taken, building and failed, and DEMO_MAX as max.
 
 Vaultwarden's data is temporary, so the pool starts empty at every start and builds its
 vaults one after another. A vault that fails is deleted, its id stays in the ledger and the
@@ -428,7 +428,7 @@ def create_app(pool: Pool, token: str, on_close: Callable[[], Awaitable[None]] |
 
     @app.get("/status")
     async def status() -> dict[str, int]:
-        return pool.counts()
+        return {**pool.counts(), "max": pool.max}
 
     return app
 

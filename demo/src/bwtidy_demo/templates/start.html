@@ -5,6 +5,7 @@
     <meta name="robots" content="noindex, nofollow" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>bwtidy demo</title>
+    $head
     <style>
       :root {
         color-scheme: light dark;
@@ -15,6 +16,9 @@
         --accent: #175cd3;
         --note: #fff4d6;
         --note-text: #5b4300;
+        --line: #dde1e8;
+        --chart-active: #175cd3;
+        --chart-away: #c2410c;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -25,6 +29,9 @@
           --accent: #6ea2ff;
           --note: #3a3016;
           --note-text: #f3dc9b;
+          --line: #343b47;
+          --chart-active: #4a85e8;
+          --chart-away: #d9661c;
         }
       }
       body {
@@ -35,7 +42,7 @@
       }
       main {
         max-width: 36rem;
-        margin: 3rem auto;
+        margin: 3rem auto 1.25rem;
         padding: 2rem;
         background: var(--card);
         border-radius: 0.75rem;
@@ -67,8 +74,99 @@
         font-weight: 600;
         cursor: pointer;
       }
+      .card {
+        max-width: 36rem;
+        margin: 1.25rem auto 3rem;
+        padding: 2rem;
+        background: var(--card);
+        border-radius: 0.75rem;
+      }
+      .usage h2 {
+        margin-top: 0;
+        font-size: 1.3rem;
+      }
+      .usage h3 {
+        margin: 1.75rem 0 0.5rem;
+        font-size: 1.05rem;
+      }
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+        gap: 0.75rem;
+      }
+      .tile {
+        display: flex;
+        flex-direction: column;
+        padding: 0.75rem 0.9rem;
+        border: 1px solid var(--line);
+        border-radius: 0.5rem;
+      }
+      .tile .value {
+        font-size: 1.6rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .tile .label {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .tile .today {
+        margin-top: 0.25rem;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      .facts {
+        font-size: 0.9rem;
+      }
+      .chart {
+        min-height: 16rem;
+      }
+      .chart .uplot {
+        font-family: inherit;
+        color: var(--muted);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+      th,
+      td {
+        padding: 0.35rem 0.5rem;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      code {
+        font-size: 0.85rem;
+        overflow-wrap: anywhere;
+      }
+      details {
+        margin-top: 0.75rem;
+      }
+      summary {
+        color: var(--accent);
+        cursor: pointer;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
       @media (max-width: 40rem) {
-        main {
+        main,
+        .card {
           margin: 1rem;
           padding: 1.25rem;
         }
@@ -93,5 +191,6 @@
         <button type="submit">Start demo</button>
       </form>
     </main>
+    $usage
   </body>
 </html>

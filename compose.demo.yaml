@@ -177,9 +177,14 @@ services:
       BWTIDY_SECURE_COOKIES: ${DEMO_SECURE_COOKIES:-}
       ## the public host name, so MCP's host check passes it. Empty passes only loopback names.
       BWTIDY_MCP_HOSTS: ${DEMO_HOST:-}
+      ## the usage stats the start page shows (dev/demo.md, Usage stats), on the stats volume:
+      ## the root file system is read-only and the accounts are a tmpfs
+      BWTIDY_STATS: "1"
+      BWTIDY_STATS_DB: /stats/stats.db
       NODE_EXTRA_CA_CERTS: /secrets/ca.crt
     volumes:
       - secrets:/secrets:ro
+      - stats:/stats
     ## the visitors' accounts with their backups, gone with the container. The size is all the
     ## visitors can fill.
     tmpfs:
@@ -285,3 +290,4 @@ networks:
 volumes:
   secrets:
   ledger:
+  stats:

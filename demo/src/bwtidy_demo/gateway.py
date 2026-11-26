@@ -10,6 +10,8 @@ outer middleware that runs before the gateway's proxy:
   `POST /api/mcp/token` asks for a token of at most one day.
 - `/` and `/index.html` are the frontend with the demo banner, or 303 to /demo without the
   routing cookie of a live demo.
+- With BWTIDY_STATS=1 the events carry the vault id, each capacity sample the demo's own
+  numbers, and the start page shows the usage below its button (bwtidy_demo.stats).
 - When a worker exits, its account directory with its backups goes and the controller deletes
   the Vaultwarden user. The same happens at the start for every directory left from before, and
   a demo older than DEMO_SESSION_MAX is stopped whatever its activity.
@@ -49,16 +51,24 @@ from bwtidy.gateway.workers import Worker, WorkerStartError
 from bwtidy.logs import setup_logging, uvicorn_log_config
 from bwtidy.protocol import ACCOUNT_COOKIE, LOGIN_HEADER, SESSION_COOKIE
 from fastapi import APIRouter, FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from bwtidy_demo import init
+from bwtidy_demo import init, stats
 from bwtidy_demo.controller import DOMAIN, SERVER
 
 log = logging.getLogger(__name__)
 
 START_PAGE = "/demo"
+STATS_PATH = "/demo/stats.json"
+STATIC_PATH = "/demo/static"
 START_PATH = "/demo/start"
 END_PATH = "/demo/end"
 ACCOUNT_PATH = "/gateway/account"
@@ -386,6 +396,11 @@ class Demo:
         self.secure = gateway_settings.secure_cookies
         self.page = with_banner(index)
         self.start_page = string.Template(template("start.html"))
+        ## the usage stats, None unless BWTIDY_STATS=1 (dev/demo.md, Usage stats)
+        self.counters = stats.Counters()
+        self.usage = (
+            stats.UsageCache(gateway_settings.stats_path) if gateway_settings.stats else None
+        )
         self._transport = transport
         self._client: httpx.AsyncClient | None = None
         ## the monotonic start of every live demo, for the hard maximum
@@ -421,6 +436,29 @@ class Demo:
         task = asyncio.create_task(work)
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+
+    async def watch_status(self) -> None:
+        """Keep the controller's counts for the next capacity sample, until cancelled."""
+        while True:
+            try:
+                response = await self.client.get("/status")
+                found = (
+                    stats.status_counts(response.json()) if response.status_code == 200 else None
+                )
+            except (httpx.HTTPError, ValueError):
+                found = None
+            self.counters.status = found
+            await asyncio.sleep(stats.STATUS_EVERY)
+
+    async def usage_section(self) -> tuple[str, str]:
+        """The start page's head and Usage section, both empty with the stats off."""
+        if self.usage is None:
+            return "", ""
+        try:
+            return stats.head(), stats.render(await self.usage.get())
+        except Exception as error:
+            log.warning("The usage section failed: %s", type(error).__name__)
+            return "", stats.render(None)
 
     async def take(self) -> Vault | None:
         """A ready vault from the controller, None when none is ready."""
@@ -522,6 +560,7 @@ class Demo:
         if request.headers.get("sec-fetch-site", "none") not in SAME_SITE:
             return PlainTextResponse(CROSS_SITE, 403)
         await self.end(request.cookies.get(ACCOUNT_COOKIE))
+        began = time.monotonic()
         try:
             vault = await self.take()
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
@@ -529,6 +568,7 @@ class Demo:
             return noted("failed")
         if vault is None:
             log.info("A demo start found no ready vault")
+            self.counters.refused()
             return noted("free")
         key: AccountKey | None = None
         worker: Worker | None = None
@@ -547,6 +587,7 @@ class Demo:
             started = True
         except LimitError:
             log.info("A demo start for %s reached a cap", vault.email)
+            self.counters.refused()
             return noted("full")
         except Exception as error:
             ## the step of a failed login, else the type only: no answer of the worker is logged
@@ -557,6 +598,7 @@ class Demo:
             if not started:
                 await self.abandon(vault.email, key, worker)
         log.info("Started the demo %s", vault.email)
+        self.counters.started(time.monotonic() - began)
         response = RedirectResponse("/", status_code=303)
         for name, value in ((ACCOUNT_COOKIE, token), (SESSION_COOKIE, session)):
             response.set_cookie(
@@ -628,15 +670,37 @@ class Demo:
         router = APIRouter()
 
         @router.get(START_PAGE, include_in_schema=False)
-        def start_page(note: str | None = None) -> Response:
+        async def start_page(note: str | None = None) -> Response:
             text = NOTES.get(note or "")
+            head, usage = await self.usage_section()
             return HTMLResponse(
                 self.start_page.substitute(
                     note=f'<p class="note" role="status">{text}</p>' if text else "",
                     idle=duration(self.settings.idle_timeout),
                     total=duration(self.settings.session_max),
+                    head=head,
+                    usage=usage,
                 ),
                 headers={"Cache-Control": "no-store"},
+            )
+
+        @router.get(STATS_PATH, include_in_schema=False)
+        async def usage() -> Response:
+            if self.usage is None:
+                return PlainTextResponse("The demo keeps no usage stats.", 404)
+            found = await self.usage.get()
+            if found is None:
+                return PlainTextResponse(stats.UNAVAILABLE, 503)
+            return JSONResponse(found, headers={"Cache-Control": "public, max-age=60"})
+
+        @router.get(STATIC_PATH + "/{name:path}", include_in_schema=False)
+        def static(name: str) -> Response:
+            kind = stats.STATIC.get(name)
+            if kind is None:
+                return PlainTextResponse("Not found", 404)
+            data = resources.files("bwtidy_demo").joinpath("static", *name.split("/")).read_bytes()
+            return Response(
+                data, media_type=kind, headers={"Cache-Control": "public, max-age=3600"}
             )
 
         @router.post(START_PATH, include_in_schema=False)
@@ -751,7 +815,13 @@ def create_demo_app(
 ) -> FastAPI:
     """The gateway wrapped by the demo. transport replaces the controller's in tests."""
     demo = Demo(settings, gateway_settings, read_index(gateway_settings, settings), transport)
-    app = create_gateway_app(gateway_settings, routers=[demo.router()], on_worker_exit=demo.cleanup)
+    app = create_gateway_app(
+        gateway_settings,
+        routers=[demo.router()],
+        on_worker_exit=demo.cleanup,
+        stats_account=stats.vault_id,
+        stats_extra=demo.counters.extra,
+    )
     demo.gateway = app.state.gateway
     app.state.demo = demo
     inner = app.router.lifespan_context
@@ -761,13 +831,17 @@ def create_demo_app(
         async with demo.running():
             await demo.sweep()
             async with inner(app):
-                enforcer = asyncio.create_task(demo.enforce_max())
+                tasks = [asyncio.create_task(demo.enforce_max())]
+                if demo.usage is not None:
+                    tasks.append(asyncio.create_task(demo.watch_status()))
                 try:
                     yield
                 finally:
-                    enforcer.cancel()
-                    with contextlib.suppress(asyncio.CancelledError):
-                        await enforcer
+                    for task in tasks:
+                        task.cancel()
+                    for task in tasks:
+                        with contextlib.suppress(asyncio.CancelledError):
+                            await task
 
     app.router.lifespan_context = lifespan
     ## added last, so it is the outermost and runs before the gateway's proxy

@@ -15,6 +15,8 @@ upstream demo {
 server {
     listen ${DEMO_EDGE_PORT} default_server;
     server_tokens off;
+    ## the usage stats replace an access log (dev/demo.md, Usage stats), the error log stays
+    access_log off;
     ## a redirect of nginx's own names the path alone: nginx knows neither the published port
     ## nor the scheme a proxy in front of it speaks
     absolute_redirect off;

@@ -72,7 +72,9 @@ def test_only_the_edge_is_on_the_public_network():
 def test_only_the_edge_publishes_a_port_and_on_loopback_by_default():
     services = blocks(COMPOSE, "services")
     assert [name for name, block in services.items() if "ports:" in block] == ["edge"]
-    assert listed(services["edge"], "ports") == ['"${DEMO_BIND:-127.0.0.1}:${DEMO_PORT:-8770}:80"']
+    assert listed(services["edge"], "ports") == [
+        '"${DEMO_BIND:-127.0.0.1}:${DEMO_PORT:-8770}:${DEMO_EDGE_PORT:-80}"'
+    ]
 
 
 def test_the_only_allowed_server_is_the_stacks_own_and_no_setting_changes_it():
