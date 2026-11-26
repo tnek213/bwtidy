@@ -57,4 +57,4 @@ alone while you are logged in.
 Reads and writes go through one long-running `bw serve` because each
 separate `bw` command costs about a second of startup. The code behind this
 page: [docs/architecture.md, section The whole on one
-page](../architecture.md#the-whole-on-one-page), layer 2.
+page](../architecture.md#the-whole-on-one-page), the layer `bw/`.
