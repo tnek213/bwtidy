@@ -1,5 +1,5 @@
 """README.md (which Docker Hub shows too) and docs/index.md carry the same introduction, the same
-alpha disclaimer and the same "At a glance" list (AGENTS.md, Writing docs), so GitHub, Docker Hub
+beta disclaimer and the same "At a glance" list (AGENTS.md, Writing docs), so GitHub, Docker Hub
 and the docs site say one thing."""
 
 from devlib.paths import ROOT
@@ -15,7 +15,7 @@ def intro(text: str) -> str:
 
 
 def disclaimer(text: str) -> str:
-    start = text.index("> **Alpha software")
+    start = text.index("> **Beta software")
     end = text.index("\n\n", start)
     return text[start:end]
 

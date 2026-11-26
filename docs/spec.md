@@ -658,7 +658,7 @@ Behind the gateway the page first needs the browser's account (see Gateway).
   account directories. An account counts once it has its SQLite file and no
   `.pending`. The file alone is not enough: the worker makes it at its
   start, before the login, so a failed first login leaves one in its pending
-  directory. Reason: a new user meets the alpha caution before the first
+  directory. Reason: a new user meets the beta caution before the first
   login, an existing one never sees it again, and no new stored data is
   needed for it. The two URLs are in `frontend/src/about/links.ts`.
 - After a failed unlock or login the page asks the gateway again (the click
@@ -1989,10 +1989,11 @@ The About page and the More actions menu are in
 [More actions](reference/ui.md#more-actions).
 
 - bwtidy follows Semantic Versioning 2.0.0: MAJOR.MINOR.PATCH, pre-releases
-  as `-alpha.N`, `-beta.N` and `-rc.N`. The version is `0.1.0-alpha.1`, and
-  everything a person sees uses that spelling.
+  as `-alpha.N`, `-beta.N` and `-rc.N`. The version is `1.0.0-beta.1`, and
+  everything a person sees uses that spelling. The stages and what each
+  promises are in [Road to 1.0](releases.md#road-to-10).
 - `backend/pyproject.toml` holds the version in Python's spelling
-  (`0.1.0a1`), which Python packaging requires, and it is the only place the
+  (`1.0.0b1`), which Python packaging requires, and it is the only place the
   version is written by hand. The backend reads it from the installed
   package metadata and spells it the semver way in `bwtidy/version.py`
   (`semver`), the one conversion. `frontend/package.json` repeats it in

@@ -26,7 +26,7 @@ from bwtidy.config import Settings, version_text
 from bwtidy.main import bw_serve_client, create_app
 from bwtidy.protocol import DB_FILE
 from bwtidy.protocol import SESSION_COOKIE as COOKIE
-from bwtidy.version import semver
+from bwtidy.version import PRE_RELEASES, semver
 from tests.support.app_env import AppEnv
 from tests.support.fake_bw import FakeBwServe
 from tests.support.hooks import nothing_async
@@ -217,10 +217,11 @@ def test_the_installed_metadata_holds_the_version_of_pyproject():
     assert version("bwtidy") == package_version()
 
 
-def test_the_shown_version_is_semver_and_alpha_while_pyproject_is():
+def test_the_shown_version_is_semver_with_the_pre_release_of_pyproject():
     assert SEMVER.fullmatch(shown_version())
-    if re.search(r"a\d+$", package_version()):
-        assert "-alpha." in shown_version()
+    pre_release = re.search(r"(a|b|rc)\d+$", package_version())
+    if pre_release:
+        assert f"-{PRE_RELEASES[pre_release.group(1)]}." in shown_version()
 
 
 def test_health_reports_the_version_and_the_commit(monkeypatch: pytest.MonkeyPatch):

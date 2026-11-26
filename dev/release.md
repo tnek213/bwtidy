@@ -6,8 +6,8 @@ on GitHub Pages, and publishing the image.
 ## The version
 
 The version (docs/spec.md has the rules) is written by hand in one place,
-`backend/pyproject.toml`, in Python's spelling (`0.1.0a1`).
-`frontend/package.json` repeats it in semver's spelling (`0.1.0-alpha.1`), and
+`backend/pyproject.toml`, in Python's spelling (`1.0.0b1`).
+`frontend/package.json` repeats it in semver's spelling (`1.0.0-beta.1`), and
 the lock files carry generated copies: the package `bwtidy` in
 `backend/uv.lock` in Python's spelling, the top-level `version` and
 `packages[""].version` of `frontend/package-lock.json` in semver's.
@@ -16,11 +16,18 @@ names the file and both versions. After a change to the version, `uv lock` in
 `backend/` and `npm install --package-lock-only` in `frontend/` write the
 copies in the lock files.
 
+bwtidy is in beta: feature complete for 1.0, with a stored format (the
+database, the bwtidy note, the backups, the settings) changing only with a
+migration. A new beta (`1.0.0-beta.N`) comes whenever something is fixed or
+the Bitwarden CLI has a new release. The beta becomes a release candidate
+(`1.0.0-rc.N`) when the gates of Road to 1.0 in `docs/releases.md` hold, and
+the release candidate becomes 1.0.0 after 8 weeks with no serious bug.
+
 ## The release notes
 
 `docs/releases.md` holds a few lines for each version, newest first, written
 for users: what the version brings, under a heading that starts with the
-version as `frontend/package.json` spells it (`## 0.1.0-alpha.1`). `scripts/ci`
+version as `frontend/package.json` spells it (`## 1.0.0-beta.1`). `scripts/ci`
 fails while it has no heading for the current version, so the entry goes into
 the commit that changes the version.
 
@@ -46,7 +53,7 @@ the checkout's last commit. The page in the checkout keeps `COMMIT`.
 
 The theme overrides are in `overrides/` (outside `docs/`, so they are not
 built as pages). Its `main.html` fills the theme's `announce` block with the
-alpha disclaimer banner on every page, one slim line with its text centered,
+beta disclaimer banner on every page, one slim line with its text centered,
 which links to the disclaimer at the top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
 the theme's 61rem leaves tables little room), keeps paragraphs, list items,
 quotes and admonitions at most 80 characters wide unless they hold a picture,
@@ -131,7 +138,7 @@ main. The image is built for `linux/amd64` with the OCI labels `source`, `versio
 | Trigger | Tags |
 | --- | --- |
 | Push to main | `main` and the short commit (7 characters) |
-| Release | the version as `frontend/package.json` spells it (`0.1.0-alpha.1`) and `latest` |
+| Release | the version as `frontend/package.json` spells it (`1.0.0-beta.1`) and `latest` |
 
 The image builds on Debian 13 (trixie): `python:3.13-slim-trixie` is the base of the
 final stage, `node:24-trixie-slim` of the build stages. The stages `frontend`, `docs`,

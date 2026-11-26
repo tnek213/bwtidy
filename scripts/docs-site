@@ -10,7 +10,7 @@
                                   (ARGS go to zensical, such as --dev-addr localhost:8001)
 
 The site is zensical.toml at the repo root over the pages in docs/, with the theme overrides in
-overrides/ (its main.html puts the alpha disclaimer as a banner above every page, widens the
+overrides/ (its main.html puts the beta disclaimer as a banner above every page, widens the
 content column, opens a picture larger on a click and links every page to the issue form for
 docs improvements, with the version below). Zensical comes
 from the backend's dependency group `docs` (backend/pyproject.toml, pinned in backend/uv.lock), run

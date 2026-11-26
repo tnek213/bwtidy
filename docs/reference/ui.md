@@ -414,8 +414,9 @@ shared: bwtidy itself sends nothing.
 ![The About page](../images/about-page.png)
 
 The version follows [Semantic Versioning 2.0.0](https://semver.org):
-MAJOR.MINOR.PATCH, pre-releases as `-alpha.N`, `-beta.N` and `-rc.N`, and
-while MAJOR is 0 anything may change. The About page shows it followed by the
+MAJOR.MINOR.PATCH, pre-releases as `-alpha.N`, `-beta.N` and `-rc.N`. What
+the beta promises on the way to 1.0.0 is in
+[Road to 1.0](../releases.md#road-to-10). The About page shows it followed by the
 commit the running image was built from, like
 `Version 0.1.0-alpha.1 (261111 7db8830)`. The app bar shows the short commit
 faintly after the title, like `7db8830`.
@@ -425,7 +426,7 @@ faintly after the title, like `7db8830`.
 The account form, the Bitwarden login and the unlock come before the app (see
 [Logging in](../explanation/login.md)). Until someone has logged in with any
 account, they show a note "Before you start" above the form. It links to the
-alpha caution in the README on GitHub and to the Works for me discussion, and
+beta caution in the README on GitHub and to the Works for me discussion, and
 the form under it works as usual. After the first login of any account it
 never shows again. It comes back only when every account is deleted, as on a
 fresh start.

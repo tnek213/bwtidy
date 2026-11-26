@@ -265,7 +265,7 @@ The `app` stage holds the backend's source with its installed dependencies
 command exits as soon as it has answered), `docs/restore.md` at
 `/app/docs/restore.md` (every backup holds it as its RESTORE.md) and the docs
 site at `/app/site`. The `docs` stage builds that site from `zensical.toml`,
-`docs/` and `overrides/main.html` (the alpha disclaimer as a banner on every
+`docs/` and `overrides/main.html` (the beta disclaimer as a banner on every
 page) with `scripts/docs-site build`, using the Zensical of the backend's
 dependency group `docs`, which stays out of the app's venv. The workflow
 `.github/workflows/docs.yml` builds the same site and publishes it on GitHub
