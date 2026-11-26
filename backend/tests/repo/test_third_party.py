@@ -146,17 +146,11 @@ def test_the_committed_list_is_up_to_date():
     assert third_party.stale_names(committed, third_party.collect()) == []
 
 
-def test_every_bundled_package_has_its_files_and_its_license_in_docs():
-    fonts = third_party.ROOT / "docs" / "assets" / "fonts"
-    assert {f"docs/assets/fonts/{d.name}" for d in fonts.iterdir()} <= set(third_party.BUNDLED)
-    for folder, package in third_party.BUNDLED.items():
-        files = {path.name for path in (third_party.ROOT / folder).iterdir()}
-        assert "LICENSE" in files, folder
-        assert files - {"LICENSE"}, folder
-        assert package["direct"] is True
-
-
-def test_the_list_holds_the_bundled_packages():
-    committed = json.loads(third_party.OUTPUT.read_text())
-    for package in third_party.BUNDLED.values():
-        assert package in committed
+def test_the_bundled_font_is_listed_and_ships_with_its_license():
+    names = {(p["name"], p["version"]) for p in third_party.collect()}
+    for package in third_party.BUNDLED:
+        assert (package["name"], package["version"]) in names
+    files = {path.name for path in third_party.BUNDLED_FONT.iterdir()}
+    assert files == {"IBMPlexMono-Regular.woff2", "IBMPlexMono-Bold.woff2", "LICENSE.txt"}
+    license = (third_party.BUNDLED_FONT / "LICENSE.txt").read_text()
+    assert "SIL Open Font License, Version 1.1" in license

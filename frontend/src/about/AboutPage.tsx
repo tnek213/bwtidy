@@ -107,9 +107,9 @@ export default function AboutPage() {
         </Section>
         <Section id="about-packages" title="Every package">
           <Prose>
-            The list below holds every package bwtidy itself ships, from its lock files and the font files of its docs.
-            The image also carries the Bitwarden CLI with the packages it brings along, which Bitwarden, Inc. licenses
-            under its own terms (GPL-3.0).
+            The list below holds every package bwtidy itself ships, from its lock files and the font of the
+            documentation. The image also carries the Bitwarden CLI with the packages it brings along, which Bitwarden,
+            Inc. licenses under its own terms (GPL-3.0).
           </Prose>
           <Accordion variant="outlined" disableGutters sx={{ maxWidth: 900 }}>
             <AccordionSummary expandIcon={<ExpandIcon />} aria-controls="about-packages-table" id="about-packages-summary">

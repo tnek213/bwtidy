@@ -151,7 +151,7 @@ export const RUNTIME_CREDITS: Credit[] = [
     language: 'CSS',
     license: 'OFL-1.1',
     usedFor: 'the code in the documentation',
-    packages: ['@fontsource/ibm-plex-mono'],
+    packages: ['@ibm/plex-mono'],
   },
 ]
 

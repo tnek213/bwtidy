@@ -105,10 +105,11 @@ The site's colors and its code font are in
 ivory and deep teal palette for each of the theme's two color schemes
 (`default` and `slate`, whose palettes name the colors `custom`, so none of
 the theme's named colors applies), the colors of the banner and the boxes,
-and IBM Plex Mono for code. The font's regular and bold woff2 files of the
-latin and latin-ext subsets come from the npm package
-`@fontsource/ibm-plex-mono` and lie in `docs/assets/fonts/ibm-plex-mono/`
-with its license (SIL Open Font License 1.1). The package's entry in
+and IBM Plex Mono for code. The font's regular and bold woff2 files, IBM's
+complete build with the box-drawing characters of the directory trees, come
+from the npm package `@ibm/plex-mono` (the files only, as its postinstall
+would report to IBM's telemetry) and lie in `docs/assets/fonts/ibm-plex-mono/`
+with its `LICENSE.txt` (SIL Open Font License 1.1). The package's entry in
 `BUNDLED` of `scripts/third-party` puts it on the About page's list: files
 of another version change the version there too. The search dialog draws
 in a shadow root of its own: the stylesheet colors it through the theme's

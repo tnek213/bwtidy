@@ -2638,9 +2638,9 @@ describe the About page and the More actions menu.
     package, with the project itself left out
   - from PyPI every package that `uv export --no-dev` names, with one for
     another platform (like `pywin32`) left out
-  - every package whose files the docs site carries in `docs/` (its code
-    font), from `BUNDLED` in the script, with the package's license file
-    beside those files
+  - the packages whose files the repo holds as they are, which no lock file
+    names (`BUNDLED` in the script). That is IBM Plex Mono, the code font of
+    the docs site, in `docs/assets/fonts/ibm-plex-mono/` with its license.
 - A PyPI package's license comes from the installed metadata. That is
   `License-Expression` or else a License classifier that names one license.
   For a package whose metadata names none it comes from the script's

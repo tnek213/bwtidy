@@ -9,10 +9,10 @@ page shows the list (docs/spec.md, About). npm: every package of the package-loc
 package, the project itself left out. PyPI: what `uv export --no-dev` names, with the license from
 the installed metadata (License-Expression, else a License classifier), so it runs with the backend
 venv's python and starts itself through `uv run --locked` when it is not. A package whose license
-is not known is an error naming it: add it to OVERRIDES once its own repo says which. Beside them
-the packages in BUNDLED, whose files the docs site carries in docs/ with the package's license
-file. `direct` marks the dependencies frontend/package.json and backend/pyproject.toml name and
-the bundled packages.
+is not known is an error naming it: add it to OVERRIDES once its own repo says which. `direct`
+marks the dependencies frontend/package.json and backend/pyproject.toml name. BUNDLED adds the
+packages whose files the repo holds as they are, which no lock file names (the code font of the
+docs site), each a direct dependency.
 """
 
 import json
@@ -38,19 +38,6 @@ OVERRIDES = {
     "pyrage": "MIT",
 }
 
-## packages that no lock file holds, as some of their files are copied into the docs site: the
-## folder of docs/ that holds them with the package's LICENSE, and the package as the list shows it
-BUNDLED = {
-    ## the regular and bold woff2 of the latin and latin-ext subsets, the site's code font
-    "docs/assets/fonts/ibm-plex-mono": {
-        "name": "@fontsource/ibm-plex-mono",
-        "version": "5.3.0",
-        "ecosystem": "npm",
-        "license": "OFL-1.1",
-        "direct": True,
-    },
-}
-
 ## the License classifiers that name one license only
 CLASSIFIERS = {
     "License :: OSI Approved :: MIT License": "MIT",
@@ -58,6 +45,20 @@ CLASSIFIERS = {
     "License :: OSI Approved :: ISC License (ISCL)": "ISC",
     "License :: OSI Approved :: Python Software Foundation License": "PSF-2.0",
 }
+
+## packages whose files are committed as they are and ship with bwtidy, which no lock file names:
+## IBM Plex Mono, the code font of the docs site, its two woff2 files and license from the npm
+## package (the files only, as its postinstall would report to IBM's telemetry)
+BUNDLED_FONT = ROOT / "docs" / "assets" / "fonts" / "ibm-plex-mono"
+BUNDLED = [
+    {
+        "name": "@ibm/plex-mono",
+        "version": "2.5.0",
+        "ecosystem": "npm",
+        "license": "OFL-1.1",
+        "direct": True,
+    },
+]
 
 Package = dict[str, Any]
 ## a package's metadata by name, as importlib.metadata.metadata gives it
@@ -172,7 +173,7 @@ def collect(read: MetadataReader = metadata.metadata) -> list[Package]:
     return deduplicated(
         npm_packages(lock, npm_direct())
         + pypi_packages(uv_export(), pypi_direct(), read)
-        + list(BUNDLED.values())
+        + [dict(package) for package in BUNDLED]
     )
 
 
