@@ -1,6 +1,6 @@
 # bwtidy
 
-<!-- intro: the same text in README.md and docs/index.md -->
+<!-- intro: the same text in README.md, docs/index.md and docker/hub-overview.md -->
 
 Password vaults get inconsistent over time. Some items use `Password` while
 others use `password`. Some web addresses include a protocol prefix and others
@@ -89,6 +89,10 @@ its new releases (see
 
 [Run bwtidy](docs/how-to/run.md) shows how to run it. It goes from pulling
 the image to the first login and also covers a reverse proxy and updates.
+
+The image is
+[tnek213/bwtidy on Docker Hub](https://hub.docker.com/r/tnek213/bwtidy).
+Its overview lists the tags, the port, the volumes and the settings.
 
 ## Documentation
 
