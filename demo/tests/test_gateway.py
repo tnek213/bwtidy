@@ -417,6 +417,13 @@ def test_the_app_without_a_live_demo_goes_to_the_start_page(env: Env, path: str)
         assert response.headers["location"] == "/demo"
 
 
+def test_the_start_page_and_the_index_ask_robots_to_stay_away(env: Env):
+    meta = '<meta name="robots" content="noindex, nofollow" />'
+    assert meta in env.request("GET", "/demo").text
+    page = env.request("GET", "/", env.start()).text
+    assert page.index("<head>") < page.index(meta) < page.index("</head>")
+
+
 def test_the_start_page_has_one_button_and_no_field(env: Env):
     response = env.request("GET", "/demo")
     assert response.status_code == 200
@@ -680,6 +687,14 @@ def test_the_settings_the_demo_depends_on(tmp_path: Path):
             read_index(gateway, settings)
     (tmp_path / "static" / "index.html").write_text("<html></html>")
     with pytest.raises(SettingsError, match="no <body>"):
+        read_index(good, settings)
+
+
+def test_an_index_without_a_head_is_refused(tmp_path: Path):
+    settings = demo_settings()
+    good = gateway_settings(tmp_path)
+    (tmp_path / "static" / "index.html").write_text("<html><body></body></html>")
+    with pytest.raises(SettingsError, match="no <head>"):
         read_index(good, settings)
 
 

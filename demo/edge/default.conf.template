@@ -34,6 +34,14 @@ server {
     proxy_read_timeout 300s;
     proxy_send_timeout 60s;
 
+    ## a request to stay away, not a lock: every answer says so, error pages included
+    add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+
+    location = /robots.txt {
+        default_type text/plain;
+        return 200 "User-agent: *\nDisallow: /\n";
+    }
+
     location / {
         proxy_pass http://demo;
     }

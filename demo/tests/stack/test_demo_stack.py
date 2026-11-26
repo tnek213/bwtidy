@@ -339,6 +339,21 @@ def test_the_front_page_sends_a_new_visitor_to_the_start_page():
     assert "<textarea" not in page.text.lower()
 
 
+def test_robots_are_asked_to_stay_away():
+    robots = "noindex, nofollow, noarchive"
+    with browser() as client:
+        response = client.get("/robots.txt")
+        assert response.status_code == 200
+        assert response.text == "User-agent: *\nDisallow: /\n"
+        assert response.headers["x-robots-tag"] == robots
+        page = client.get("/demo")
+        assert page.headers["x-robots-tag"] == robots
+        assert '<meta name="robots" content="noindex, nofollow" />' in page.text
+        assert client.get("/no-such-page").headers["x-robots-tag"] == robots
+        api = client.get("/api/session")
+        assert api.headers["x-robots-tag"] == robots
+
+
 def test_the_docs_the_demo_serves_hold_the_demo_note():
     with browser() as client:
         page = client.get("/docs/tutorial/first-cleanup/")

@@ -96,6 +96,8 @@ REFUSED_POST = frozenset({ACCOUNT_PATH, "/api/session"})
 ## the fetch metadata of a start from the demo's own page or typed in the address bar
 SAME_SITE = frozenset({"same-origin", "none"})
 BODY = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
+HEAD = re.compile(r"<head\b[^>]*>", re.IGNORECASE)
+ROBOTS_META = '<meta name="robots" content="noindex, nofollow" />'
 ## where a docs page's content starts, the theme's article, else the page's body
 DOCS_CONTENT = re.compile(r"<article\b[^>]*md-content__inner[^>]*>", re.IGNORECASE)
 DOCS_PATH = "/docs"
@@ -173,6 +175,8 @@ def read_index(gateway: GatewaySettings, settings: DemoSettings) -> str:
         ) from None
     if BODY.search(index) is None:
         raise SettingsError(f"BWTIDY_STATIC_DIR: {path} has no <body>")
+    if HEAD.search(index) is None:
+        raise SettingsError(f"BWTIDY_STATIC_DIR: {path} has no <head>")
     return index
 
 
@@ -181,8 +185,9 @@ def template(name: str) -> str:
 
 
 def with_banner(index: str) -> str:
-    """index.html with the banner right after its <body>."""
+    """index.html with the banner right after its <body> and the robots meta tag in its <head>."""
     banner = template("banner.html")
+    index = HEAD.sub(lambda match: match.group(0) + "\n" + ROBOTS_META, index, count=1)
     return BODY.sub(lambda match: match.group(0) + "\n" + banner, index, count=1)
 
 

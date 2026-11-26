@@ -459,6 +459,14 @@ streamable HTTP answers with a stream of events. bwtidy uses no WebSocket.
 The template is mounted from the checkout, so a change to it takes a
 `docker compose restart edge`.
 
+The edge asks crawlers and bots to stay away: `GET /robots.txt` answers
+`User-agent: *` and `Disallow: /`, every answer carries `X-Robots-Tag: noindex,
+nofollow, noarchive` (error pages too), and the start page and the frontend
+index hold a robots meta tag with `noindex, nofollow`. It is only a request,
+not all bots listen. A crawler that follows the rules neither indexes the demo
+nor inflates its stats, and one that only follows links never takes a vault,
+as a start needs a POST.
+
 Behind a reverse proxy the edge sees the proxy's address for every visitor.
 Name the proxy in `DEMO_TRUSTED_PROXIES` and the limits count the visitor
 (Behind a reverse proxy).
