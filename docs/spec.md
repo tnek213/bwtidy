@@ -209,10 +209,11 @@ frozen login or end shows where it stopped.
 ## Gateway
 
 The gateway (`backend/src/bwtidy/gateway/`, entry point `bwtidy-gateway`) is
-the one process that listens. It starts the workers and proxies to them. It
-never parses, logs or stores anything that passes through the proxy. It logs
-account keys, uids, worker starts and exits, the session requests (see Logs)
-and a request a worker did not answer.
+the one process that listens. It starts the workers and proxies to them.
+Unless the usage stats are on, it never parses, logs or stores anything that
+passes through the proxy. With them on it reads and keeps only what Usage
+stats names. It logs account keys, uids, worker starts and exits, the session
+requests (see Logs) and a request a worker did not answer.
 
 It runs as root (`USER 0`), which it needs to start each worker as the
 account's uid. `compose.yaml` drops every capability but `CHOWN`,
@@ -491,6 +492,95 @@ routed by its `Authorization: Bearer TOKEN` alone.
 - A match with a running worker: the request is proxied unchanged, the
   `Authorization` header with it, and the worker checks the token again.
 
+## Usage stats
+
+Off unless `BWTIDY_STATS=1`. The variables, what is kept and the command that
+shows it: [Configuration](reference/configuration.md#usage-stats). Reason: a
+public demo needs to know whether it is used, what fails and when it was
+full, and an operator may want the same of their own install. Off, nothing
+changes: no file, no table and no work per request.
+
+The gateway records them, never a worker: each worker runs as its account's
+uid and cannot write a file the gateway owns, and only the gateway sees every
+account's requests and the workers' cap. `GatewaySettings.stats` and
+`GatewaySettings.stats_db` hold the two variables. Nothing leaves the machine,
+bwtidy never sends the stats anywhere.
+
+Only what comes from the code is kept: route templates, MCP tool and method
+names, exception types and code locations. Never what a person typed or a
+vault holds: no item names, values, ids, folder or field names, search text,
+request bodies, JSON-RPC ids or arguments, exception messages or arguments,
+IP addresses or user agents. A unit test sends markers in all of these and
+finds none in the file.
+
+- An event is one request that reaches a worker: its UTC time, the account's
+  id, the channel (`ui` or `mcp`), the operation, ok, the HTTP status, the
+  duration in milliseconds and the gateway's version. A request the gateway
+  answers itself (`/api/health`, the account form, a refused MCP token, a
+  401 without a routing cookie) is none.
+- A UI operation is `METHOD TEMPLATE`, the template of the first worker route
+  that takes the request (`PUT /api/items/{item_id}`), never the path. A path
+  no route takes is `other`.
+- An MCP `POST /mcp` counts each JSON-RPC message of its body, a batch each
+  call: a `tools/call` by its `params.name`, any other message by its method,
+  each only when the worker registers that tool or its MCP SDK knows that
+  method, else `other`. `GET /mcp` and `DELETE /mcp` are themselves. A body
+  that is no JSON or over 2 MiB is one `other`.
+- ok: a status of 2xx or 3xx and, for an MCP call with an id, an answer with
+  a result that is no tool error (`isError`) and no `error` object. An answer
+  over 2 MiB is not read, its calls count by the status alone. The bodies go
+  on unchanged and a streamed answer keeps streaming: the gateway reads a copy.
+- The account id is the first 16 hex characters of HMAC-SHA256 of the account
+  key (server and email) with a random salt that the file makes at its first
+  open, so the same account counts as one without its email.
+  `create_gateway_app(stats_account=...)` lets a wrapper of the gateway (the
+  demo) store its own label instead.
+- Errors: an exception a worker did not handle reaches the gateway only as a
+  500. A worker the gateway started with the stats on (it sets
+  `BWTIDY_STATS_REPORT=1`) adds to that 500 the header `X-Bwtidy-Stats-Error`:
+  the exception's type and its frames inside the bwtidy package as (path
+  relative to the package, function, line), never its text, its arguments, its
+  locals or a log line. The gateway strips the header from every answer,
+  stats on or off, keeps an error only when the header holds nothing else,
+  and keeps it under the fingerprint sha256 of the type and the frames, with
+  its first and last time, its count, and the channel and operation of its
+  event. A 500 that a route answers itself (a failed backup, a write that
+  failed midway) is a failed event without an error.
+- The names: the gateway asks a worker once for `GET /stats/names`, a path it
+  never proxies, which answers the templates of its `/api/` routes, its tool
+  names and its MCP SDK's client methods. Every worker runs the same code, so
+  the first one that answers serves all. Until then every operation is
+  `other`.
+- Capacity: every 60 seconds a sample of the workers that run or start,
+  `BWTIDY_MAX_WORKERS`, and the starts refused with 429 `Too many accounts are
+  open at once.` since the last sample. `create_gateway_app(stats_extra=...)`
+  gives a wrapper's own numbers as JSON in the sample's `extra`. A wrapper that
+  counts sessions gives `sessions`, the sessions started since the last
+  sample, which the summary adds up.
+- Writes: the request only notes itself in RAM. At most every 5 seconds the
+  notes become rows, written in one transaction in a thread. A write that
+  fails drops its rows and logs one line (the error's type and SQLite's text,
+  no request data) until a write succeeds again. A request never waits for it
+  or fails with it. Past 10000 notes between two writes the rest are dropped.
+- Retention: at the gateway's start and every day the events of the days
+  before the last 200 are counted into `daily` (day, channel, operation, ok,
+  count) and deleted, and so are the capacity samples of those days. Whole
+  days, so a day is either in the events or in `daily`. `daily` and `errors`
+  are kept for good, an error with its count and its last time.
+- The file: `BWTIDY_STATS_DB`, else `stats.db` in the parent of
+  `BWTIDY_ACCOUNTS_DIR` (`/data/stats.db`). The gateway makes it mode 0600,
+  owned by its own uid, in WAL mode. It must be outside the accounts
+  directory and the backups root, whose directories the account uids own, and
+  a link, a file that is not regular or one of another uid stops the start.
+- The summary (`summary` in `stats/summary.py`) is the one plain dict a page
+  or `bwtidy stats` shows: the totals (accounts, sessions when a wrapper gives
+  them, UI and MCP operations, ok and failed), each operation's ok and failed
+  per channel, the errors by operation and type, and the capacity per hour. It
+  reads `daily` for the days whose events were rolled up, which count no
+  accounts. It never answers an account id, a frame or a fingerprint. The
+  command adds the top errors with their frames, for the operator where the
+  gateway runs.
+
 ## Schema versions
 
 - Each account's `app/bwtidy.sqlite` holds its schema version in SQLite's
@@ -504,6 +594,18 @@ routed by its `Authorization: Bearer TOKEN` alone.
   with a log line that names the file, its version and version 1, and
   nothing in such a file changes. The browser sees that the worker could not
   start, as for any other reason.
+- The gateway's `stats.db` (see Usage stats) has versions of its own in
+  `PRAGMA user_version`, moved up by `MIGRATIONS` in `stats/db.py`: an ordered
+  list of numbered steps, each a tuple of SQL statements. Opening runs every
+  step above the file's version, each in one transaction that also sets its
+  version. A file at a newer version than the code knows stops the gateway's
+  start with a log line that names the file, its version and the newest
+  version known, and nothing in it changes. Version 1 (step 1): the tables
+  `events` (with the index `events_at`), `errors`, `capacity` (with the index
+  `capacity_at`), `daily` and `settings`, which holds the salt. Reason: the
+  rolled-up days and the errors are kept for good, so a release that keeps a
+  new number migrates the file instead of starting it over, and the next step
+  is one more tuple in the list.
 
 ## Session and access
 

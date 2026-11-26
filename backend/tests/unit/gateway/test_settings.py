@@ -71,3 +71,22 @@ def test_the_backups_root_is_read_from_the_environment(monkeypatch: pytest.Monke
     assert GatewaySettings.from_env().backups_root is None
     monkeypatch.setenv("BWTIDY_BACKUPS_ROOT", "/backups")
     assert GatewaySettings.from_env().backups_root == Path("/backups")
+
+
+def test_the_usage_stats_are_off_unless_asked_and_their_file_follows_the_accounts(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    for name in ("BWTIDY_STATS", "BWTIDY_STATS_DB"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("BWTIDY_ACCOUNTS_DIR", "/srv/bwtidy/accounts")
+    settings = GatewaySettings.from_env()
+    assert settings.stats is False
+    assert settings.stats_path == Path("/srv/bwtidy/stats.db")
+    monkeypatch.setenv("BWTIDY_STATS", "1")
+    monkeypatch.setenv("BWTIDY_STATS_DB", "/stats/stats.db")
+    settings = GatewaySettings.from_env()
+    assert settings.stats is True
+    assert settings.stats_path == Path("/stats/stats.db")
+    monkeypatch.delenv("BWTIDY_ACCOUNTS_DIR")
+    monkeypatch.delenv("BWTIDY_STATS_DB")
+    assert GatewaySettings.from_env().stats_path == Path("/data/stats.db")

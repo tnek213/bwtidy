@@ -15,7 +15,7 @@ import httpx2 as httpx
 
 from bwtidy.gateway.accounts import AccountKey, LimitError
 from bwtidy.gateway.settings import GatewaySettings
-from bwtidy.protocol import PENDING_MARKER, WORKER_LOG
+from bwtidy.protocol import PENDING_MARKER, STATS_REPORT_ENV, WORKER_LOG
 
 log = logging.getLogger(__name__)
 
@@ -123,6 +123,8 @@ def worker_env(settings: GatewaySettings, key: AccountKey, path: Path) -> dict[s
     backups = {}
     if settings.backups_root is not None:
         backups["BWTIDY_BACKUPS_DIR"] = str(settings.backups_root / key.host_dir / key.email)
+    ## only with the usage stats on does a worker report its names and its errors
+    stats = {STATS_REPORT_ENV: "1"} if settings.stats else {}
     return {
         **settings.passed_on,
         "HOME": str(path / "home"),
@@ -136,6 +138,7 @@ def worker_env(settings: GatewaySettings, key: AccountKey, path: Path) -> dict[s
         "BWTIDY_PENDING_MARKER": str(path / PENDING_MARKER),
         "BWTIDY_SECURE_COOKIES": "1" if settings.secure_cookies else "0",
         **backups,
+        **stats,
     }
 
 
@@ -197,6 +200,8 @@ class Workers:
         ## accounts whose worker start is reserved but not yet in _workers
         self._starting: set[AccountKey] = set()
         self._watchers: set[asyncio.Task[None]] = set()
+        ## the starts refused with TOO_MANY_WORKERS since the usage stats last took the count
+        self._turned_away = 0
 
     def get(self, key: AccountKey) -> Worker | None:
         worker = self._workers.get(key)
@@ -222,8 +227,14 @@ class Workers:
             raise RuntimeError(f"A worker for {key.label} runs already")
         if self.count() >= self._settings.max_workers:
             log.warning("Refused to start a worker for %s, too many run", key.label)
+            self._turned_away += 1
             raise LimitError(TOO_MANY_WORKERS)
         self._starting.add(key)
+
+    def take_turned_away(self) -> int:
+        """The starts refused with TOO_MANY_WORKERS since the last call."""
+        count, self._turned_away = self._turned_away, 0
+        return count
 
     def release(self, key: AccountKey) -> None:
         self._starting.discard(key)

@@ -16,8 +16,9 @@ MCP client ---+--> gateway -----+                                        |    se
 
 - The gateway serves the web page, the account form and these docs (at
   `/docs/`), and passes every other request on to the worker of your
-  account. It never logs or stores
-  what passes through it. An MCP client finds its account by its token.
+  account. It never logs or stores what passes through it, unless you turn
+  on the [usage stats](../reference/configuration.md#usage-stats), which keep
+  counts and never your data. An MCP client finds its account by its token.
 - A worker is bwtidy itself for one account: the grid's data, the queue, the
   backups and the MCP tools. The gateway starts it when you click Unlock or
   Log in, and it exits when your session ends, taking the vault out of
@@ -40,7 +41,8 @@ MCP client ---+--> gateway -----+                                        |    se
   [The bwtidy note](tool-note.md).
 - bwtidy has no telemetry. It sends nothing to its author or anyone else,
   and the only connection out of the container is the Bitwarden CLI's to
-  your Bitwarden server.
+  your Bitwarden server. The usage stats you can turn on stay in a file on
+  your machine.
 
 ## What happens when you use it
 

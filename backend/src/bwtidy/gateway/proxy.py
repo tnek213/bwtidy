@@ -18,7 +18,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from bwtidy.gateway.accounts import AccountError, AccountKey, LimitError, check_server
 from bwtidy.gateway.workers import Unanswered, Worker, WorkerStartError
 from bwtidy.mcp_token import bearer
-from bwtidy.protocol import ACCOUNT_COOKIE, WORKER_GONE
+from bwtidy.protocol import ACCOUNT_COOKIE, STATS_ERROR_HEADER, WORKER_GONE
 
 if TYPE_CHECKING:
     from bwtidy.gateway.app import Gateway
@@ -52,6 +52,12 @@ HOP_BY_HOP = frozenset(
 )
 ## the gateway's uvicorn adds these itself
 SERVER_HEADERS = frozenset({"date", "server"})
+## the worker's error report for the usage stats never reaches the browser (gateway/stats.py)
+ERROR_HEADER = STATS_ERROR_HEADER.lower()
+## what the proxy notes in the request's scope for the usage stats: the worker it went to, and
+## the worker's error report taken out of the answer
+REACHED = "bwtidy.reached"
+ERROR_REPORT = "bwtidy.error_report"
 
 
 class ProxyMiddleware:
@@ -75,7 +81,11 @@ class ProxyMiddleware:
             await self.app(scope, receive, send)
             return
         ## the request goes on unchanged, an MCP request's token is checked again by the worker
-        response = found if isinstance(found, Response) else await proxy(request, found)
+        if isinstance(found, Response):
+            response = found
+        else:
+            scope[REACHED] = found
+            response = await proxy(request, found)
         await response(scope, receive, send)
 
     async def browser_worker(self, method: str, path: str, request: Request) -> Response | Worker:
@@ -195,11 +205,15 @@ async def proxy(request: Request, worker: Worker) -> Response:
         for name, value in answer.headers.multi_items()
         if passed_back(name.lower(), value)
     ]
+    report = answer.headers.get(ERROR_HEADER)
+    if report is not None:
+        request.scope[ERROR_REPORT] = report
     return response
 
 
 def passed_back(name: str, value: str) -> bool:
-    """Whether a worker's response header reaches the browser: never the routing cookie."""
-    if name in HOP_BY_HOP or name in SERVER_HEADERS:
+    """Whether a worker's response header reaches the browser: never the routing cookie, never
+    the error report of the usage stats."""
+    if name in HOP_BY_HOP or name in SERVER_HEADERS or name == ERROR_HEADER:
         return False
     return name != "set-cookie" or value.split("=", 1)[0].strip() != ACCOUNT_COOKIE

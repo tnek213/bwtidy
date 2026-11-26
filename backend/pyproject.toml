@@ -83,7 +83,7 @@ layers = [
     "bwtidy.sections",
     "bwtidy.items",
     "bwtidy.bw",
-    "bwtidy.config | bwtidy.login_state",
+    "bwtidy.config | bwtidy.login_state | bwtidy.stats",
     "bwtidy.version | bwtidy.protocol | bwtidy.logs | bwtidy.timing | bwtidy.validation | bwtidy.passphrase | bwtidy.mcp_token | bwtidy.db",
 ]
 
@@ -106,6 +106,8 @@ forbidden_modules = [
     "bwtidy.items",
     "bwtidy.bw",
     "bwtidy.db",
+    ## the worker's side of the usage stats, which brings the MCP SDK along
+    "bwtidy.stats.report",
 ]
 
 [[tool.importlinter.contracts]]
