@@ -1,7 +1,49 @@
 # Releasing
 
-The version and its release notes, the documentation site and its publishing
-on GitHub Pages, and publishing the image.
+How a pull request is merged into main, the version and its release notes,
+the documentation site and its publishing on GitHub Pages, and publishing the
+image.
+
+## Merging pull requests
+
+The ruleset "Protect main" (Settings, Rules, Rulesets) guards main. Its bypass
+list is empty, so its rules hold for the maintainer too:
+
+- Restrict deletions and Block force pushes: the history of main is never
+  lost or rewritten.
+- Require a pull request before merging, with no approvals since there is
+  one maintainer: every change goes through a pull request and its CI.
+- Require status checks to pass, with the check `ci`: the job of
+  `.github/workflows/ci.yml` that runs `scripts/ci`.
+- Require signed commits: every commit on main shows as Verified. GitHub
+  signs the merge commits and squash commits it makes itself.
+
+The repository allows merge commits and squash merging, both with the pull
+request's title as the subject and an empty body. Rebase merging stays off,
+because GitHub cannot sign the commits a rebase merge writes.
+
+The merge method follows from the pull request's commits:
+
+- All signed: merge with a merge commit ("Create a merge commit" in the web
+  UI, or `gh pr merge N --merge`). The contributor's commits land unchanged
+  with the merge commit on top, so their own squash stays one commit.
+- At least one unsigned: squash with `gh pr merge N --squash --admin`, which
+  makes one commit that GitHub signs.
+
+The web UI cannot merge the second kind. It checks the pull request's own
+commits, shows "Merging is blocked" with "Commits must have verified
+signatures" and disables Squash and merge. GitHub applies the rule to the
+commits that reach main, and a squash brings only its own signed commit.
+`gh pr merge` makes the web UI's check before it asks GitHub to merge, and
+`--admin` skips only that check. With no bypass list GitHub still enforces
+every rule: the merge fails while `ci` has not passed, and a merge commit
+that would bring an unsigned commit onto main fails with "Commits must have
+verified signatures".
+
+A bypass of Require signed commits for the admin role would enable Squash
+and merge in the web UI. It would also let a merge commit bring unsigned
+commits onto main without a warning, even from `gh pr merge N --merge`
+without `--admin`. That is why the rule has no bypass.
 
 ## The version
 

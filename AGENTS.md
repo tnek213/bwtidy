@@ -32,8 +32,8 @@ spec changes.
 - `dev/` the developer guide and the dev vault's fixture: `dev/README.md` (set
   up, the commands, the credentials), `dev/dev-vault.md` (the dev stacks, the
   snapshot, the fixture), `dev/testing.md` (the suites and how to write a
-  test), `dev/release.md` (the docs site and the image) and `dev/demo.md`
-  (the design of the public demo).
+  test), `dev/release.md` (merging pull requests, the docs site and the
+  image) and `dev/demo.md` (the design of the public demo).
 - How it is built: [docs/architecture.md](docs/architecture.md). Read it before
   changing structure.
 
