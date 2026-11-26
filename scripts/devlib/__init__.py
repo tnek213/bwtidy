@@ -6,6 +6,7 @@
   stacks    the dev stacks of a worktree: numbers, env files, ports, projects, run_stacks
   compose   docker compose of a stack, its certificate and the wait for Vaultwarden
   snapshot  the snapshot image of a seeded stack
+  demo      the demo stack of a worktree (compose.demo.yaml): project, images, port, up, down
   seed      the dev vault's accounts and content, through the web vault and bw
   gateway   the gateway in a stack's app container: start, signal, stop, run_backend
   health    /api/health: healthy, health_text, health_version, wait_healthy

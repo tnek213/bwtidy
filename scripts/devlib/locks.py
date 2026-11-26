@@ -3,8 +3,8 @@
 scripts/ci runs npm ci in a fresh worktree and whenever the frontend lock file differs from the
 one node_modules was installed from (a stamp file, see npm_install_needed), so this check finds
 a package.json changed without npm install before a build or the CI workflow does.
-The backend needs no such check: every uv call of the scripts runs with --locked, which fails
-on a stale backend/uv.lock.
+The backend and the demo need no such check: every uv call of the scripts runs with --locked,
+which fails on a stale backend/uv.lock or demo/uv.lock.
 """
 
 import hashlib

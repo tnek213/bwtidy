@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""demo-stack: the demo (compose.demo.yaml, dev/demo.md) of this worktree, and its test.
+
+  scripts/demo-stack up [--no-build]   build the images, start the stack, print its address
+  scripts/demo-stack test [PYTEST ARGS]   up, then demo/tests/stack against it
+  scripts/demo-stack url               the address of the running stack
+  scripts/demo-stack compose ARGS      docker compose ARGS on the stack (ps, logs, exec)
+  scripts/demo-stack down              stop it, remove its volumes and its images
+  scripts/demo-stack -h | --help       print this and start nothing
+
+up builds the normal image from this worktree (the Dockerfile's target app), the demo image on
+top of it (demo/Dockerfile) and starts the stack on a free port of 127.0.0.1, in a compose
+project and with images of this worktree alone. A second up keeps the port and changes the
+stack in place, --no-build skips the two builds. The DEMO_ settings of compose.demo.yaml
+(DEMO_MAX, DEMO_POOL_READY, DEMO_START_RATE and the others) are taken from the environment:
+DEMO_MAX=1 scripts/demo-stack up.
+
+test runs demo/tests/stack/test_demo_stack.py with pytest: a visitor's whole demo through
+the edge, every refused route, that no bwtidy container reaches the internet and that the
+end of a demo deletes the account. The stack stays up afterwards, down removes it. scripts/ci
+never runs these tests.
+"""
+
+import os
+import subprocess
+import sys
+
+from devlib import demo
+from devlib.paths import ROOT
+
+SUITE = "tests/stack"
+
+
+def test_environment(port: int, environ: dict[str, str]) -> dict[str, str]:
+    """What the tests read: that they may run, the stack's address and its project."""
+    return {
+        **environ,
+        "DEMO_STACK": "1",
+        "DEMO_STACK_URL": demo.url(port),
+        "DEMO_STACK_PROJECT": demo.project_name(ROOT),
+    }
+
+
+def test(args: list[str]) -> int:
+    port = demo.up(ROOT)
+    command = ["uv", "run", "--locked", "--quiet", "pytest", SUITE, *args]
+    env = test_environment(port, dict(os.environ))
+    return subprocess.run(command, cwd=ROOT / "demo", env=env, check=False).returncode
+
+
+def main(args: list[str]) -> int:
+    if not args or args[0] in ("-h", "--help"):
+        print(__doc__, file=sys.stdout if args else sys.stderr)
+        return 0 if args else 2
+    command, rest = args[0], args[1:]
+    try:
+        if command == "up" and rest in ([], ["--no-build"]):
+            print(demo.url(demo.up(ROOT, build=not rest)))
+            return 0
+        if command == "test":
+            return test(rest)
+        if command == "url" and not rest:
+            port = demo.running_port(ROOT)
+            if port is None:
+                print("demo-stack: the stack is not up (scripts/demo-stack up)", file=sys.stderr)
+                return 1
+            print(demo.url(port))
+            return 0
+        if command == "compose" and rest:
+            env = demo.environment(ROOT, demo.running_port(ROOT) or 0)
+            return subprocess.run(demo.compose(ROOT, *rest), cwd=ROOT, env=env).returncode
+        if command == "down" and not rest:
+            demo.down(ROOT)
+            return 0
+    except subprocess.CalledProcessError as error:
+        print(f"demo-stack: {error.cmd[0]} {error.cmd[1]} failed", file=sys.stderr)
+        return error.returncode or 1
+    print(__doc__, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

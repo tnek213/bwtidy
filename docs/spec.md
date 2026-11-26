@@ -451,7 +451,8 @@ worker gets SIGTERM and is killed when it still runs 120 seconds later.
 - Without a routing cookie, and without a running worker for anything but
   the two clicks above, those paths answer 401 `{"detail": "No account"}`, so
   the frontend opens the account again.
-- Every other path is the gateway's: its own routes, then the documentation
+- Every other path is the gateway's: its own routes, then the routes passed
+  in `routers` (see Extra routes and the exit hook), then the documentation
   site, then the static files (mounted last). The workers get no static
   directory, so the frontend always comes from the gateway.
 
@@ -469,6 +470,26 @@ host it is served from, as the address of a self-hosted bwtidy stays private:
 no page requests anything from another host (the header's version and star
 count are written at build time, not fetched from GitHub), and the referrer
 policy `same-origin` keeps the `Referer` off every link to another site.
+
+### Extra routes and the exit hook
+
+`create_gateway_app` also takes `routers` and `on_worker_exit`, so an outside
+package that wraps the gateway (a demo, for one) can add its own pages and
+learn when a worker exits, without bwtidy knowing about it. `bwtidy-gateway`
+passes neither, so the gateway behaves as described above.
+
+- `routers`: FastAPI `APIRouter`s, included in their order after the
+  gateway's own routes and before the documentation site and the static
+  files, so a router's path wins over a static file of the same path (`/`,
+  `/index.html`) but not over a route of the gateway. Paths the proxy takes
+  (under `/api/` and `/mcp`) never reach a router: the proxy runs first.
+- `on_worker_exit`: an async callable awaited once with every `Worker` that
+  exited, after the gateway's own cleanup (the delete marker, the `.pending`
+  directory) and outside the account's lock, so it may take the lock itself.
+  It also runs when that cleanup failed. An exception in it is logged by the
+  gateway as `The worker exit hook failed for ACCOUNT: TYPE` (the exception's
+  type only, its text could hold a value) and never propagates: the gateway
+  keeps serving and the worker is still forgotten.
 
 ### MCP
 

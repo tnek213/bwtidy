@@ -15,6 +15,8 @@ and e2e tests run on is in [The dev vault](dev-vault.md).
 | Integration  | `backend/tests/integration`               | `scripts/integration`, in the app container      |
 | End-to-end   | `backend/tests/e2e`                       | `scripts/e2e`, Playwright on the host            |
 | Docs         | `backend/tests/e2e/docs`                  | `scripts/docs-shots`                              |
+| Demo         | `demo/tests`, the demo's own project      | `scripts/ci`, with fakes                          |
+| Demo stack   | `demo/tests/stack`                        | `scripts/demo-stack test`, against the running demo stack |
 
 One file of each:
 
@@ -26,6 +28,8 @@ cd frontend && npx vitest run src/App.test.tsx
 scripts/integration tests/integration/test_seed.py
 scripts/e2e tests/e2e/test_dismiss.py
 scripts/docs-shots -k more_menu
+cd demo && uv run --locked pytest tests/test_gateway.py
+scripts/demo-stack test -k edge
 ```
 
 `-k NAME` runs one test of any of them. While you change code run only what
@@ -608,7 +612,7 @@ Besides lint, types, the build and the tests, `scripts/ci` runs these.
 
 Dependencies change only through the lock files, and every script installs
 from them locked (AGENTS.md, Checks): `uv sync --locked` and `uv run --locked`
-fail on a `backend/uv.lock` that is out of date, `npm ci` on a
+fail on a `backend/uv.lock` or `demo/uv.lock` that is out of date, `npm ci` on a
 `package-lock.json` that does not match its `package.json`. `scripts/ci` runs
 `npm ci` in a fresh worktree and again when `frontend/package-lock.json`
 changed since the last install (it stamps
@@ -620,9 +624,10 @@ time.
 Each dependency is declared with a compatible range in npm's caret sense
 (AGENTS.md, Checks), which `tests/repo/test_dependency_ranges.py` checks for
 `backend/pyproject.toml`. `scripts/update-deps` updates everything within the
-ranges: `uv lock --upgrade` in `backend/`, `npm update` and `npm ci` in
+ranges: `uv lock --upgrade` in `backend/` and `demo/`, `npm update` and `npm ci` in
 `frontend/`, `npm update --package-lock-only` in `docker/bitwarden-cli/` (only
-the image installs the CLI), the digest of each image the `Dockerfile` names
+the image installs the CLI), the digest of each image that the `Dockerfile`,
+`demo/Dockerfile` and `compose.demo.yaml` name
 (its tag stays) and the commit SHA of each action to the newest release tag
 of its major version. Then it runs `scripts/third-party` and the version
 check, prints what changed per ecosystem and lists the updates beyond the
@@ -681,6 +686,24 @@ code, and its parameters follow in a table.
 
 `scripts/ci` then builds the documentation site strictly, see
 [Releasing](release.md#the-documentation-site).
+
+## The demo stack test
+
+`scripts/demo-stack test` builds the demo image from the worktree, starts
+the demo stack (`compose.demo.yaml`) and runs
+`demo/tests/stack/test_demo_stack.py` against it, through the edge: a
+visitor's whole demo, every refused route, that no bwtidy container reaches
+the internet, the cleanup at the end and the limits. What it checks and how
+to run a part of it is in [The demo](demo.md#the-stack-test). It takes
+about three minutes and about 1 GB of RAM, on a stack of its own beside the
+dev stacks. `scripts/demo-stack down` removes it. `scripts/ci` never runs
+it, so run it after a change to `demo/`, `compose.demo.yaml` or the gateway.
+
+`backend/tests/repo/test_demo_stack_files.py` reads `compose.demo.yaml` and
+`demo/Dockerfile` alone, in `scripts/ci`: the internal networks, the one
+published port, the one allowed server, the dropped capabilities, the
+Vaultwarden version of the dev stack and that the normal image holds no demo
+code.
 
 ## Smoke test on a real account
 

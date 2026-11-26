@@ -51,9 +51,9 @@ Work only against the dev stack, never against a real vault.
 The pull request template (`.github/pull_request_template.md`) holds the
 checklist for a pull request.
 
-Dependencies change only through the lock files (`backend/uv.lock`,
+Dependencies change only through the lock files (`backend/uv.lock`, `demo/uv.lock`,
 `frontend/package-lock.json`, `docker/bitwarden-cli/package-lock.json`):
-`uv lock` or `uv add` in `backend/`, `npm install` in the npm folder, and the
+`uv lock` or `uv add` in `backend/` or `demo/`, `npm install` in the npm folder, and the
 changed lock file goes into the change. Every build and test uses them locked
 and fails when one is out of date. `scripts/update-deps` updates every
 dependency within its declared range and lists the updates beyond it. [AGENTS.md](AGENTS.md) has the details.

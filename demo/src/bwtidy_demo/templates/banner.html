@@ -1,0 +1,45 @@
+<style>
+  :root {
+    --demo-banner: 40px;
+  }
+  #demo-banner {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    height: var(--demo-banner);
+    padding: 0 1rem;
+    overflow: hidden;
+    background: #fff4d6;
+    color: #5b4300;
+    font: 14px/1.2 system-ui, sans-serif;
+    white-space: nowrap;
+  }
+  #demo-banner form {
+    margin: 0;
+  }
+  #demo-banner button {
+    padding: 0.3rem 0.9rem;
+    border: 1px solid #5b4300;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #demo-banner span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #root > div {
+    height: calc(100vh - var(--demo-banner)) !important;
+  }
+</style>
+<div id="demo-banner" role="region" aria-label="Demo">
+  <span>Demo: your vault is deleted when the session ends. Never enter your own details.</span>
+  <form method="post" action="/demo/end">
+    <button type="submit">End demo</button>
+  </form>
+</div>

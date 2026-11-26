@@ -22,7 +22,10 @@ Python package `bwtidy`:
   it answers from the account directory whether the account exists, is
   pending and has its CLI logged in. With `BWTIDY_STATS=1` it also records
   the usage stats of the requests it proxies in a file of its own
-  (`stats/`, spec: Usage stats).
+  (`stats/`, spec: Usage stats). `create_gateway_app` takes extra
+  routers (included before the docs site and the static files) and an
+  `on_worker_exit` hook, so an outside package can wrap the gateway without
+  bwtidy knowing about it (spec: Gateway, Extra routes and the exit hook).
 - A worker (`main.py`, entry point `bwtidy`) serves one account for one
   session, as the account's own uid on a unix socket in the account's
   directory. It runs its own `bw serve` as a child on a second socket, holds

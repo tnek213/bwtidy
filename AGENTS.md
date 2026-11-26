@@ -28,8 +28,9 @@ request does not ask for spec changes.
   `docs/restore.md` (a how-to that every backup holds as RESTORE.md).
 - `dev/` the developer guide and the dev vault's fixture: `dev/README.md` (set
   up, the commands, the credentials), `dev/dev-vault.md` (the dev stacks, the
-  snapshot, the fixture), `dev/testing.md` (the suites and how to write a test)
-  and `dev/release.md` (the docs site and the image).
+  snapshot, the fixture), `dev/testing.md` (the suites and how to write a
+  test), `dev/release.md` (the docs site and the image) and `dev/demo.md`
+  (the design of the public demo).
 - How it is built: [docs/architecture.md](docs/architecture.md). Read it before
   changing structure.
 
@@ -45,15 +46,15 @@ pull request.
 pytest and vitest.
 
 Dependencies change only through the lock files: `uv add` or `uv lock` in
-`backend/`, `npm install` in `frontend/` or `docker/bitwarden-cli/` (the
-image's Bitwarden CLI), as a dev step whose changed lock file goes into the
+`backend/` or `demo/` (the demo's own project), `npm install` in `frontend/` or
+`docker/bitwarden-cli/` (the image's Bitwarden CLI), as a dev step whose changed lock file goes into the
 commit. Every build and test installs from them locked (`uv sync --locked`,
 `uv run --locked`, `npm ci`) and fails on a lock file that is out of date
 instead of updating it, so a commit builds and tests the same anywhere. The
 Dockerfile pins its images by tag and digest, the workflows their actions by
 commit SHA (the tag in a comment above), and Dependabot proposes updates.
 A dependency is declared with a compatible range, npm's caret: `^X.Y.Z` in a
-`package.json`, a lower bound and `<X+1` in `backend/pyproject.toml`
+`package.json`, a lower bound and `<X+1` in `backend/pyproject.toml` or `demo/pyproject.toml`
 (`<0.(Y+1)` for 0.Y.Z), X.Y.Z being the version the lock holds, or an exact
 pin. `scripts/update-deps` updates everything within those ranges and lists
 what lies beyond them for a person to decide.
@@ -61,6 +62,12 @@ what lies beyond them for a person to decide.
 `scripts/e2e` runs the browser tests in `backend/tests/e2e` against a fresh
 dev vault (see dev/testing.md). A change to what the UI does comes with an e2e
 test there.
+
+`scripts/demo-stack test` runs the demo's stack test (`demo/tests/stack`)
+against the demo stack of `compose.demo.yaml` (see dev/demo.md, The stack
+test). A change to `demo/`, to `compose.demo.yaml` or to what the gateway
+routes reruns it. Its checks of the refused routes and of the missing route
+to the internet are never weakened to make it pass.
 
 A change to what a user sees updates the page under `docs/` that covers it
 (reference, how-to or explanation) in the same commit. `docs/spec.md` changes

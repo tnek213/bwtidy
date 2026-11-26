@@ -2,6 +2,7 @@
 routing cookies and what becomes of an account directory as its worker comes and goes."""
 
 import asyncio
+import logging
 import os
 import signal
 from collections.abc import Iterator
@@ -11,11 +12,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from fastapi import APIRouter
+from fastapi.responses import PlainTextResponse
 from fastapi.testclient import TestClient
 
 from bwtidy.config import SettingsError
 from bwtidy.gateway.app import LOCKED, NO_ROUTE, create_gateway_app
 from bwtidy.gateway.settings import GatewaySettings
+from bwtidy.gateway.workers import Worker
 from bwtidy.mcp_token import EXPIRED
 from bwtidy.protocol import ACCOUNT_COOKIE as COOKIE
 from bwtidy.protocol import DELETE_MARKER, PENDING_MARKER
@@ -404,3 +408,75 @@ def test_without_a_docs_dir_there_are_no_docs(tmp_path: Path):
     for test_client in client(tmp_path):
         assert_absent(DOCS_HOME, test_client.get("/docs/").text, "the response")
         assert test_client.get("/").text == FRONTEND
+
+
+ROUTED = "answered by a router"
+
+
+def test_a_router_answers_before_the_static_files(tmp_path: Path):
+    static = tmp_path / "static"
+    write(static / "index.html", FRONTEND)
+    write(static / "other.txt", "a static file")
+    router = APIRouter()
+
+    @router.get("/")
+    @router.get("/index.html")
+    def page() -> PlainTextResponse:
+        return PlainTextResponse(ROUTED)
+
+    gateway_settings = settings(tmp_path, static_dir=static)
+    with TestClient(create_gateway_app(gateway_settings, routers=[router])) as test_client:
+        assert test_client.get("/").text == ROUTED
+        assert test_client.get("/index.html").text == ROUTED
+        ## the rest of the static files and the gateway's own routes stay as they were
+        assert test_client.get("/other.txt").text == "a static file"
+        assert test_client.get("/api/health").json()["status"] == "ok"
+
+
+def hooked_env(tmp_path: Path, hook: Any) -> Iterator[GatewayEnv]:
+    app = create_gateway_app(settings(tmp_path), on_worker_exit=hook)
+    with TestClient(app) as test_client:
+        yield GatewayEnv(test_client, app, tmp_path / "a")
+
+
+def test_the_exit_hook_runs_once_after_the_gateways_own_cleanup(tmp_path: Path):
+    calls: list[tuple[Worker, bool]] = []
+    envs: list[GatewayEnv] = []
+
+    async def hook(worker: Worker) -> None:
+        ## outside the account's lock, so the hook can take it
+        async with envs[0].gateway.lock(worker.key):
+            calls.append((worker, worker.path.exists()))
+
+    for env in hooked_env(tmp_path, hook):
+        envs.append(env)
+        env.started()
+        worker = env.gateway.workers.get(account(EMAIL))
+        os.kill(worker.pid, signal.SIGKILL)
+        wait_for(worker.gone.is_set, "the worker's cleanup to end")
+        ## the pending directory was gone before the hook ran
+        assert calls == [(worker, False)]
+
+
+def test_a_failing_exit_hook_is_logged_and_the_gateway_keeps_working(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+):
+    async def hook(worker: Worker) -> None:
+        raise RuntimeError("not-in-a-log")
+
+    for env in hooked_env(tmp_path, hook):
+        with caplog.at_level(logging.INFO, logger="bwtidy"):
+            token = env.started()
+            worker = env.gateway.workers.get(account(EMAIL))
+            os.kill(worker.pid, signal.SIGKILL)
+            wait_for(worker.gone.is_set, "the worker's cleanup to end")
+        failed = [r for r in caplog.records if "exit hook" in r.getMessage()]
+        assert [r.getMessage() for r in failed] == [
+            f"The worker exit hook failed for {account(EMAIL).label}: RuntimeError"
+        ]
+        assert failed[0].levelno == logging.ERROR
+        assert_absent("not-in-a-log", caplog.text, "the log")
+        assert env.directory_gone()
+        ## the next Log in starts a new worker
+        assert env.click(token).status_code == 200
+        assert len(env.worker_pids()) == 1
