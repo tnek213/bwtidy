@@ -35,6 +35,11 @@ INDEX = """<!doctype html>
 </body>
 </html>
 """
+DOCS_PAGE = """<!doctype html>
+<html><body><main>
+<article class="md-content__inner md-typeset"><h1>Tutorial</h1></article>
+</main></body></html>
+"""
 ## the fake worker: its health, the bw-login sequence of dev/demo.md (the output answers
 ## running once, then exits with 1 for WRONG and 0 for any other password), and an echo of every
 ## other request. Every request but the health polls is appended to the file seen.
@@ -240,7 +245,14 @@ def gateway_settings(tmp_path: Path, **extra: Any) -> GatewaySettings:
     static = tmp_path / "static"
     static.mkdir(exist_ok=True)
     (static / "index.html").write_text(INDEX)
+    docs = tmp_path / "docs"
+    (docs / "tutorial" / "mcp").mkdir(parents=True, exist_ok=True)
+    (docs / "tutorial" / "first-cleanup").mkdir(parents=True, exist_ok=True)
+    for name in ("tutorial/mcp", "tutorial/first-cleanup"):
+        (docs / name / "index.html").write_text(DOCS_PAGE)
+    (docs / "style.css").write_text("body { color: red }")
     options: dict[str, Any] = {
+        "docs_dir": docs,
         "accounts_dir": tmp_path / "a",
         "allowed_servers": frozenset({SERVER}),
         "switch_uid": False,
@@ -690,3 +702,51 @@ def test_the_demo_settings_from_the_environment(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setenv("DEMO_SESSION_MAX", "nope")
     with pytest.raises(SettingsError, match="DEMO_SESSION_MAX"):
         DemoSettings.from_env()
+
+
+def test_a_docs_page_has_the_demo_note_at_the_top_of_its_content(env: Env):
+    response = env.request("GET", "/docs/tutorial/first-cleanup/")
+    assert response.status_code == 200
+    page = response.text
+    assert "data-demo-note" in page
+    assert page.index("data-demo-note") < page.index("<h1>")
+    assert page.index('md-content__inner md-typeset">') < page.index("data-demo-note")
+    assert "deleted when the session ends (after 45 minutes at most, or " in page
+    assert 'href="/demo"' in page
+    assert "/mcp" not in page
+    assert response.headers["content-length"] == str(len(response.content))
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_a_conditional_request_for_a_docs_page_still_gets_the_note(env: Env):
+    first = env.request("GET", "/docs/tutorial/first-cleanup/")
+    again = env.request(
+        "GET", "/docs/tutorial/first-cleanup/", headers={"If-None-Match": "x", "Range": "bytes=0-5"}
+    )
+    assert first.status_code == again.status_code == 200
+    assert "data-demo-note" in again.text
+
+
+def test_the_mcp_page_names_the_plain_address_from_the_request_host(env: Env):
+    page = env.request("GET", "/docs/tutorial/mcp/", headers={"Host": "localhost:8770"}).text
+    assert "<code>http://localhost:8770/mcp</code>" in page
+    assert "A token lives at most 1 day." in page
+
+
+def test_the_mcp_page_names_the_public_host_when_cookies_are_secure(tmp_path: Path):
+    with open_env(tmp_path, demo={"public_host": "demo.example.org"}, secure_cookies=True) as env:
+        page = env.request("GET", "/docs/tutorial/mcp/", headers={"Host": "other"}).text
+        assert "<code>https://demo.example.org/mcp</code>" in page
+        assert "other" not in page
+        assert "/mcp" not in env.request("GET", "/docs/tutorial/first-cleanup/").text
+
+
+def test_a_host_in_the_mcp_address_is_escaped(env: Env):
+    page = env.request("GET", "/docs/tutorial/mcp/", headers={"Host": "a<b>"}).text
+    assert "a<b>" not in page
+
+
+def test_a_page_outside_the_docs_and_a_docs_asset_are_untouched(env: Env):
+    assert env.request("GET", "/docs/style.css").text == "body { color: red }"
+    assert "data-demo-note" not in env.request("GET", "/demo").text
+    assert "data-demo-note" not in env.request("GET", "/docs/../index.html").text

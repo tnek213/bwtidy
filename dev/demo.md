@@ -185,6 +185,30 @@ below the banner without a second scroll bar. A demo e2e test checks that
 the grid's last row and the page's bottom edge are visible. The banner is
 outside React's root, so it stays through every page of the app.
 
+## Docs note
+
+The general docs stay free of demo text. The demo image serves the same
+prebuilt site at `/docs/` (`BWTIDY_DOCS_DIR`), and the wrapper's middleware
+adds the demo's note to the HTML of every `GET /docs/...` answer with status
+200 (`bwtidy_demo/templates/docs_note.html`), right after the opening tag of
+the theme's `md-content__inner` article (right after `<body>` if a page has
+none). It says that every visitor gets a fresh sample vault, deleted when the
+session ends (`DEMO_SESSION_MAX` at most, the idle timeout idle), and that
+where a tutorial says to log in the reader uses Start demo. Its inline style
+copies the colors of the site's own banner (`overrides/main.html`). On
+`tutorial/mcp/` it also names the MCP address and that a token lives at most
+1 day: `https://DEMO_HOST/mcp` when `DEMO_SECURE_COOKIES` is on (the host from
+`BWTIDY_MCP_HOSTS`, which compose fills from `DEMO_HOST`), else
+`http://` and the request's own `Host`, which is `localhost:PORT` as the
+visitor reached it. Assets and other types stay untouched, and the answer is
+`no-store` with conditional headers dropped, so the note never goes stale.
+
+This is done at request time, not in `demo/Dockerfile`, because the MCP
+address depends on the host and the port of a running stack, which no build
+knows. One mechanism then serves every page, and it needs only a stable anchor
+(the article class or `<body>`) in the site's HTML, not a copy of the site that
+a build step must keep in step with the theme.
+
 ## End and cleanup
 
 A demo ends when its session ends: the idle or heartbeat timeout, Lock, End

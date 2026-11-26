@@ -19,6 +19,7 @@ The vault's password never leaves this process: no page, no log line, no cookie 
 
 import asyncio
 import contextlib
+import html
 import json
 import logging
 import re
@@ -49,6 +50,7 @@ from bwtidy.logs import setup_logging, uvicorn_log_config
 from bwtidy.protocol import ACCOUNT_COOKIE, LOGIN_HEADER, SESSION_COOKIE
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from starlette.datastructures import Headers, MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from bwtidy_demo import init
@@ -94,6 +96,10 @@ REFUSED_POST = frozenset({ACCOUNT_PATH, "/api/session"})
 ## the fetch metadata of a start from the demo's own page or typed in the address bar
 SAME_SITE = frozenset({"same-origin", "none"})
 BODY = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
+## where a docs page's content starts, the theme's article, else the page's body
+DOCS_CONTENT = re.compile(r"<article\b[^>]*md-content__inner[^>]*>", re.IGNORECASE)
+DOCS_PATH = "/docs"
+MCP_PAGES = ("/docs/tutorial/mcp", "/docs/tutorial/mcp/index.html")
 
 
 class LoginFailed(Exception):
@@ -117,6 +123,9 @@ class DemoSettings:
     max_poll: float = MAX_POLL
     ## the workers' idle timeout, for the start page's text
     idle_timeout: float = IDLE_TIMEOUT
+    ## the public host name (DEMO_HOST, which compose gives bwtidy as BWTIDY_MCP_HOSTS), for
+    ## the MCP address in the docs. Empty uses the host of the request.
+    public_host: str = ""
 
     @classmethod
     def from_env(cls) -> "DemoSettings":
@@ -145,6 +154,7 @@ class DemoSettings:
             server=server,
             session_max=env_seconds("DEMO_SESSION_MAX", SESSION_MAX),
             idle_timeout=Policy.from_env().idle_timeout,
+            public_host=(env_text("BWTIDY_MCP_HOSTS") or "").split(",")[0].strip(),
         )
 
 
@@ -174,6 +184,14 @@ def with_banner(index: str) -> str:
     """index.html with the banner right after its <body>."""
     banner = template("banner.html")
     return BODY.sub(lambda match: match.group(0) + "\n" + banner, index, count=1)
+
+
+def with_docs_note(page: str, note: str) -> str:
+    """A docs page with the note at the top of its content."""
+    for pattern in (DOCS_CONTENT, BODY):
+        if pattern.search(page):
+            return pattern.sub(lambda match: match.group(0) + "\n" + note, page, count=1)
+    return page
 
 
 def duration(seconds: float) -> str:
@@ -586,6 +604,21 @@ class Demo:
         for email in dict.fromkeys(email for _, email in found):
             await self.release(email)
 
+    def docs_note(self, path: str, host: str) -> str:
+        """The note for a docs page, with the MCP address on the MCP tutorial."""
+        mcp = ""
+        if path in MCP_PAGES:
+            name = (self.settings.public_host if self.secure else "") or host
+            address = f"{'https' if self.secure else 'http'}://{name}/mcp"
+            mcp = string.Template(template("docs_mcp.html")).substitute(
+                address=html.escape(address), days=MCP_TOKEN_DAYS
+            )
+        return string.Template(template("docs_note.html")).substitute(
+            idle=duration(self.settings.idle_timeout),
+            total=duration(self.settings.session_max),
+            mcp=mcp,
+        )
+
     def router(self) -> APIRouter:
         router = APIRouter()
 
@@ -654,8 +687,55 @@ class DemoMiddleware:
                 return
             scope, receive = with_body(scope, receive, capped_days(body))
             await self.app(scope, receive, send)
+        elif method == "GET" and (path == DOCS_PATH or path.startswith(DOCS_PATH + "/")):
+            await self.docs(scope, receive, send, path)
         else:
             await self.app(scope, receive, send)
+
+    async def docs(self, scope: Scope, receive: Receive, send: Send, path: str) -> None:
+        """A docs page answered by the site, with the demo's note added to its HTML."""
+        ## a conditional request would get a 304 for the page without the note
+        scope = {
+            **scope,
+            "headers": [
+                (name, value)
+                for name, value in scope["headers"]
+                if name not in (b"if-none-match", b"if-modified-since", b"range")
+            ],
+        }
+        host = Request(scope).headers.get("host", "localhost")
+        held: list[Message] = []
+        page = False
+
+        async def intercept(message: Message) -> None:
+            nonlocal page
+            if message["type"] == "http.response.start":
+                headers = Headers(raw=message["headers"])
+                page = message["status"] == 200 and headers.get("content-type", "").startswith(
+                    "text/html"
+                )
+                if not page:
+                    await send(message)
+                    return
+            elif not page:
+                await send(message)
+                return
+            held.append(message)
+            if message["type"] == "http.response.body" and not message.get("more_body"):
+                start = held[0]
+                body = b"".join(m.get("body", b"") for m in held[1:])
+                text = with_docs_note(
+                    body.decode("utf-8", "replace"), self.demo.docs_note(path, host)
+                ).encode()
+                headers = MutableHeaders(raw=list(start["headers"]))
+                for name in ("etag", "last-modified", "content-length"):
+                    del headers[name]
+                headers["content-length"] = str(len(text))
+                headers["cache-control"] = "no-store"
+                await send({**start, "headers": headers.raw})
+                await send({"type": "http.response.body", "body": text})
+
+        await self.app(scope, receive, intercept)
 
 
 def create_demo_app(

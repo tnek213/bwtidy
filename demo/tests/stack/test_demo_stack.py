@@ -339,6 +339,14 @@ def test_the_front_page_sends_a_new_visitor_to_the_start_page():
     assert "<textarea" not in page.text.lower()
 
 
+def test_the_docs_the_demo_serves_hold_the_demo_note():
+    with browser() as client:
+        page = client.get("/docs/tutorial/first-cleanup/")
+    assert page.status_code == 200
+    assert "data-demo-note" in page.text
+    assert "Start demo" in page.text
+
+
 def test_a_start_logs_the_visitor_in_with_both_cookies(first: Visitor):
     assert set(first.client.cookies) == {"bwtidy_account", "bwtidy_session"}
     session = first.client.get("/api/session").json()
