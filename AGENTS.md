@@ -116,6 +116,10 @@ and others link to it.
 Write without semicolons. A colon only introduces a list block. A sentence has
 at most one comma and a paragraph at most two.
 
+The text refers to a numbered mark in a screenshot with its circled digit
+after a no-break space (U+00A0), as in Search ①, and `scripts/docs-lint`
+checks the space.
+
 A sequence is prose, not a numbered list, because a page already runs from top
 to bottom. Numbers stay only in a tutorial or a how-to, where the reader keeps
 their place while clicking through the app.

@@ -33,10 +33,10 @@ fingerprint.
 
 ![The grid with Search, Hide empty columns and Columns outlined and numbered 1 to 3](../images/tutorial-grid.png)
 
-- Search (1) shows only the items with the words you type.
-- Hide empty columns (2) hides every column that none of the shown items
+- Search ① shows only the items with the words you type.
+- Hide empty columns ② hides every column that none of the shown items
   fill in.
-- Columns (3) picks the columns to show (see
+- Columns ③ picks the columns to show (see
   [Show or hide columns](../how-to/show-hide-columns.md)).
 
 Scroll to the right and you will likely find the same field under a few

@@ -555,13 +555,13 @@ its end.
 
 ### More actions
 
-The three dots at the right end of the app bar (1) open the More actions
+The three dots at the right end of the app bar ① open the More actions
 menu.
 
 ![The app bar with the three dots button outlined and numbered 1](../images/more-menu-closed.png)
 
 The menu holds Settings, Switch account (while an account is open) and About
-bwtidy (2). Settings opens the [Settings](#settings) page. Switch account
+bwtidy ②. Settings opens the [Settings](#settings) page. Switch account
 tries to write the edits that wait, ends the session and takes you back to the
 account form. About bwtidy opens the [About](#about) page.
 

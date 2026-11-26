@@ -31,6 +31,11 @@ targets and URLs, a semicolon, an em dash (U+2014) or ` -- ` used as a dash is r
 STYLE `semicolon`, `em dash` or `double hyphen as a dash`. The semicolon of an HTML entity
 (like `&amp;`) does not count.
 
+Marks: a circled digit (U+2460 to U+2473), the way the text refers to a numbered mark in a
+screenshot, must follow a no-break space (U+00A0) so the word and its mark never wrap apart.
+Outside fenced code and inline code it prints
+`FILE:LINE: circled digit without a no-break space before it` for one that does not.
+
 Diagrams: a fenced code block whose info string starts with a Kroki diagram type (```mermaid,
 ```d2 and the others) needs `alt="TEXT"` after the type, as scripts/docs-site turns it into a
 picture with that alt text. One without is reported as `FILE:LINE: diagram without alt text`,
@@ -228,6 +233,16 @@ def style_problems(text: str) -> list[tuple[int, str]]:
     return found
 
 
+def circled_problems(text: str) -> list[int]:
+    """Line of every circled digit that does not follow a no-break space, outside code."""
+    text = strip_code(strip_fences(text))
+    return [
+        number
+        for number, line in enumerate(text.split("\n"), 1)
+        if re.search("(?<!\u00a0)[\u2460-\u2473]", line)
+    ]
+
+
 def local(path: str) -> str | None:
     """The file part of a link, None when the link is no local file."""
     if not path or path.startswith("#") or SCHEME.match(path):
@@ -315,6 +330,8 @@ def lint(root: Path) -> list[str]:
                     found.append((line, f"no heading for #{anchor} in {shown}"))
         for line, style in style_problems(text):
             found.append((line, f"{style} ({STYLE_HINT})"))
+        for line in circled_problems(text):
+            found.append((line, "circled digit without a no-break space before it"))
         problems.extend(f"{rel}:{line}: {message}" for line, message in sorted(found))
     for image in tracked(root, f"{IMAGES}/"):
         if image.name.startswith("."):
