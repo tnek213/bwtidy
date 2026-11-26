@@ -44,17 +44,47 @@ def test_the_tokens_are_long_and_random(tmp_path: Path):
     assert admin != controller
 
 
-def test_a_second_run_replaces_every_file(tmp_path: Path):
+def test_a_second_run_keeps_a_full_set(tmp_path: Path):
+    assert init.init(tmp_path) is True
+    first = contents(tmp_path)
+    assert init.init(tmp_path) is False
+    assert contents(tmp_path) == first
+    assert {path.name for path in tmp_path.iterdir()} == set(FILES)
+
+
+@pytest.mark.parametrize("name", FILES)
+def test_a_set_that_lacks_a_file_is_written_anew(tmp_path: Path, name: str):
     init.init(tmp_path)
     first = contents(tmp_path)
-    ## a file left too open by hand gets its mode back
-    (tmp_path / init.ADMIN_TOKEN).chmod(0o666)
-    init.init(tmp_path)
+    (tmp_path / name).unlink()
+    assert init.init(tmp_path) is True
     second = contents(tmp_path)
-    for name in FILES:
-        assert first[name] != second[name], name
-        assert mode(tmp_path / name) == FILES[name], name
+    for other in FILES:
+        assert first[other] != second[other], other
+        assert mode(tmp_path / other) == FILES[other], other
     assert {path.name for path in tmp_path.iterdir()} == set(FILES)
+
+
+def test_an_empty_file_does_not_count(tmp_path: Path):
+    init.init(tmp_path)
+    first = contents(tmp_path)
+    (tmp_path / init.CONTROLLER_TOKEN).write_bytes(b"")
+    assert init.init(tmp_path) is True
+    token = (tmp_path / init.CONTROLLER_TOKEN).read_bytes()
+    assert token not in (b"", first[init.CONTROLLER_TOKEN])
+
+
+def test_the_server_certificate_is_written_last():
+    assert init.FILES[-1] == init.SERVER_CERT
+    assert set(init.FILES) == set(FILES)
+
+
+def test_run_says_whether_it_wrote_or_kept(tmp_path: Path, monkeypatch, caplog):
+    monkeypatch.setenv("DEMO_SECRETS", str(tmp_path))
+    with caplog.at_level("INFO"):
+        init.run()
+        init.run()
+    assert [record.getMessage().split(" ")[0] for record in caplog.records] == ["wrote", "kept"]
 
 
 def test_run_writes_into_demo_secrets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

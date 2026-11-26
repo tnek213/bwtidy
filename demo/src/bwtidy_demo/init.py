@@ -1,4 +1,9 @@
-"""The stack's secrets, written fresh into the secrets volume at every start (bwtidy-demo-init).
+"""The stack's secrets, written into the secrets volume once (bwtidy-demo-init).
+
+compose starts the init container again at every `up`, also one that leaves Vaultwarden
+running. Vaultwarden reads its certificate and its admin token only when it starts, so new
+secrets under a running Vaultwarden would cut the controller and the workers off from it. A
+directory that holds every file is therefore left as it is. Removing the volume gives new ones.
 
 Every container of the demo image runs as root, as does Vaultwarden, so the tokens and the
 server's key are 0600. The certificates are 0644 and the directory 0755: a worker runs bw as
@@ -29,7 +34,10 @@ CA_CERT = "ca.crt"
 SERVER_CERT = "vaultwarden.crt"
 SERVER_KEY = "vaultwarden.key"
 SERVER_NAME = "vaultwarden"
-## init makes new ones at every start, the long validity only keeps a long running stack working
+## in the order init writes them: the server certificate last, so a write that was cut off
+## never leaves a full set
+FILES = (ADMIN_TOKEN, CONTROLLER_TOKEN, SERVER_KEY, CA_CERT, SERVER_CERT)
+## the secrets stay until their volume is removed, so the stack works for as long as it is kept
 VALIDITY = datetime.timedelta(days=3650)
 
 PRIVATE = 0o600
@@ -142,10 +150,23 @@ def certificates(
     )
 
 
-def init(directory: Path) -> None:
-    """Write every secret of the stack into directory, replacing what is there."""
+def complete(directory: Path) -> bool:
+    """Whether directory holds every secret, each with content."""
+    try:
+        return all((directory / name).stat().st_size > 0 for name in FILES)
+    except OSError:
+        return False
+
+
+def init(directory: Path) -> bool:
+    """Write every secret of the stack into directory, unless it holds them all: True if written.
+
+    A directory that lacks one (a first start, or a write that was cut off) gets all of them anew.
+    """
     directory.mkdir(parents=True, exist_ok=True)
     directory.chmod(DIRECTORY)
+    if complete(directory):
+        return False
     ca, server, key = certificates()
     write(directory / ADMIN_TOKEN, token().encode(), PRIVATE)
     write(directory / CONTROLLER_TOKEN, token().encode(), PRIVATE)
@@ -153,14 +174,18 @@ def init(directory: Path) -> None:
     write(directory / CA_CERT, ca, PUBLIC)
     ## the chain, so a client that is given only the CA can build the path
     write(directory / SERVER_CERT, server + ca, PUBLIC)
+    return True
 
 
 def run() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     directory = Path(os.environ.get("DEMO_SECRETS", str(SECRETS_DIR)))
     try:
-        init(directory)
+        written = init(directory)
     except OSError as error:
         log.error("could not write the secrets into %s: %s", directory, error.strerror)
         sys.exit(1)
-    log.info("wrote the stack's secrets into %s", directory)
+    if written:
+        log.info("wrote the stack's secrets into %s", directory)
+    else:
+        log.info("kept the stack's secrets in %s", directory)

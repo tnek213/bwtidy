@@ -61,6 +61,12 @@ what lies beyond them for a person to decide.
 dev vault (see dev/testing.md). A change to what the UI does comes with an e2e
 test there.
 
+`scripts/demo-stack test` runs the demo's stack test (`demo/tests/stack`)
+against the demo stack of `compose.demo.yaml` (see dev/demo.md, The stack
+test). A change to `demo/`, to `compose.demo.yaml` or to what the gateway
+routes reruns it. Its checks of the refused routes and of the missing route
+to the internet are never weakened to make it pass.
+
 A change to what a user sees updates the page under `docs/` that covers it
 (reference, how-to or explanation) in the same commit, as well as
 `docs/spec.md`.

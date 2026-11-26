@@ -20,6 +20,28 @@ FROM node AS frontend
 FROM --platform=linux/amd64 python:3.13-slim-trixie@{OLD} AS python
 """
 
+DEMO_DOCKERFILE = f"""# syntax=docker/dockerfile:1@{OLD}
+
+ARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:main
+
+FROM ghcr.io/astral-sh/uv:0.11@{OLD} AS uv
+
+FROM ${{BWTIDY_IMAGE}}
+"""
+
+COMPOSE = f"""x-demo-image: &demo-image
+  image: ${{DEMO_IMAGE:-bwtidy-demo:local}}
+
+services:
+  bwtidy:
+    image: ${{BWTIDY_IMAGE:?set it}}:${{BWTIDY_VERSION:-latest}}
+  vaultwarden:
+    image: vaultwarden/server:1.37.4@{OLD}
+  edge:
+    ## an image line in a comment is no image: nginx:1.0
+    image: nginx:1.30-alpine
+"""
+
 WORKFLOW = f"""jobs:
   ci:
     steps:
@@ -65,6 +87,95 @@ def test_a_new_digest_keeps_the_tag_and_the_rest_of_the_line(deps):
     assert "FROM node AS frontend" in text
     assert f"FROM --platform=linux/amd64 python:3.13-slim-trixie@{NEW} AS python" in text
     assert OLD not in text
+
+
+def test_image_refs_of_a_compose_file_are_its_image_lines_without_a_variable(deps):
+    refs = deps.image_refs(COMPOSE)
+    assert [(r.image, r.tag, r.digest) for r in refs] == [
+        ("vaultwarden/server", "1.37.4", OLD),
+        ("nginx", "1.30-alpine", None),
+    ]
+    text = COMPOSE
+    for ref in refs:
+        text = deps.with_digest(text, ref, NEW)
+    assert f"    image: vaultwarden/server:1.37.4@{NEW}\n" in text
+    assert f"    image: nginx:1.30-alpine@{NEW}\n" in text
+    assert "  image: ${DEMO_IMAGE:-bwtidy-demo:local}\n" in text
+    assert "image: ${BWTIDY_IMAGE:?set it}:${BWTIDY_VERSION:-latest}\n" in text
+    assert OLD not in text
+
+
+def test_a_from_of_a_build_argument_is_no_image_ref(deps):
+    refs = deps.image_refs(DEMO_DOCKERFILE)
+    assert [(r.image, r.tag, r.digest) for r in refs] == [
+        ("docker/dockerfile", "1", OLD),
+        ("ghcr.io/astral-sh/uv", "0.11", OLD),
+    ]
+
+
+class FakeRegistry:
+    """A registry where every tag points to NEW and nginx has a newer tag."""
+
+    lookups: list[str] = []
+
+    def __init__(self, image: str) -> None:
+        self.image = image
+
+    def digest(self, tag: str) -> str:
+        if self.image == "broken/image":
+            raise OSError("no answer")
+        FakeRegistry.lookups.append(f"{self.image}:{tag}")
+        return NEW
+
+    def tags(self) -> list[str]:
+        return ["1.30-alpine", "1.32-alpine"] if self.image == "nginx" else []
+
+
+@pytest.fixture
+def image_files(deps, monkeypatch, tmp_path):
+    files = {
+        "Dockerfile": DOCKERFILE,
+        "demo.Dockerfile": DEMO_DOCKERFILE,
+        "compose.demo.yaml": COMPOSE + "    image: broken/image:1\n    image: broken/image:1\n",
+    }
+    paths = [tmp_path / name for name in files]
+    for path, text in zip(paths, files.values(), strict=True):
+        path.write_text(text)
+    monkeypatch.setattr(deps, "IMAGE_FILES", paths)
+    monkeypatch.setattr(deps, "Registry", FakeRegistry)
+    monkeypatch.setattr(FakeRegistry, "lookups", [])
+    return paths
+
+
+def test_update_images_pins_every_file_and_lists_a_shared_image_once(deps, image_files):
+    outside: list[str] = []
+    errors: list[str] = []
+    found = deps.update_images(False, outside, errors)
+    assert found == [
+        ("docker/dockerfile:1", OLD, NEW),
+        ("ghcr.io/astral-sh/uv:0.11", OLD, NEW),
+        ("node:24-trixie-slim", None, NEW),
+        ("python:3.13-slim-trixie", OLD, NEW),
+        ("vaultwarden/server:1.37.4", OLD, NEW),
+        ("nginx:1.30-alpine", None, NEW),
+    ]
+    assert len(FakeRegistry.lookups) == len(set(FakeRegistry.lookups)) == 6
+    assert outside == ["image nginx:1.30-alpine: newer tag nginx:1.32-alpine"]
+    ## an image that cannot be looked up is an error once, and its lines stay
+    assert errors == ["broken/image:1: no answer"]
+    for path in image_files:
+        text = path.read_text()
+        assert OLD not in text, path.name
+        assert NEW in text, path.name
+    assert image_files[2].read_text().count("image: broken/image:1\n") == 2
+    assert "FROM ${BWTIDY_IMAGE}\n" in image_files[1].read_text()
+
+
+def test_update_images_writes_nothing_in_a_dry_run(deps, image_files):
+    before = [path.read_text() for path in image_files]
+    found = deps.update_images(True, [], [])
+    assert len(found) == 6
+    assert [path.read_text() for path in image_files] == before
 
 
 @pytest.mark.parametrize(
@@ -223,9 +334,15 @@ def test_npm_outside_lists_a_latest_beyond_the_range(deps):
 
 
 def test_the_repo_pins_every_image_by_digest_and_every_action_by_sha(deps):
-    refs = deps.image_refs(deps.DOCKERFILE.read_text())
-    assert refs
-    assert [f"{r.image}:{r.tag}" for r in refs if r.digest is None] == []
+    assert [path.relative_to(deps.ROOT).as_posix() for path in deps.IMAGE_FILES] == [
+        "Dockerfile",
+        "demo/Dockerfile",
+        "compose.demo.yaml",
+    ]
+    for path in deps.IMAGE_FILES:
+        refs = deps.image_refs(path.read_text())
+        assert refs, path.name
+        assert [f"{r.image}:{r.tag}" for r in refs if r.digest is None] == [], path.name
     for workflow in deps.WORKFLOWS.glob("*.yml"):
         text = workflow.read_text()
         uses = [

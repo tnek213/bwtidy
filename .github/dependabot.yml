@@ -49,6 +49,28 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
 
+  # the demo image's own Dockerfile: its uv. Its base is our own image, a build argument.
+  - package-ecosystem: docker
+    directory: /demo
+    schedule:
+      interval: weekly
+    groups:
+      demo-docker-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # the images compose.demo.yaml pins by tag and digest: the demo's Vaultwarden and nginx. The
+  # other compose files name no image with a fixed tag. A new Vaultwarden version goes into
+  # compose.dev.yaml in the same pull request, by hand: a repo test keeps the two the same.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      compose-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

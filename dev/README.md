@@ -68,6 +68,7 @@ Every script prints its usage with `--help`.
 | `scripts/manual`        | tests main by hand: updates it, resets the vault, runs `scripts/dev-app` ([The dev vault](dev-vault.md#testing-by-hand)) |
 | `scripts/integration`   | the integration tests in the app container ([Testing](testing.md#integration-tests))     |
 | `scripts/e2e`           | the browser tests against the gateway ([Testing](testing.md#end-to-end-tests))           |
+| `scripts/demo-stack`    | the worktree's demo stack: `up`, `test`, `compose`, `down` ([The demo](demo.md#the-stack-test)) |
 | `scripts/docs-shots`    | takes the documentation screenshots ([Testing](testing.md#documentation-screenshots))    |
 | `scripts/install-hooks` | installs the pre-push hook ([Testing](testing.md#the-pre-push-hook))                      |
 | `scripts/pre-push`      | what the pre-push hook runs: ci (quick unless main) on what is pushed, the docs screenshots of a UI change ([Testing](testing.md#the-pre-push-hook)) |
@@ -97,7 +98,7 @@ Every script but `scripts/docs-site` is a command line over the package
 seeding of the dev vault, the gateway in the app container (how it starts and
 stops, and the run `scripts/dev-app` and `scripts/manual` share), `/api/health`,
 the options and test paths of the two test scripts with the sleep lock, git, what
-the pre-push hook checks, the version and the backend venv. `scripts/docs-site` stays
+the pre-push hook checks, the version, the backend venv and the demo stack. `scripts/docs-site` stays
 on its own, the Dockerfile's docs stage copies it alone.
 
 ## Credentials

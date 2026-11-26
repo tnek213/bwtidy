@@ -8,8 +8,9 @@ Backend and demo: uv lock --upgrade, within the ranges of backend/pyproject.toml
 demo/pyproject.toml. Frontend: npm update
 within the ranges of frontend/package.json (an exact pin stays), then npm ci so node_modules
 match. The image's Bitwarden CLI (docker/bitwarden-cli): npm update --package-lock-only, as only
-the image installs it. The Dockerfile: each image keeps the tag it names and gets the digest that
-tag points to now. The workflows: each action moves to the newest release tag of its major
+the image installs it. The Dockerfile, demo/Dockerfile and compose.demo.yaml (the demo's
+Vaultwarden and nginx): each image keeps the tag it names and gets the digest that tag points to
+now. The workflows: each action moves to the newest release tag of its major
 version, with its commit SHA and that tag in the comment above it. Then it runs
 scripts/third-party and the version check, and prints what changed (package, old version, new
 version) per ecosystem. Last it lists the updates outside the ranges (new major versions, newer
@@ -37,6 +38,8 @@ DEMO = ROOT / "demo"
 FRONTEND = ROOT / "frontend"
 CLI = ROOT / "docker" / "bitwarden-cli"
 DOCKERFILE = ROOT / "Dockerfile"
+## every file that pins images by tag and digest: the two Dockerfiles and the demo's compose file
+IMAGE_FILES = [DOCKERFILE, DEMO / "Dockerfile", ROOT / "compose.demo.yaml"]
 WORKFLOWS = ROOT / ".github" / "workflows"
 ## seconds for one network command or request, a registry with many tags pages through several
 TIMEOUT = 120
@@ -55,7 +58,7 @@ Change = tuple[str, str | None, str | None]
 
 @dataclass(frozen=True)
 class ImageRef:
-    """An image of the Dockerfile that names a tag: its line, image, tag and pinned digest."""
+    """An image with a tag in a Dockerfile or compose file: its line, image, tag and digest."""
 
     line: int
     image: str
@@ -133,18 +136,21 @@ def newer_majors(tag: str, tags: list[str]) -> list[str]:
     return [newest_in_major(f"v{major}", tags) for major in majors]
 
 
-## --- the Dockerfile
+## --- the Dockerfiles and the compose file
 
 
 def image_refs(text: str) -> list[ImageRef]:
-    """Every image with a tag in the Dockerfile: the syntax line and the FROM lines.
+    """Every image with a tag in a Dockerfile or a compose file.
 
-    A FROM of an earlier stage (FROM node AS frontend) names no tag and is left out.
+    In a Dockerfile the syntax line and the FROM lines, in a compose file the image lines. A
+    FROM of an earlier stage (FROM node AS frontend) names no tag and is left out, as is an
+    image that comes from a variable (FROM ${BWTIDY_IMAGE}, image: ${DEMO_IMAGE:-name:tag}):
+    that one is ours, or picked by whoever runs it.
     """
     refs = []
     for index, line in enumerate(text.splitlines()):
-        match = re.match(r"(?:# syntax=|FROM\s+(?:--platform=\S+\s+)?)(\S+)", line)
-        if match is None:
+        match = re.match(r"(?:# syntax=|FROM\s+(?:--platform=\S+\s+)?|\s*image:\s+)(\S+)", line)
+        if match is None or "$" in match[1]:
             continue
         name, _, digest = match[1].partition("@")
         image, colon, tag = name.rpartition(":")
@@ -370,24 +376,35 @@ def update_npm(project: Path, dry_run: bool, install: bool) -> list[Change]:
 
 
 def update_images(dry_run: bool, outside: list[str], errors: list[str]) -> list[Change]:
-    text = DOCKERFILE.read_text()
     found: list[Change] = []
-    for ref in image_refs(text):
-        name = f"{ref.image}:{ref.tag}"
-        try:
-            registry = Registry(ref.image)
-            digest = registry.digest(ref.tag)
-            newer = newer_tags(ref.tag, registry.tags())
-        except (OSError, KeyError, ValueError) as error:
-            errors.append(f"{name}: {error}")
-            continue
-        if digest != ref.digest:
-            found.append((name, ref.digest, digest))
-            text = with_digest(text, ref, digest)
-        if newer:
-            outside.append(f"image {name}: newer tag {ref.image}:{newer[-1]}")
-    if not dry_run:
-        DOCKERFILE.write_text(text)
+    ## an image two files name (uv, the Dockerfile syntax) is looked up once and listed once
+    known: dict[str, tuple[str, list[str]]] = {}
+    failed: set[str] = set()
+    for path in IMAGE_FILES:
+        text = path.read_text()
+        for ref in image_refs(text):
+            name = f"{ref.image}:{ref.tag}"
+            if name in failed:
+                continue
+            try:
+                if name not in known:
+                    registry = Registry(ref.image)
+                    known[name] = (registry.digest(ref.tag), newer_tags(ref.tag, registry.tags()))
+            except (OSError, KeyError, ValueError) as error:
+                errors.append(f"{name}: {error}")
+                failed.add(name)
+                continue
+            digest, newer = known[name]
+            if digest != ref.digest:
+                change = (name, ref.digest, digest)
+                if change not in found:
+                    found.append(change)
+                text = with_digest(text, ref, digest)
+            note = f"image {name}: newer tag {ref.image}:{newer[-1]}" if newer else ""
+            if note and note not in outside:
+                outside.append(note)
+        if not dry_run:
+            path.write_text(text)
     return found
 
 
@@ -467,7 +484,9 @@ def main(args: list[str]) -> int:
         "Bitwarden CLI (docker/bitwarden-cli/package-lock.json)": update_npm(
             CLI, dry_run, install=False
         ),
-        "images (Dockerfile)": update_images(dry_run, outside, errors),
+        "images (Dockerfile, demo/Dockerfile, compose.demo.yaml)": update_images(
+            dry_run, outside, errors
+        ),
         "actions (.github/workflows)": update_actions(dry_run, outside, errors),
     }
     outside_packages(outside, found["backend (backend/uv.lock)"], found["demo (demo/uv.lock)"])
