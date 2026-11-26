@@ -28,23 +28,36 @@ INTRO = """\
 # MCP tools
 
 <!-- Written by scripts/mcp-reference from the tools the MCP server registers. Do not edit it by
-hand, run the script. -->
+hand. Run the script instead. -->
 
-These are the tools bwtidy's MCP server offers an AI agent, as its client lists them. An agent
-reads your vault without the secret values and proposes changes into the queue. It never writes:
-a proposal waits on the Queue page until you approve or reject it. Why it works this way:
-[What an agent can do](../explanation/mcp.md). How to connect a client:
-[Connect an MCP client](../how-to/mcp.md).
+This page lists every tool that bwtidy's MCP server offers an AI agent. It shows each tool's
+name, parameters and description as an MCP client sees them. The agent reads your vault without
+the secret values and proposes changes to the queue. It never changes the vault on its own.
+Nothing it proposes reaches the vault until you approve it on the Queue page, where you can also
+reject it.
+
+[What an agent can do](../explanation/mcp.md) explains why it works this way.
+[Connect an MCP client](../how-to/mcp.md) shows how to connect your client.
 
 Each tool is one of three kinds:
 
-- read: reads the vault or the queue and changes nothing.
-- propose: adds one entry to the queue and changes nothing in the vault until you approve it.
-- end: ends the bwtidy session, like Log out in the web UI.
+- A read tool reads the vault or the queue and changes nothing.
+- A propose tool adds one entry to the queue. It changes nothing in the vault until you approve
+  the entry.
+- An end tool ends the bwtidy session like Log out in the web UI. It first writes the edits you
+  have waiting in the web UI.
 
-The descriptions are the text the agent reads, so they speak to the agent. While MCP is off,
-every tool answers only that bwtidy MCP is disabled.
+A tool's kind follows its MCP annotations, which the client sees too. A read tool is marked
+read-only and an end tool is marked destructive.
+
+The descriptions are the text the agent reads, so they speak to the agent. While MCP is off a
+tool call answers only that bwtidy MCP is disabled.
+[When a request fails](../how-to/mcp.md#when-a-request-fails) lists the checks that come first
+and the answers they give.
 """
+
+## the line under each tool's heading that names its kind
+KIND_LINE = {"read": "A read tool.", "propose": "A propose tool.", "end": "An end tool."}
 
 SECTIONS = {
     "read": "Read tools",
@@ -166,7 +179,7 @@ def tool_section(tool: Any) -> list[str]:
     lines = [
         f"### {tool.name}",
         "",
-        f"Kind: {kind(tool)}.",
+        KIND_LINE[kind(tool)],
         "",
         *description(tool.description or ""),
     ]

@@ -40,7 +40,8 @@ def test_a_tools_kind_follows_its_annotations(tools, page):
         expected = (
             "read" if hints.read_only_hint else "end" if hints.destructive_hint else "propose"
         )
-        assert f"\nKind: {expected}.\n" in section(page, tool.name), tool.name
+        article = "An" if expected == "end" else "A"
+        assert f"\n{article} {expected} tool.\n" in section(page, tool.name), tool.name
 
 
 def test_every_kind_has_a_tool(tools, mcp_reference):
@@ -93,7 +94,7 @@ def test_check_fails_on_a_changed_file(tmp_path, monkeypatch, capsys, page, mcp_
     assert output.read_text() == page
     assert mcp_reference.main(["--check"]) == 0
 
-    output.write_text(page.replace("Kind: read.", "Kind: propose.", 1))
+    output.write_text(page.replace("A read tool.", "A propose tool.", 1))
     capsys.readouterr()
     assert mcp_reference.main(["--check"]) == 1
     assert "mcp-tools.md is stale, run scripts/mcp-reference" in capsys.readouterr().err
