@@ -218,8 +218,9 @@ requests (see Logs) and a request a worker did not answer.
 It runs as root (`USER 0`), which it needs to start each worker as the
 account's uid. `compose.yaml` drops every capability but `CHOWN`,
 `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID` and `KILL`, sets
-`no-new-privileges` and makes the root file system read-only (the two volumes
-and a tmpfs on `/tmp` are the only places that take writes).
+`no-new-privileges` and makes the root file system read-only (the volumes of
+the accounts, the backups and the usage stats and a tmpfs on `/tmp` are the
+only places that take writes).
 
 Its settings are in [Configuration](reference/configuration.md#gateway). The
 reasons behind some:
@@ -593,7 +594,9 @@ finds none in the file.
   days, so a day is either in the events or in `daily`. `daily` and `errors`
   are kept for good, an error with its count and its last time.
 - The file: `BWTIDY_STATS_DB`, else `stats.db` in the parent of
-  `BWTIDY_ACCOUNTS_DIR` (`/data/stats.db`). The gateway makes it mode 0600,
+  `BWTIDY_ACCOUNTS_DIR` (`/data/stats.db`). `compose.yaml` sets
+  `/stats/stats.db` on the volume `bwtidy-stats`, because its root file system
+  is read-only and `/data` lies on it. The gateway makes it mode 0600,
   owned by its own uid, in WAL mode. It must be outside the accounts
   directory and the backups root, whose directories the account uids own, and
   a link, a file that is not regular or one of another uid stops the start.

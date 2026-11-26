@@ -41,7 +41,7 @@ starts one worker per open account (see
 | `BWTIDY_BACKUP_KEEP_ALWAYS` | `5` | The newest this many backups are kept whatever their age. |
 | `BWTIDY_FAILED_KEEP_HOURS` | `30` | Hours after which a failed queue entry is deleted. |
 | `BWTIDY_STATS` | `0` | `1` turns on the [usage stats](#usage-stats), which stay on this machine. |
-| `BWTIDY_STATS_DB` | `/data/stats.db` | The usage stats file, by default `stats.db` next to the accounts directory. It must be outside the accounts directory and the backups. |
+| `BWTIDY_STATS_DB` | `/stats/stats.db` | The usage stats file, on the volume `bwtidy-stats` that `compose.yaml` mounts at `/stats`. It must be outside the accounts directory and the backups. |
 
 The gateway checks the six from `BWTIDY_HEARTBEAT_TIMEOUT` to
 `BWTIDY_FAILED_KEEP_HOURS` at its start and passes them on to every worker,
@@ -126,28 +126,14 @@ It never keeps item names, values, folder or field names, what you searched
 for, request bodies, error messages, IP addresses or browsers. After 200 days
 the requests are kept only as counts per day.
 
-`compose.yaml` mounts only the accounts and the backups, and its root file
-system is read-only, so the file needs a volume of its own. Set in `.env`:
+`compose.yaml` keeps the file at `/stats/stats.db` on the volume
+`bwtidy-stats` because the container's root file system is read-only. So
+`BWTIDY_STATS=1` in `.env` is all it takes.
 
-```sh
-BWTIDY_STATS=1
-BWTIDY_STATS_DB=/stats/stats.db
-```
-
-and mount the volume in a `compose.override.yaml` next to `compose.yaml`,
-which Compose reads by itself:
-
-```yaml
-services:
-  bwtidy:
-    volumes:
-      - bwtidy-stats:/stats
-
-volumes:
-  bwtidy-stats:
-```
-
-Without a place it can write the file, the gateway does not start.
+A path of your own in `BWTIDY_STATS_DB` needs a mount that takes writes, added
+in a `compose.override.yaml` next to `compose.yaml`. Without one the gateway
+does not start. Outside `compose.yaml` an unset `BWTIDY_STATS_DB` means
+`stats.db` in the parent of the accounts directory.
 
 `bwtidy stats` prints the last 14 days: the accounts, the UI and MCP
 operations with how many succeeded and failed, the busiest hour and the most
@@ -189,6 +175,8 @@ The paths in the container:
 └── HOST/
     └── EMAIL/
         └── TIMESTAMP.zip.age     a backup, named by its time in UTC
+/stats/                           the volume bwtidy-stats, empty unless BWTIDY_STATS=1
+└── stats.db                      the usage stats
 ```
 
 `bwtidy.sqlite` is not encrypted: a secret value is in it only

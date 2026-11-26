@@ -1,11 +1,14 @@
 """The gateway's settings (docs/spec.md, Gateway): what it reads from the environment and passes on
 to the workers."""
 
+import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from bwtidy.config import SettingsError
+from bwtidy.gateway.app import stats_outside_accounts
 from bwtidy.gateway.settings import GatewaySettings, passed_on_from_env
 from tests.support.gateway_env import make_env
 
@@ -90,3 +93,23 @@ def test_the_usage_stats_are_off_unless_asked_and_their_file_follows_the_account
     monkeypatch.delenv("BWTIDY_ACCOUNTS_DIR")
     monkeypatch.delenv("BWTIDY_STATS_DB")
     assert GatewaySettings.from_env().stats_path == Path("/data/stats.db")
+
+
+def test_compose_keeps_the_stats_file_on_a_volume_of_its_own(monkeypatch: pytest.MonkeyPatch):
+    ## the root file system of compose.yaml is read-only, so BWTIDY_STATS=1 alone works only
+    ## when the default path lies on a mount that takes writes
+    compose = Path(__file__).resolve().parents[4] / "compose.yaml"
+    service = yaml.safe_load(compose.read_text())["services"]["bwtidy"]
+    assert service["read_only"] is True
+    environment = service["environment"]
+    default = re.fullmatch(r"\$\{BWTIDY_STATS_DB:-(.+)\}", environment["BWTIDY_STATS_DB"])
+    assert default is not None
+    mounts = {Path(volume.rsplit(":", 1)[1]) for volume in service["volumes"]}
+    monkeypatch.setenv("BWTIDY_STATS", "1")
+    monkeypatch.setenv("BWTIDY_STATS_DB", default[1])
+    monkeypatch.setenv("BWTIDY_ACCOUNTS_DIR", "/data/accounts")
+    monkeypatch.setenv("BWTIDY_BACKUPS_ROOT", environment["BWTIDY_BACKUPS_ROOT"])
+    settings = GatewaySettings.from_env()
+    assert settings.stats_path.parent in mounts
+    assert {settings.accounts_dir, settings.backups_root} <= mounts
+    stats_outside_accounts(settings)

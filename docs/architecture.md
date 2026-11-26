@@ -259,9 +259,10 @@ checkout as `bwtidy:local` instead (how to run it: docs/how-to/run.md). The
 container has a read-only root file system with a tmpfs `/tmp`, the
 capabilities the gateway needs to start workers as other uids, a health check
 on `/api/health` and its port 8000 published on the host's `127.0.0.1` (8765
-by default). It mounts the volume `bwtidy-accounts` at `/data/accounts` and
+by default). It mounts the volume `bwtidy-accounts` at `/data/accounts`,
 the backups at `/backups` (the volume `bwtidy-backups` or the host directory
-that `BWTIDY_BACKUPS` names, with `BWTIDY_BACKUPS_ROOT=/backups`). A stop gets 150
+that `BWTIDY_BACKUPS` names, with `BWTIDY_BACKUPS_ROOT=/backups`) and the
+volume `bwtidy-stats` at `/stats` (with `BWTIDY_STATS_DB=/stats/stats.db`). A stop gets 150
 seconds, which `STOP_TIMEOUT` in `gateway/workers.py` plus the gateway's
 request drain must stay below.
 
