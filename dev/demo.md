@@ -448,7 +448,9 @@ vault that is handed out always finds a free worker.
 ## The edge
 
 nginx, configured by `demo/edge/default.conf.template`: the image fills in
-the rates and bursts from the container's environment when it starts. It
+the rates, the bursts and the port from the container's environment when it
+starts. `demo/edge/15-trusted-proxies.sh` runs before that and writes the
+real-ip config (Behind a reverse proxy). It
 proxies everything to `demo:8000` with the `Host` header the browser sent
 (the cookies, the redirects and MCP's host check go by it), and applies the
 limits above with `limit_req`, keyed by the client's address. `/mcp` is not
@@ -457,9 +459,67 @@ streamable HTTP answers with a stream of events. bwtidy uses no WebSocket.
 The template is mounted from the checkout, so a change to it takes a
 `docker compose restart edge`.
 
-Behind a reverse proxy the edge sees the proxy's address for every visitor,
-so the limits then count for all visitors together. Raise them, or limit in
-the proxy.
+Behind a reverse proxy the edge sees the proxy's address for every visitor.
+Name the proxy in `DEMO_TRUSTED_PROXIES` and the limits count the visitor
+(Behind a reverse proxy).
+
+## Behind a reverse proxy
+
+Settings for an edge that sits behind a proxy with TLS:
+
+- `DEMO_TRUSTED_PROXIES`: a space separated list of addresses or CIDRs,
+  empty by default. For each entry the edge gets a `set_real_ip_from`, plus
+  `real_ip_header X-Forwarded-For` and `real_ip_recursive on`, so the limits
+  count the visitor the proxy names. The entry is the address the edge sees
+  the proxy from, not the visitor's. `15-trusted-proxies.sh` writes
+  `/etc/nginx/conf.d/00-real-ip.conf` when the container starts. With the
+  list empty it writes nothing and the edge never believes
+  `X-Forwarded-For`, so a visitor cannot pick the address the limits count.
+  The proxy must set the header itself (Caddy's `reverse_proxy` and nginx's
+  `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for` do).
+- `DEMO_EDGE_PORT`: the port nginx listens on inside the edge, `80` by
+  default. The published port stays `DEMO_BIND:DEMO_PORT` and maps to it. Set
+  it when something else already uses 80 in the edge's network namespace
+  (a sidecar), or when the proxy expects another port.
+- `DEMO_SECURE_COOKIES=1` and `DEMO_HOST` set to the public host name or
+  address, as in On a VPS.
+
+The sidecar pattern: a VPN or tunnel container carries the edge's network,
+so the stack publishes no port and the proxy reaches the edge through the
+tunnel. An override file for `compose.demo.yaml`:
+
+```yaml
+services:
+  sidecar:
+    # the VPN client image of your choice, with its own settings
+    image: busybox:1.37
+    command: ["sleep", "infinity"]
+    networks:
+      - front
+      - public
+
+  edge:
+    network_mode: service:sidecar
+    ports: !reset []
+    networks: !reset {}
+    depends_on:
+      sidecar:
+        condition: service_started
+```
+
+The sidecar joins `front` (where the demo is) and `public` (the route out for
+the tunnel), and the edge shares its network namespace, so nginx reaches
+`demo:8000` through the sidecar's networks. Run both files:
+
+```sh
+docker compose -f compose.demo.yaml -f sidecar.yaml up -d
+```
+
+Set `DEMO_EDGE_PORT` to the port the tunnel forwards to, and
+`DEMO_TRUSTED_PROXIES` to the proxy's address as the edge sees it (the tunnel
+address of the proxy). `demo/tests/files/sidecar-override.yaml` is this
+override with the stand-in, and a test checks that `docker compose config`
+accepts it.
 
 ## Testing
 
@@ -478,6 +538,8 @@ counts and limits, the ledger across a restart, failed builds, the token on
 every route, `/status` and the log lines without a secret), and `BwCli`
 against a fake `bw` script (the arguments, the environment and the
 temporary directory).
+
+`test_edge.py` renders the edge's config as the container does (an empty `DEMO_TRUSTED_PROXIES` writes no real-ip config, a list writes one `set_real_ip_from` each, `DEMO_EDGE_PORT` sets the listen port) and checks that the sidecar override is valid compose.
 
 `test_gateway.py` runs the wrapper with the gateway's fake worker approach:
 a small script that answers the health, the bw-login sequence and an echo of
@@ -573,6 +635,8 @@ default. A `.env` beside the compose file or the environment changes it:
 | `DEMO_IMAGE`            | `bwtidy-demo:local`              | the name the built demo image gets                          |
 | `DEMO_BUILD_CONTEXT`    | `.`                              | the build context: the checkout, or a git URL               |
 | `DEMO_BIND`, `DEMO_PORT` | `127.0.0.1`, `8770`             | where the edge is published                                 |
+| `DEMO_EDGE_PORT`        | `80`                             | the port nginx listens on inside the edge, the published port maps to it |
+| `DEMO_TRUSTED_PROXIES`  | empty                            | reverse proxies whose `X-Forwarded-For` is believed (Behind a reverse proxy) |
 | `DEMO_HOST`             | empty                            | the public host name, for MCP's host check (`BWTIDY_MCP_HOSTS`) |
 | `DEMO_SECURE_COOKIES`   | empty                            | `1` behind HTTPS (`BWTIDY_SECURE_COOKIES`)                  |
 | `DEMO_POOL_READY`, `DEMO_MAX` | 2, 6                       | the pool and the visitors at once                           |
@@ -599,7 +663,8 @@ BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234 docker compose -f compose.demo.yam
 ```
 
 Without a checkout, the host needs `compose.demo.yaml` and
-`demo/edge/default.conf.template` (the edge mounts it) at their paths, and
+`demo/edge/default.conf.template` and `demo/edge/15-trusted-proxies.sh` (the
+edge mounts them) at their paths, and
 `DEMO_BUILD_CONTEXT` names the repo for the build, a branch or commit after
 `#`:
 
@@ -738,7 +803,7 @@ front of it holds the certificate for the public name.
 
 2. Build from a pinned commit with a remote git context, so the VPS needs no
    checkout of the sources (only `compose.demo.yaml` and
-   `demo/edge/default.conf.template` at their paths):
+   the two files of `demo/edge` at their paths):
 
    ```sh
    DEMO_BUILD_CONTEXT=https://github.com/tnek213/bwtidy.git#COMMIT docker compose -f compose.demo.yaml up -d --build
@@ -772,10 +837,9 @@ front of it holds the certificate for the public name.
    }
    ```
 
-   The edge limits go by the address of the peer, and behind the proxy that
-   is the proxy for every visitor. The limits then cap the demo as a whole
-   instead of each visitor, which protects it just as well and means one
-   visitor's burst can use the rest's share.
+   The edge limits go by the address of the peer. Behind the proxy that is
+   the proxy for every visitor, unless the edge trusts the proxy's
+   `X-Forwarded-For` (Behind a reverse proxy).
 
 Updating: pull the new commit or set a new `COMMIT` and `BWTIDY_IMAGE`, and
 run the `up -d --build` again. Every container that changed is made anew,

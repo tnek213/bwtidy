@@ -232,17 +232,22 @@ services:
       DEMO_START_BURST: ${DEMO_START_BURST:-5}
       DEMO_MCP_RATE: ${DEMO_MCP_RATE:-10r/s}
       DEMO_MCP_BURST: ${DEMO_MCP_BURST:-40}
+      ## the port nginx listens on inside the container
+      DEMO_EDGE_PORT: ${DEMO_EDGE_PORT:-80}
+      ## addresses or CIDRs of reverse proxies whose X-Forwarded-For is believed, empty for none
+      DEMO_TRUSTED_PROXIES: ${DEMO_TRUSTED_PROXIES:-}
     volumes:
       - ./demo/edge/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./demo/edge/15-trusted-proxies.sh:/docker-entrypoint.d/15-trusted-proxies.sh:ro
     ## loopback by default: put a reverse proxy with TLS in front, or reach it through a tunnel
     ports:
-      - "${DEMO_BIND:-127.0.0.1}:${DEMO_PORT:-8770}:80"
+      - "${DEMO_BIND:-127.0.0.1}:${DEMO_PORT:-8770}:${DEMO_EDGE_PORT:-80}"
     networks:
       - front
       - public
     ## through nginx to the gateway, so healthy means a visitor gets an answer
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:${DEMO_EDGE_PORT:-80}/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3

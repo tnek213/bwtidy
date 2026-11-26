@@ -13,7 +13,7 @@ upstream demo {
 }
 
 server {
-    listen 80 default_server;
+    listen ${DEMO_EDGE_PORT} default_server;
     server_tokens off;
     ## a redirect of nginx's own names the path alone: nginx knows neither the published port
     ## nor the scheme a proxy in front of it speaks
