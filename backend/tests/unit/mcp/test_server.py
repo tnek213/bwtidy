@@ -198,7 +198,7 @@ def test_tool_descriptions_say_proposals_only_and_no_secrets(env: AppEnv):
         assert "Secret values are never available" in description
     for name in ("propose_set_uris", "propose_set_uri_match"):
         description = tools[name].description or ""
-        assert "no secret value is read or written" in description
+        assert "No secret value is read or written" in description
         assert "null is the client's default" in description
         for word in ("domain", "host", "startsWith", "exact", "regex", "never"):
             assert word in description, (name, word)

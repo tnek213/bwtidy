@@ -71,7 +71,8 @@ def test_search_finds_pages(page: Page):
     page.keyboard.press("/")
     page.get_by_placeholder("Search").fill("backup")
     expect(page.get_by_text(re.compile(r"^\d+ results$"))).to_be_visible()
-    expect(page.get_by_role("link", name="Restoring a vault from a bwtidy backup")).to_be_visible()
+    nav = page.get_by_role("navigation", name="How-to guides")
+    expect(nav.get_by_role("link", name="Restore a vault from a backup")).to_be_visible()
 
 
 ## the theme's own content column is about 810 px wide in a 1600 px window
