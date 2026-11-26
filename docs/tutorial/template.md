@@ -53,7 +53,7 @@ has a datatype, its value must fit it too.
 
     ![The new template's coordinates login.username, login.password and login.uris with the datatype Web address and Save outlined as 1 and 2](../images/tutorial-template-editor.png)
 
-bwtidy keeps the datatype and the template in its own note in your vault. It
+bwtidy keeps the datatype and the template in the bwtidy note in your vault. It
 saves them right away (see [The bwtidy note](../explanation/tool-note.md)).
 
 ## See it in the grid

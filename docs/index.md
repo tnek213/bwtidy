@@ -19,8 +19,8 @@ through MCP. The agent can add proposed changes to a queue without seeing
 secret values. You review each proposal and decide whether to accept it. Only
 accepted proposals are written to your vault.
 
-Before each write bwtidy saves a backup of the whole vault. The backup is an
-age-encrypted ZIP stored in bwtidy's backups volume. You can restore it with
+Before each write of your changes bwtidy saves a backup of the whole vault.
+The backup is an age-encrypted ZIP stored in bwtidy's backups volume. You can restore it with
 standard tools. Your vault stays on your Bitwarden or Vaultwarden server.
 bwtidy reads and writes vault data through Bitwarden's official CLI.
 
@@ -49,18 +49,19 @@ New to bwtidy? [Run it](how-to/run.md) first and then follow
 - **Your vault stays on your server.** bwtidy runs in one container on your
   machine. It reads and writes your vault through `bw`, Bitwarden's official
   CLI.
-- **A backup before every write.** bwtidy saves a backup of the whole vault
-  before each write. The backup is a ZIP encrypted with age using your master
+- **A backup before your changes are written.** bwtidy saves a backup of the
+  whole vault before each write of your changes. The backup is a ZIP encrypted with age using your master
   password as the passphrase. It lives in bwtidy's backups volume and can be
   restored with standard tools without bwtidy.
 - **Your master password.** It remains in memory while you are logged in and is
   wiped when you log out. It is also wiped two minutes after you close the last
   tab or after two hours without activity. Both timings are defaults. A copy is
-  stored in bwtidy's note in your vault so older backups remain readable after
+  stored in the bwtidy note in your vault so older backups remain readable after
   you change your password. It is never written elsewhere or logged and it is
   never given to an AI agent.
-- **bwtidy's settings stay in one item.** It stores settings in a secure note
-  named `bwtidy`. You can rename the note and bwtidy will still find it.
+- **Your templates travel with your vault.** bwtidy keeps your templates and
+  datatypes in a secure note named `bwtidy` along with the generator settings.
+  You can rename the note and bwtidy will still find it.
 - **Accounts are kept apart.** Each account runs in its own process under its
   own Linux user. One account cannot read another account's data.
 - **You control changes.** In the web UI you make changes directly. An AI agent
@@ -114,7 +115,8 @@ the first starts from the vault as the one before it left it.
   template. The grid shows how well each item fits the template and each
   value its datatype. Then you use the template to turn notes into logins.
 - In [Your first MCP-assisted cleanup](tutorial/mcp.md) you make an MCP
-  token and connect your agent. Then you approve its proposals in the Queue.
+  token and connect your agent. Then you approve its proposals on the Queue
+  page.
 
 ## How-to guides
 
@@ -155,7 +157,7 @@ the first starts from the vault as the one before it left it.
   secret and where they never go. It also says what a backup holds.
 - [What an agent can do](explanation/mcp.md) explains what an agent sees and
   what it can propose. Nothing it proposes is written until you approve it
-  in the Queue.
+  on the Queue page.
 - [The bwtidy note](explanation/tool-note.md) describes the note that bwtidy
   keeps in your vault and what it holds.
 - [How bwtidy uses the Bitwarden CLI](explanation/bw-cli.md) shows how

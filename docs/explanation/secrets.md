@@ -4,7 +4,7 @@ bwtidy treats some values as secret. Such a value stays in your vault and in
 encrypted files. The worker holds it in memory while you are logged in. You
 see one only when you reveal it.
 
-```graphviz alt="Your vault loads into the worker's memory at the unlock. From there a secret reaches the grid one revealed cell at a time. An export of the vault goes into the backups encrypted with your master password. A grid edit or a new item's secret waits age-encrypted in the queue until the worker decrypts it for its write. No log or error message gets a secret, and no MCP answer or change log entry does either."
+```graphviz alt="Your vault loads into the worker's memory at the unlock. From there a secret reaches the grid one revealed cell at a time. An export of the vault goes into the backups encrypted with your master password. A grid edit or a new item's secret waits age-encrypted in the queue until the worker decrypts it for its write. No log or error message gets a secret, and no MCP answer or Change log row does either."
 digraph {
   rankdir=TB
   nodesep=0.35
@@ -17,7 +17,7 @@ digraph {
   grid [label="Grid\neach revealed cell\nfor up to 30 seconds"]
   queue [label="Queue in SQLite\nage-encrypted" shape=cylinder fillcolor="#f1f8e9" color="#558b2f"]
   backups [label="Backups\nencrypted with your\nmaster password" shape=cylinder fillcolor="#f1f8e9" color="#558b2f"]
-  never [label="Logs\nerror messages\nMCP answers\nchange log" fillcolor="#ffebee" color="#c62828" fontcolor="#b71c1c"]
+  never [label="Logs\nerror messages\nMCP answers\nChange log" fillcolor="#ffebee" color="#c62828" fontcolor="#b71c1c"]
   vault -> worker [label=" unlock"]
   worker -> grid [label=" reveal"]
   grid -> queue [label=" edit or new item"]
@@ -62,8 +62,9 @@ the two columns but never the value.
 
 ## Where they never go
 
-Secret values never reach a log, an error message, an MCP answer or the
-change log. The SQLite file holds a secret only in age-encrypted form.
+Secret values never reach a log or an error message. They never reach an MCP
+answer or the Change log either. The SQLite file holds a secret only in
+age-encrypted form.
 
 An edit of a secret cell waits in the queue encrypted, and so does a new
 item's secret value. The key that encrypts them is itself encrypted with
@@ -77,7 +78,9 @@ goes.
 
 ## Backups
 
-Every write has a backup of the whole vault as it is right before the write.
+Every write of your changes has a backup of the whole vault as it is right
+before the write. Only the few writes that an unlock makes to the bwtidy note
+come without one (see [How bwtidy writes it](tool-note.md#how-bwtidy-writes-it)).
 Each backup is one file `TIMESTAMP.zip.age`. It is a zip encrypted with
 [age](https://age-encryption.org) with your master password as the
 passphrase. You open it with `age -d` at a terminal.
@@ -91,12 +94,10 @@ A backup holds these parts:
 - the raw listings of the folders, collections and organizations
 - `RESTORE.md` with the steps that bring a lost vault back
 
-`bw import` has no zip format. A restore therefore imports the `data.json`
-inside the personal export. `RESTORE.md` is a copy of
+`RESTORE.md` is a copy of
 [Restore a vault from a backup](../restore.md), which also shows
 [every file of a backup](../restore.md#what-a-backup-holds). Its steps need
-nothing of bwtidy, only age and Python 3 with bash and the Bitwarden CLI.
-They work on Linux and macOS as well as Windows.
+nothing of bwtidy.
 
 The exports go from the CLI into memory and bwtidy builds the zip there. No
 plain copy of your vault touches the disk.

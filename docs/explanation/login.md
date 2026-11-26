@@ -78,7 +78,10 @@ The session ends when one of these happens:
 
 Both times are defaults that
 [Configuration](../reference/configuration.md#set-in-env) lets you change.
-At the end your unsaved edits are written first. Then `bw serve` is locked
+At the end bwtidy first tries to write your unsaved edits. An edit it cannot
+write in time stays pending for the next unlock (see
+[How edits are saved](edits.md#the-queue-and-the-auto-commit)). Then
+`bw serve` is locked
 and the password and the session key are wiped from memory. MCP is switched
 off and the worker exits. The CLI stays logged in unless you tick "Also log
 out of Bitwarden" in the Log out dialog.

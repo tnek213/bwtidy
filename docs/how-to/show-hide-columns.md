@@ -1,7 +1,8 @@
 # Show or hide columns
 
-The Columns button above the grid opens the column chooser. While you have
-hidden columns there the button says how many, as in Columns (3 hidden). The
+Click Columns above the grid to open the column chooser. There you show or
+hide columns and pick the columns for a merge. While you have hidden columns
+in the chooser the button says how many, as in Columns (3 hidden). The
 chooser lists the columns under their groups. The Item group comes first and
 Custom fields last. In between come the groups of the item types, such as
 Login or SSH key.

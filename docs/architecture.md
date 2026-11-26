@@ -31,26 +31,10 @@ directory. It starts its own `bw serve` as a child on a second socket and
 holds the unlocked vault in RAM. It exits when the session ends. Only bw talks
 to the Bitwarden server.
 
-```mermaid alt="The browser and an MCP client reach the gateway, which proxies to one worker per account"
-%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false, "rankSpacing": 32, "nodeSpacing": 24}}}%%
-flowchart LR
-  browser["Browser"]
-  agent["MCP client<br/>with a bearer token"]
-  gateway["Gateway<br/>root, port 8000"]
-  subgraph a["Account A"]
-    workerA["Worker A<br/>uid A, app.sock"] -- bw.sock --> serveA["bw serve A"]
-  end
-  subgraph b["Account B"]
-    workerB["Worker B<br/>uid B, app.sock"] -- bw.sock --> serveB["bw serve B"]
-  end
-  server[("Bitwarden<br/>server")]
-  browser -- HTTP --> gateway
-  agent -- HTTP --> gateway
-  gateway --> workerA
-  gateway --> workerB
-  serveA --> server
-  serveB --> server
-```
+[How bwtidy fits together](explanation/overview.md) draws these processes for
+two accounts. The gateway listens on port 8000 in the container. A worker
+answers on `run/app.sock` in its account's directory and its `bw serve` on
+`run/bw.sock`.
 
 The worker's code lies in fifteen layers under `backend/src/bwtidy`. A module
 imports from its own layer and the layers below it but never from a layer

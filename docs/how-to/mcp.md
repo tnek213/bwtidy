@@ -157,5 +157,6 @@ Each answer has its own fix.
   is missing from `BWTIDY_MCP_HOSTS`. Add it as in
   [Behind a reverse proxy](#behind-a-reverse-proxy).
 - When every tool call answers that bwtidy MCP is disabled, switch MCP on in
-  the app bar. The tools answer only while a logged in tab is open, so log in
-  again if the session has ended.
+  the app bar. The tools answer only while your session runs, so log in
+  again if it has ended (see
+  [The session](../explanation/login.md#the-session)).

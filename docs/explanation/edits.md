@@ -15,14 +15,16 @@ in the Auto-commit box on the Queue page. Commit now writes the waiting edits
 at once. A save on the Types page or of the generator settings skips the wait
 and is written right away.
 
-When you log out or switch account, bwtidy writes the waiting edits first.
-The same happens when your session times out. An edit that could not be
-written then stays in the queue and is written right after the next unlock.
+When you log out or switch account, bwtidy tries to write the waiting edits
+first. The same happens when your session times out. An edit that could not
+be written then stays in the queue and the next unlock tries it again at
+once.
 
 An agent's proposals wait in the same queue. The auto-commit never takes
 them, so they are written only when you approve them (see
 [What an agent can do](mcp.md)). The only writes that skip the queue are a
-few to bwtidy's own note (see [The bwtidy note](tool-note.md)).
+few to the bwtidy note (see
+[How bwtidy writes it](tool-note.md#how-bwtidy-writes-it)).
 
 ## What a write does
 
@@ -46,7 +48,7 @@ Each item gets one last check right before it is written. When an edit fails
 there the edits before it stay written and the ones after it wait in the
 queue for the next write.
 
-Last, the write records itself in the change log and reloads the vault. It
+Last, the write records its changes in the Change log and reloads the vault. It
 also starts the next backup in the background.
 
 ```mermaid alt="A write syncs and checks the edits, then takes a backup and checks again before it writes the items one at a time and records the changes"
@@ -80,10 +82,11 @@ under the new name is in place. The backup holds that old file. When such a
 rename fails halfway, bwtidy deletes its own copy again as long as the old
 file is still there.
 
-## The change log
+## The Change log
 
-Every write gets a row in the Change log. The row says when the write ran
-and whether it came from the grid or an agent. It names the operation and
+Each change that a write tries gets a row in the Change log. Changes written
+together share their backup. The row says when the write ran and whether
+the change came from the grid or an agent. It names the operation and
 the items and fields it touched. It also shows the result and the backup
 taken before the write. A row never holds a value.
 

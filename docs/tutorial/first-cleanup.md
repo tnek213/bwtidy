@@ -73,7 +73,7 @@ Five notes call their password field `Password` and two others call it
 
 Switch Hide empty columns off and clear Search to see the whole vault again.
 
-## See it in the Queue
+## See it on the Queue page
 
 Click Queue in the app bar. Both edits wait under Pending. Each shows its
 items and the values before and after (a secret value stays masked).
@@ -103,12 +103,6 @@ backup or reuses one that matches the vault. It has its own row further
 down, which links to its file. The file is encrypted with your master
 password. Right after the write bwtidy starts the next backup in the
 background. Its row shows at the top once it is done.
-
-```mermaid alt="A backup is taken or reused before the write and the Backup column of your two rows names it. The write gives each of your two edits a row. After the write the next backup starts in the background and its row shows at the top of the Change log."
-flowchart LR
-  before[(Backup taken or reused<br>named in the Backup column)] --> write[The write with<br>a row for each edit]
-  write --> after[(Next backup started<br>in the background)]
-```
 
 Changed your mind? Restore on an edit's row opens a dialog that says what
 happens to each item. Once you confirm, it puts them back as that backup

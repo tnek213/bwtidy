@@ -87,22 +87,29 @@ id yet (after a reinstall, say). Its `note` section names it. Each time
 bwtidy looks for its note it tries these ways in turn. Only an unlock
 creates a note when none of them finds one.
 
-```mermaid alt="bwtidy looks for its note among your personal secure notes. It first tries the id it remembers, whatever the note is named now. Then it tries the name bwtidy and then a note whose note section holds its own name. The first match is the bwtidy note. When nothing matches an unlock creates a new note named bwtidy. bwtidy remembers the id of the note it settles on."
-flowchart TD
-  Start(["Look among your<br/>personal secure notes"])
-  Id{"A note with the<br/>remembered id?"}
-  Name{"A note named<br/>bwtidy?"}
-  Own{"A note whose note<br/>section names it?"}
-  New["An unlock creates a<br/>new note named bwtidy"]
-  Found(["The bwtidy note<br/>with its id remembered"])
-  Start --> Id
-  Id -- yes --> Found
-  Id -- no --> Name
-  Name -- yes --> Found
-  Name -- no --> Own
-  Own -- yes --> Found
-  Own -- no --> New
-  New --> Found
+```graphviz alt="bwtidy looks for its note among your personal secure notes. It first tries the id it remembers, whatever the note is named now. Then it tries the name bwtidy and then a note whose note section holds its own name. The first match is the bwtidy note. When nothing matches an unlock creates a new note named bwtidy. bwtidy remembers the id of the note it settles on."
+digraph {
+  nodesep=0.4
+  ranksep=0.3
+  fontname="sans-serif"
+  node [fontname="sans-serif" fontsize=13 shape=box style="rounded,filled" fillcolor="#ffffff" color="#5c6bc0" margin="0.12,0.06"]
+  edge [fontname="sans-serif" fontsize=12 color="#455a64"]
+  start [label="Look among your\npersonal secure notes" fillcolor="#e8eaf6"]
+  id [label="A note with the remembered id?"]
+  name [label="A note named bwtidy?"]
+  own [label="A note whose note section names it?"]
+  new [label="An unlock creates a\nnew note named bwtidy" fillcolor="#fff3e0" color="#e65100"]
+  found [label="The bwtidy note\nwith its id remembered" fillcolor="#f1f8e9" color="#558b2f"]
+  { rank=same; name; found }
+  start -> id
+  id -> name [label=" no"]
+  name -> own [label=" no"]
+  own -> new [label=" no"]
+  id -> found [label="yes"]
+  name -> found [label="yes"]
+  own -> found [label="yes"]
+  new -> found [constraint=false]
+}
 ```
 
 ## For developers

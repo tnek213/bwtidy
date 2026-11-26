@@ -21,8 +21,10 @@ shows how to check it. You can also
 ## Start it
 
 Get `compose.yaml` and `example.env` by cloning the repository. You can also
-download the two files into one directory from
-https://raw.githubusercontent.com/tnek213/bwtidy/main/ instead. Then copy
+download
+[compose.yaml](https://raw.githubusercontent.com/tnek213/bwtidy/main/compose.yaml)
+and [example.env](https://raw.githubusercontent.com/tnek213/bwtidy/main/example.env)
+into one directory instead. Then copy
 `example.env` to `.env`, which is your settings file. With a clone it takes
 these two commands.
 
@@ -170,7 +172,7 @@ both settings.
 - To update the published image, change `BWTIDY_VERSION` in `.env` or keep
   `latest`. Then run `docker compose pull && docker compose up -d`. Your data
   is kept.
-- To stop bwtidy, run `docker compose down`. The stop ends every session,
+- `docker compose down` stops bwtidy. The stop ends every session,
   which first tries to write your unsaved edits (see
   [Logging in](../explanation/login.md#the-session)). The volumes stay and
   with them your accounts and their backups. `docker compose down -v`

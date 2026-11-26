@@ -42,13 +42,13 @@ It also sees which secret fields an item has set but never their values.
 fields. Beyond the items it sees all of this:
 
 - the folders and the collections
-- the templates and the datatypes
+- the templates and the datatypes they use on plain values
 - how well each item fits its template
 - the custom fields whose names are near duplicates
 - its own proposals and what became of them
 
 It never sees the [bwtidy note](tool-note.md) or what an attachment holds.
-The backups and the change log are out of its reach too.
+The backups and the Change log are out of its reach too.
 
 ## What it can propose
 
@@ -80,7 +80,7 @@ under Rejected right away. The agent sees it as pending until bwtidy decides
 on another entry in the queue. From then on it shows as rejected.
 
 The agent can also end your session or log the Bitwarden CLI out. Like a
-logout in the web UI this first writes the edits you have waiting. Its
+logout in the web UI this first tries to write the edits you have waiting. Its
 instructions tell it to do either only when you ask.
 
 ## You approve every change
@@ -91,7 +91,7 @@ proposal shows it too.
 
 The auto-commit never takes a proposal. You approve or reject them one at a
 time or several at once. An approved batch is written like any edit, with a
-backup first and a change log row for each change.
+backup first and a Change log row for each change.
 [How edits are saved](edits.md) explains that write.
 
 ![The Queue page with an agent's pending proposal to rename an item, its checkbox and the Approve selected button outlined](../images/explanation-queue-proposal.png)
@@ -101,8 +101,10 @@ backup first and a change log row for each change.
 - The token picks the account. An agent reaches only the account whose token
   it holds. bwtidy keeps only a hash of the token, so it shows the token just
   once.
-- MCP works only while it is switched on in the app bar and while you are
-  logged in with a tab open. Every login starts with MCP switched off.
+- MCP works only while it is switched on in the app bar and your session
+  runs. By default the session ends 2 minutes after the last tab closes (see
+  [The session](login.md#the-session)). Every login starts with MCP switched
+  off.
 - The server answers only requests addressed to localhost or to a host name
   you allowed in `BWTIDY_MCP_HOSTS`. That way a web page cannot reach it
   through a host name of its own.

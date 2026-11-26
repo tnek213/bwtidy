@@ -40,7 +40,7 @@ digraph {
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `BWTIDY_IMAGE` | | The image to run without its tag. `compose.yaml` refuses to start without it. `example.env` sets the published image `docker.io/tnek213/bwtidy`. A build from a checkout (see [Run bwtidy](../how-to/run.md)) names its image `bwtidy:local` instead, but the variable must still be set. |
+| `BWTIDY_IMAGE` | | The image to run without its tag. `compose.yaml` refuses to start without it. `example.env` sets the published image `docker.io/tnek213/bwtidy`. A build from a checkout (see [Build the image yourself](../how-to/run.md#build-the-image-yourself)) names its image `bwtidy:local` instead, but the variable must still be set. |
 | `BWTIDY_VERSION` | `latest` | The image tag. A build from a checkout ignores it. |
 | `BWTIDY_HOST_PORT` | `8765` | The port on the host's 127.0.0.1 where the web page is published. |
 | `BWTIDY_BACKUPS` | `bwtidy-backups` | Where the backups are kept. It is the volume or a host directory such as another disk, a network share or a directory your backup tool reads. Its file system must let root chown. |
@@ -154,7 +154,7 @@ These are the paths in the container.
 └── HOST/
     └── EMAIL/                    one account's data, owned by its uid (mode 0700)
         ├── app/
-        │   ├── bwtidy.sqlite     the queue, the change log and the settings
+        │   ├── bwtidy.sqlite     the queue, the Change log and the settings
         │   └── mcp-token.sha256  the hash of the MCP token
         ├── bw/                   the Bitwarden CLI's login and state
         ├── home/                 the worker's home directory
@@ -168,9 +168,11 @@ These are the paths in the container.
 
 `bwtidy.sqlite` itself is not encrypted. A secret value is in it only
 age-encrypted. Names, notes and URIs are plain text in the queue's diffs. The
-change log names the fields that each write changed.
+Change log names the fields that each write changed.
 
-Decrypt a backup with `age -d -o backup.zip FILE` and give the master
-password it was made with as the passphrase. Every backup holds `RESTORE.md` with the steps
+Decrypt a backup with `age -d -o backup.zip FILE`. Its passphrase is the
+master password bwtidy last logged in with, and
+[step 1 of the restore](../restore.md#1-decrypt-the-backup-on-a-tmpfs) says
+when it is an earlier one. Every backup holds `RESTORE.md` with the steps
 that bring a lost vault back from it. The same steps are on the page
 [Restore a vault from a backup](../restore.md).

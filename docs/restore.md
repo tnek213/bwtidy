@@ -1,6 +1,6 @@
-# Restoring a vault from a bwtidy backup
+# Restore a vault from a backup
 
-Written for bwtidy COMMIT. The project: https://github.com/tnek213/bwtidy
+Written for bwtidy COMMIT. The project is at https://github.com/tnek213/bwtidy.
 
 This page is for when the vault itself is gone or badly broken. The account
 may be lost or most items deleted, or you may be moving to a new account. You
@@ -121,11 +121,15 @@ which is the volume `bwtidy-backups` or the host directory that
 
 `age` asks for the passphrase at a terminal. It is the master password bwtidy
 last logged in with, since a login with a new master password re-encrypts
-every backup. A copy made before a master password change takes an earlier
-one, and so does a backup whose re-encryption was cut off. The secure note
-named `bwtidy` lists these passphrases in its hidden fields `backup-password`
-and `older-backup-passwords`. Every backup that opens holds the note too. The
-second block below prints its fields.
+every backup under its backups mount. A backup keeps an earlier one when it
+was copied elsewhere before the change or its re-encryption was cut off. So
+does a backup that bwtidy could not open at that login. The bwtidy note lists
+these passphrases in its hidden fields `backup-password` and
+`older-backup-passwords`. It is a secure note named `bwtidy` unless you
+renamed it. The note keeps an earlier password only until the re-encryption
+is done, so for an older copy you may need to remember it yourself. Every
+backup that opens holds the note too. The second block below prints these
+two fields.
 
 The first block makes the directory for the decrypted files and decrypts and
 unpacks the backup there. Put the path of your backup in place of
@@ -151,15 +155,21 @@ for org in json.load(open("raw/organizations.json")):
     print("organization", org["id"], org["name"])'
 ```
 
-This prints the fields of the `bwtidy` note, which hold the passphrases of
-older backups.
+This prints the two fields of the bwtidy note with the note's name. It finds
+the note as a personal secure note with the field `backup-password`, so a
+renamed note shows too.
 
 ```sh
 python3 -c '
 import json
+wanted = ("backup-password", "older-backup-passwords")
 for item in json.load(open("raw/items.json")):
-    if item["name"] == "bwtidy":
-        print(json.dumps(item.get("fields"), indent=2))'
+    if item.get("type") != 2 or item.get("organizationId"):
+        continue
+    fields = [f for f in item.get("fields") or [] if f.get("name") in wanted]
+    if any(f["name"] == "backup-password" for f in fields):
+        print(item["name"])
+        print(json.dumps(fields, indent=2))'
 ```
 
 ## 2. Prepare an empty account
@@ -432,9 +442,11 @@ in the account. For the backup put the new name into `raw/organizations.json`
 under that id as well. Then run the program again.
 
 Each "no imported item fits" line is an attachment of a backup item that
-matches nothing. No imported item has its content and no single unused one has its type, name
-and organization. When every item of an organization gets such a line, check
-that the organization has the name it had in the backup (step 2). Otherwise
+matches nothing. No imported item has its content and no single unused one
+has its type, name and organization.
+
+When every item of an organization gets such a line, check that the
+organization has the name it had in the backup (step 2). Otherwise
 upload the attachments by hand.
 
 This prints the old item (OLDID). For an item of the trash put

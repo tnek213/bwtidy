@@ -2,7 +2,8 @@
 
 In this tutorial you connect an AI agent to bwtidy and ask it to sort the
 logins that are in no folder. The agent looks through your vault and
-proposes the moves. You review its proposals in the Queue and approve them.
+proposes the moves. You review its proposals on the Queue page and approve
+them.
 Then you find the write and its backup in the Change log.
 
 This tutorial continues from [Your first template](template.md) with the
@@ -19,7 +20,7 @@ You, your agent and bwtidy each have a part in this tutorial. You set up
 bwtidy and the agent. The agent proposes changes and only you decide which
 ones bwtidy writes.
 
-```mermaid alt="You make a token in bwtidy and switch MCP on. You connect your agent with the token and the MCP URL and ask it for a cleanup. The agent lists your items and folders and proposes the moves, which wait in the Queue. You approve them there and bwtidy writes them with a backup of the vault before the write. The Change log then shows the write and its backup."
+```mermaid alt="You make a token in bwtidy and switch MCP on. You connect your agent with the token and the MCP URL and ask it for a cleanup. The agent lists your items and folders and proposes the moves, which wait on the Queue page. You approve them there and bwtidy writes them with a backup of the vault before the write. The Change log then shows the write and its backup."
 sequenceDiagram
   participant Agent as AI agent
   actor You
@@ -29,8 +30,8 @@ sequenceDiagram
   You->>Agent: Ask for a cleanup
   Agent->>bwtidy: List the items and folders
   Agent->>bwtidy: Propose the moves
-  Note over bwtidy: The proposals wait in the Queue
-  You->>bwtidy: Approve them in the Queue
+  Note over bwtidy: The proposals wait on the Queue page
+  You->>bwtidy: Approve them on the Queue page
   Note over bwtidy: The write with a backup before it
   You->>bwtidy: Look in the Change log
 ```
@@ -92,7 +93,8 @@ in the prompt if yours differ.
 
 The agent lists your items and folders. Then it calls a propose tool once
 for each folder it moves logins into and tells you what it proposed. Nothing
-has changed in your vault yet. Each proposal waits in the Queue for you.
+has changed in your vault yet. Each proposal waits on the Queue page for
+you.
 
 In the pictures the agent proposes to move six logins into Home and Example
 Forge into Work. Old webshop and School portal are among the six. Your agent
@@ -104,7 +106,7 @@ Click Queue in the app bar. Its badge counts the entries that wait there.
 Each proposal shows its summary with the agent's reason. A table under it
 lists every item with the column it changes and the value before and after.
 
-![The Queue with two proposals to move logins into Home and Work, Select all and Approve selected outlined and numbered 1 and 2](../images/tutorial-mcp-queue.png)
+![The Queue page with two proposals to move logins into Home and Work, Select all and Approve selected outlined and numbered 1 and 2](../images/tutorial-mcp-queue.png)
 
 Read them as you would read a colleague's suggestions. The auto-commit never
 writes an agent's proposal, so they wait until you decide.

@@ -130,8 +130,8 @@ A cell's look tells you more:
 ### Cell menu
 
 Right click a cell to open its menu. The Cell part acts on the cell and the
-Row part on the item. Only the entries that fit the cell show. On bwtidy's
-own note every entry is disabled.
+Row part on the item. Only the entries that fit the cell show. On the
+bwtidy note every entry is disabled.
 
 ![The cell menu of a login's password cell, with Cell and Row parts](../images/reference-cell-menu.png)
 
@@ -218,7 +218,7 @@ Organization when you belong to one.
 
 ### Alerts
 
-- bwtidy's note is named "NAME" now shows when bwtidy's own note has another
+- bwtidy's note is named "NAME" now shows when the bwtidy note has another
   name than the one it should have, for example after a rename in another
   app. Rename it back gives it that name again. Keep this name keeps NAME and
   the warning goes away (see
@@ -315,12 +315,17 @@ Most entries start on Pending.
 ```graphviz alt="A new edit or proposal starts on Pending. A proposal that would put a secret value into a plain column goes straight to Rejected. A write takes entries from Pending and moves each to Applied or Failed. Entries that the write does not reach go back to Pending. Reject moves an entry to Rejected. Retry writes a failed entry again and Dismiss deletes it."
 digraph {
   rankdir=TB
-  bgcolor=white
-  node [shape=box style="rounded,filled" fillcolor="#ececff" color="#9370db" fontname="sans-serif" fontsize=14]
-  edge [color="#333333" fontname="sans-serif" fontsize=13]
-  new [shape=circle fixedsize=true width=0.6 label="New"]
+  nodesep=0.4
+  ranksep=0.4
+  fontname="sans-serif"
+  node [fontname="sans-serif" fontsize=13 shape=box style="rounded,filled" fillcolor="#ffffff" color="#5c6bc0" margin="0.12,0.06"]
+  edge [fontname="sans-serif" fontsize=12 color="#455a64"]
+  new [label="New" shape=plaintext style=""]
+  Pending [fillcolor="#e8eaf6"]
+  Applied [fillcolor="#f1f8e9" color="#558b2f"]
+  Failed [fillcolor="#fff3e0" color="#e65100"]
   writing [label="Writing" style="rounded,dashed"]
-  gone [label="Deleted" style="rounded,dashed"]
+  gone [label="Deleted" shape=plaintext style=""]
   new -> Pending [label="edit or proposal"]
   new -> Rejected [label="secret value refused"]
   Pending -> writing [label="commit or approve"]
@@ -373,8 +378,9 @@ On Failed:
 
 ## Change log
 
-The Change log lists every write with the fields it changed and its backup,
-newest first. The backup is the vault as it was right before that write.
+The Change log has a row for each change that a write tried and a row for
+each backup, newest first. A change's row names the fields it changed and
+its backup. That backup is the vault as it was right before the write.
 
 ![The Change log with the two written edits, their backup outlined and the backup's own row outlined below them](../images/tutorial-change-log.png)
 
@@ -386,8 +392,9 @@ newest first. The backup is the vault as it was right before that write.
   as text. It never holds a value.
 - The table shows Time and Source first. Operation follows (hover it for what
   it did) and then Items, Result and Backup.
-- A backup's name downloads the encrypted file. Decrypt it with `age -d` and
-  the master password.
+- The name on a backup's own row downloads the encrypted file. Decrypt it with `age -d` and
+  the master password (see
+  [step 1 of the restore](../restore.md#1-decrypt-the-backup-on-a-tmpfs)).
 - Restore on a row puts its items back as that backup holds them. A dialog
   first says what happens to each item. On a folder's row Restore gives the
   folder its old name back or creates a deleted folder again. On an attachment
@@ -428,7 +435,7 @@ generator and Delete data. Display holds the first three settings below.
   Bitwarden's own generator. Example shows what it makes and Another example
   makes a new one. Save keeps the choice as the default. An item can have its
   own from the cell menu.
-- Delete my data deletes every backup, the change log and the decided queue
+- Delete my data deletes every backup, the Change log and the decided queue
   entries. The settings, the MCP token and the templates stay.
 - Delete my account deletes the same and also the settings and the MCP token.
   It then logs out of Bitwarden and removes the account from bwtidy.
@@ -540,8 +547,9 @@ Bitwarden CLI logged in. With "Also log out of Bitwarden" checked it logs the
 CLI out too. The next login then runs the Bitwarden login again and
 bitwarden.com may email a new device code. Only a running session can log
 the CLI out. When the session already ended the page asks you to unlock
-first. Your unsaved changes are written before you are logged out.
-[Logging in](../explanation/login.md) explains the session and its end.
+first. bwtidy tries to write your unsaved changes before you are logged out.
+[Logging in](../explanation/login.md#the-session) explains the session and
+its end.
 
 ![The Log out dialog with Also log out of Bitwarden](../images/reference-log-out.png)
 
@@ -554,7 +562,7 @@ menu.
 
 The menu holds Settings, Switch account (while an account is open) and About
 bwtidy (2). Settings opens the [Settings](#settings) page. Switch account
-saves the edits not yet written, ends the session and takes you back to the
+tries to write the edits that wait, ends the session and takes you back to the
 account form. About bwtidy opens the [About](#about) page.
 
 ![The open More actions menu with About bwtidy outlined and numbered 2](../images/more-menu-open.png)

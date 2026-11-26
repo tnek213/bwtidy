@@ -51,7 +51,7 @@ flowchart LR
 - Your vault stays on your Bitwarden server. While you are logged in the
   worker keeps a copy of it in memory.
 - On disk each account has a directory with the Bitwarden CLI's login, a
-  SQLite file and a log. The SQLite file holds the queue, the change log and
+  SQLite file and a log. The SQLite file holds the queue, the Change log and
   the settings. The backups are encrypted files in a directory of their own.
   See [Configuration](../reference/configuration.md#files-and-volumes).
 - In the vault itself bwtidy keeps one secure note of its own. See
@@ -69,7 +69,7 @@ written in batches, while an agent's wait for your approval (see
 [How edits are saved](edits.md) and [What an agent can do](mcp.md)).
 
 Each write has an encrypted backup of the vault from just before it. Every
-write from the queue lands in the change log, where you can undo it. Secret
+write from the queue lands in the Change log, where you can undo it. Secret
 values stay masked unless you reveal one (see
 [Secret values and backups](secrets.md)).
 
