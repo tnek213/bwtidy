@@ -57,13 +57,22 @@ anything but what it is meant to call.
 
 ## Start flow
 
-1. `GET /demo` serves the start page from the wrapper, on the same origin as
-   bwtidy. Its Start demo button is a plain HTML form that POSTs to
-   `/demo/start`: both cookies are SameSite=Strict, so the browser must get
-   them in an answer to a same-site navigation, never a cross-site one.
-2. `POST /demo/start` asks the controller for a ready vault: its server
+1. `GET /demo` serves the start page from the wrapper (the template
+   `bwtidy_demo/templates/start.html`), on the same origin as bwtidy: what the
+   demo is, that the vault is deleted when the session ends (with the idle
+   timeout and `DEMO_SESSION_MAX` in minutes), never to enter one's own
+   details, and one Start demo button. It has no input field. The button is a
+   plain HTML form that POSTs to `/demo/start`: both cookies are
+   SameSite=Strict, so the browser must get them in an answer to a same-site
+   navigation, never a cross-site one. A start whose `Sec-Fetch-Site` is
+   neither `same-origin` nor `none` answers 403 and takes no vault, so another
+   site cannot use up the pool.
+2. `POST /demo/start` first ends the demo of the browser's routing cookie,
+   if it has a live one, as End demo does. It then asks the controller for a
+   ready vault (`POST /take` with the controller token): its server
    (`https://vaultwarden`), its email and its master password. The password
-   never leaves the `demo` process: no page, no log, no cookie.
+   never leaves the `demo` process: no page, no log, no cookie. A server
+   other than `DEMO_SERVER` fails the start.
 3. Then, in the gateway's process (`app.state.gateway`):
    1. `key = await account_key(server, email, settings.allowed_servers)`.
       `BWTIDY_ALLOWED_SERVERS` is `https://vaultwarden`, the only server.
@@ -85,10 +94,17 @@ anything but what it is meant to call.
    Secure per `BWTIDY_SECURE_COOKIES`.
 5. The frontend opens the grid as it does after any login, unchanged.
 
-A start that fails (no ready vault, a cap reached, a failed login) answers
-the start page again with a short text ("No demo vault is free right now.
-Try again in a minute.") and leaves no account behind: the worker is
-stopped, its exit hook deletes the directory and the Vaultwarden user.
+A start that fails answers 303 to the start page with a note, and leaves no
+account behind: the worker is stopped, its exit hook deletes the directory
+and the Vaultwarden user (a start that got no worker releases the vault
+itself). The query names one of three fixed notes, the page never shows a
+text from the request:
+
+| Query          | When                                   | The note                                                 |
+| -------------- | -------------------------------------- | -------------------------------------------------------- |
+| `?note=free`   | the controller has no ready vault (409) | "No demo vault is free right now. Try again in a minute." |
+| `?note=full`   | a cap of the gateway (`LimitError`)    | "The demo is full right now. Try again in a few minutes." |
+| `?note=failed` | anything else: the controller, the worker, the login | "The demo could not start. Try again in a minute." |
 
 `GET /` and `GET /index.html` without a routing cookie of a live demo
 account answer 303 to `/demo`, so a visitor whose demo ended lands on the
@@ -98,34 +114,51 @@ start page, never on the account form.
 
 An outer middleware of the wrapper (`app.add_middleware` after
 `create_gateway_app`, so it runs before the gateway's proxy) answers these
-from the browser with 403 and a plain text such as `The demo logs you in
-itself. Start a new demo at /demo.`:
+from the browser with 403 and the plain text `The demo logs you in itself.
+Start a new demo at /demo.`:
 
 - `POST /gateway/account`: only `/demo/start` routes a browser.
-- `POST /api/bw-login`, `POST /api/bw-login/input` and `POST
-  /api/bw-login/finish`: only the wrapper logs in, in process, never
-  through the proxy.
+- Every method on `/api/bw-login` and below it (`POST /api/bw-login`, `POST
+  /api/bw-login/input`, `POST /api/bw-login/finish`, the output and the
+  cancel): only the wrapper logs in, in process, never through the proxy.
 - `POST /api/session` (the unlock): the visitor has no password to type,
   and a working unlock form would be a credential field.
-- `POST /api/bw-logout`.
-- `POST /api/account/delete` (Delete my account, `api/account.py`): the end
-  of the demo deletes the account anyway.
+- `POST /api/bw-logout` (every method).
+- `POST /api/account/delete` (Delete my account, `api/account.py`, every
+  method): the end of the demo deletes the account anyway. `POST
+  /api/account/delete-data` stays.
+
+`POST /api/session/heartbeat` and `DELETE /api/session` (Lock) stay: Lock
+ends the session, and with it the demo.
+
+The middleware compares the path with its empty and dot segments resolved
+and without a trailing slash: the proxy forwards the raw path and httpx
+resolves its dot segments, so `/api/./bw-login` would reach the worker as
+`/api/bw-login`. The percent-encoded spellings are decoded by the server
+before the middleware sees them.
 
 `DELETE /gateway/account` (Switch account, and the end of Delete all data)
 becomes End demo: the wrapper stops the account's worker
 (`gateway.workers.stop`), which runs the cleanup below, and answers 204 with
-the routing cookie cleared, as the gateway would.
+the routing cookie and the session cookie cleared, as the gateway would.
 
-`POST /api/mcp/token` is capped: the wrapper reads its small JSON body and
-passes it on with `days` 1 when it asks for more or for no expiry (`null`).
-The answer's `expiresAt` shows the real expiry. MCP itself works for the
-visitor's vault only, as in bwtidy: the token names the account.
+`POST /api/mcp/token` is capped by rewriting, never refused: the wrapper
+reads its small JSON body (more than 4 KiB answers 413) and passes it on
+with `days` 1 when it asks for more, for no expiry (`null`), or leaves
+`days` out (bwtidy's default is 90 days). An empty body becomes `{"days":
+1}`. A JSON object is written anew, so the worker parses exactly what was
+checked. Anything else (not an object, `days` 0 or not a number) goes on as
+it is, and the worker refuses it. The answer's `expiresAt` shows the real
+expiry. MCP itself works for the visitor's vault only, as in bwtidy: the
+token names the account.
 
 ## Banner
 
 The wrapper's router serves `/` and `/index.html` itself (a router wins over
-the static files). It reads `settings.static_dir/index.html` once at the
-start and inserts a fixed banner right after `<body>`: "Demo: your vault is
+the static files), with `Cache-Control: no-store`. It reads
+`settings.static_dir/index.html` once at the start (a missing file or one
+without `<body>` fails the start) and inserts a fixed banner
+(`bwtidy_demo/templates/banner.html`) right after `<body>`: "Demo: your vault is
 deleted when the session ends. Never enter your own details." with an End
 demo button (a form that POSTs to `/demo/end`, which does what `DELETE
 /gateway/account` does and answers 303 to `/demo`).
@@ -152,16 +185,46 @@ The worker then exits (`BWTIDY_EXIT_AFTER_SESSION`), and the gateway awaits
    way `Gateway.delete_on_request` does: `gateway.accounts.delete(path,
    force=True)`, which also removes its backups directory, then
    `gateway.forget_key(key)`. The hook runs outside the gateway's own lock,
-   so it can take it.
-2. Tells the controller to delete the Vaultwarden user.
+   so it can take it. A backups directory whose account directory is gone
+   already goes too.
+2. Tells the controller to delete the Vaultwarden user (`POST /release`). A
+   502 (Vaultwarden refused) or no answer is tried again after 1, 2, 4 and 8
+   seconds, then given up with an error in the log. Any other refusal is
+   logged and not tried again.
 
-The hard maximum: the wrapper notes each demo's start and stops its worker
-(`gateway.workers.stop`) after `DEMO_SESSION_MAX`, whatever the activity.
-The cleanup then runs through the hook like any other end.
+The cleanup is idempotent: it releases each email once, however often the
+hook, End demo, the hard maximum or a failed start call it, and deleting a
+directory that is gone does nothing. End demo awaits it, so its answer comes
+once the account is gone.
 
-At its start the wrapper deletes every account directory left from before
-(they are all demo accounts) and asks the controller to delete their users.
-A gateway restart never leaves a vault behind.
+The hard maximum: the wrapper notes each demo's start once its login
+succeeded, checks every 10 seconds and stops the worker
+(`gateway.workers.stop`) of a demo older than `DEMO_SESSION_MAX`, whatever
+the activity. The cleanup then runs through the hook like any other end.
+
+At its start, before the gateway's own start, the wrapper deletes every
+account directory left from before (they are all demo accounts), the ones a
+create left under their temporary name and the backups directories without
+an account, and asks the controller to delete the users of those in
+`demo.bwtidy.test`. When the gateway stops, it stops every worker and their
+hooks clean up. A gateway restart never leaves a vault behind.
+
+### The wrapper's settings
+
+The wrapper (`bwtidy_demo.gateway`, `bwtidy-demo-gateway`) reads the
+gateway's own settings (`GatewaySettings.from_env`) and these. A missing or
+unusable one stops it at the start with a message naming it:
+
+| Setting                  | Default               | What                                                                 |
+| ------------------------ | --------------------- | -------------------------------------------------------------------- |
+| `DEMO_CONTROLLER_URL`    | none, required        | the controller's API, such as `http://controller:8100`             |
+| `DEMO_SECRETS`           | `/secrets`            | the secrets volume, its `controller-token` must be readable and not empty |
+| `DEMO_SERVER`            | `https://vaultwarden` | the demo's Vaultwarden. `BWTIDY_ALLOWED_SERVERS` must hold it and nothing else |
+| `DEMO_SESSION_MAX`       | `2700`                | the hard maximum of a demo, in seconds                               |
+
+`BWTIDY_STATIC_DIR` is required too: the banner is inserted into its
+`index.html`. The secrets volume's variable is `DEMO_SECRETS`, the name
+`init` and the controller read.
 
 ## Controller
 
@@ -308,7 +371,7 @@ The defaults, adjusted after measuring:
 | idle session end               | 15 minutes | `BWTIDY_SESSION_IDLE_TIMEOUT=900` (seconds)               |
 | closed tab                     | 2 minutes  | `BWTIDY_HEARTBEAT_TIMEOUT`, bwtidy's default 120          |
 | a session at most              | 45 minutes | `DEMO_SESSION_MAX=2700` (seconds, the wrapper)            |
-| MCP token lifetime             | 1 day      | the wrapper's cap on `POST /api/mcp/token`                 |
+| MCP token lifetime             | 1 day      | the wrapper's rewrite of `POST /api/mcp/token`             |
 | `POST /demo/start`             | per address | the edge's `limit_req` zone for it                        |
 | `/mcp`                         | per address | the edge's `limit_req` zone for it                        |
 
@@ -332,6 +395,18 @@ counts and limits, the ledger across a restart, failed builds, the token on
 every route, `/status` and the log lines without a secret), and `BwCli`
 against a fake `bw` script (the arguments, the environment and the
 temporary directory).
+
+`test_gateway.py` runs the wrapper with the gateway's fake worker approach:
+a small script that answers the health, the bw-login sequence and an echo of
+every other request, and writes each request it gets to a file in its
+account directory. The controller is a mock transport. It checks that every
+refused route, in every spelling (dot segments sent as a raw ASGI request,
+since an HTTP client resolves them), answers 403 and reaches no worker,
+that the routes the app needs still do, the redirects to `/demo`, the start
+page, the start (both cookies, the login sequence, no password in a page, a
+header or the log), the three notes, End demo and Switch account, the
+release once and its retries, the hard maximum, the start sweep, the banner
+and the MCP token rewrite.
 
 `bwtidy_demo.vaultwarden` registers and deletes the users. Its module
 docstring says where in Vaultwarden's and the Bitwarden clients' source each

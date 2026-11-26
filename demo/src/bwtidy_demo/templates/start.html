@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>bwtidy demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f7f9;
+        --card: #ffffff;
+        --text: #1d2330;
+        --muted: #4f5869;
+        --accent: #175cd3;
+        --note: #fff4d6;
+        --note-text: #5b4300;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #14171c;
+          --card: #1e232b;
+          --text: #e7eaf0;
+          --muted: #a9b1c0;
+          --accent: #6ea2ff;
+          --note: #3a3016;
+          --note-text: #f3dc9b;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.5 system-ui, sans-serif;
+      }
+      main {
+        max-width: 36rem;
+        margin: 3rem auto;
+        padding: 2rem;
+        background: var(--card);
+        border-radius: 0.75rem;
+      }
+      h1 {
+        margin-top: 0;
+        font-size: 1.6rem;
+      }
+      p {
+        color: var(--muted);
+      }
+      .warning {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .note {
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        background: var(--note);
+        color: var(--note-text);
+      }
+      button {
+        padding: 0.7rem 1.6rem;
+        border: 0;
+        border-radius: 0.5rem;
+        background: var(--accent);
+        color: #ffffff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      @media (max-width: 40rem) {
+        main {
+          margin: 1rem;
+          padding: 1.25rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Try bwtidy</h1>
+      <p>
+        bwtidy is a self-hosted web UI and MCP server for tidying a Bitwarden or Vaultwarden
+        vault. This demo gives you a vault of your own on a server that only the demo uses,
+        filled with sample items, and logs you in.
+      </p>
+      <p>
+        Your demo vault and everything in it are deleted when the session ends: after $idle
+        without activity, after $total at most, or when you click End demo.
+      </p>
+      <p class="warning">Never enter your own details, passwords or secrets in the demo.</p>
+      $note
+      <form method="post" action="/demo/start">
+        <button type="submit">Start demo</button>
+      </form>
+    </main>
+  </body>
+</html>
