@@ -47,30 +47,61 @@ New to bwtidy? [Run it](how-to/run.md), then follow
 ## At a glance
 
 - **Your vault stays on your server.** bwtidy runs in one container on your
-  own machine. It reads and writes your vault on your Bitwarden or
-  Vaultwarden server only through `bw`, Bitwarden's official command-line
-  tool, exactly as Bitwarden publishes it.
-- **A backup before every change.** Before each write bwtidy saves a backup
-  of the whole vault: a zip file encrypted with [age](https://age-encryption.org),
-  with your master password as the passphrase. The backups are in bwtidy's
-  backups volume, and you can restore one with standard tools, without
-  bwtidy.
-- **Your master password.** It stays in memory while you are logged in, and
-  is wiped when you log out, 2 minutes after you close the last tab or after
-  2 hours without activity (both by default). The one stored copy is inside
-  your own vault, in bwtidy's note, so older backups stay readable after you
-  change your master password. It is never written anywhere else, never
-  logged and never given to an AI agent.
-- **One item of its own in your vault.** bwtidy keeps its settings in one
-  item, a secure note named `bwtidy`. You can rename it, and bwtidy still
-  finds it.
-- **Accounts are kept apart.** Each account is handled by its own process,
-  running as its own Linux user, so one account cannot read another's data.
-- **AI agents propose, you decide.** An AI agent connected over MCP never
-  sees secret values, and nothing it proposes is written until you approve
-  it.
-- **No telemetry.** bwtidy sends nothing to its author or anyone else. The
-  only connection it makes is to your own Bitwarden server.
+  machine. It reads and writes your vault through `bw`, Bitwarden's official
+  CLI.
+- **A backup before every write.** bwtidy saves a backup of the whole vault
+  before each write. The backup is a ZIP encrypted with age using your master
+  password as the passphrase. It lives in bwtidy's backups volume and can be
+  restored with standard tools without bwtidy.
+- **Your master password.** It remains in memory while you are logged in and is
+  wiped when you log out. It is also wiped two minutes after you close the last
+  tab or after two hours without activity. Both timings are defaults. A copy is
+  stored in bwtidy's note in your vault so older backups remain readable after
+  you change your password. It is never written elsewhere or logged and it is
+  never given to an AI agent.
+- **bwtidy's settings stay in one item.** It stores settings in a secure note
+  named `bwtidy`. You can rename the note and bwtidy will still find it.
+- **Accounts are kept apart.** Each account runs in its own process under its
+  own Linux user. One account cannot read another account's data.
+- **You control changes.** In the web UI you make changes directly. An AI agent
+  connected through MCP can add proposed changes to a queue without seeing
+  secret values. You review each proposal and choose whether to accept it. Only
+  accepted proposals are written to your vault.
+- **No telemetry.** bwtidy sends no telemetry to its author or anyone else. Its
+  vault connection is to your Bitwarden or Vaultwarden server.
+
+```graphviz alt="bwtidy runs in one container on your machine and saves an encrypted backup to its backups volume before each write. You edit items in the web UI or accept what an AI agent proposes over MCP without seeing secret values, and bwtidy writes the changes through the Bitwarden CLI to your Bitwarden or Vaultwarden server."
+digraph {
+  nodesep=0.3
+  ranksep=0.4
+  fontname="sans-serif"
+  node [fontname="sans-serif" fontsize=13 shape=box style="rounded,filled" fillcolor="#ffffff" color="#5c6bc0" margin="0.12,0.06"]
+  edge [fontname="sans-serif" fontsize=12 color="#455a64"]
+  you [label="You" fillcolor="#e8eaf6"]
+  subgraph cluster_agent {
+    label="Sees no secret values" style="rounded,dashed" color="#e65100" fontcolor="#bf360c" fontsize=12
+    agent [label="AI agent" fillcolor="#fff3e0" color="#e65100"]
+  }
+  subgraph cluster_machine {
+    label="Your machine" labeljust=l labelloc=b style="rounded,dashed" color="#2e7d32" fontcolor="#1b5e20"
+    subgraph cluster_bwtidy {
+      label="bwtidy container" labeljust=r labelloc=b style="rounded,filled" fillcolor="#f1f8e9" color="#558b2f" fontcolor="#33691e"
+      ui [label="Web UI"]
+      queue [label="Queue"]
+      bw [label="bw\nBitwarden's official CLI"]
+    }
+    backups [label="Backups volume" shape=cylinder]
+  }
+  server [label="Bitwarden or\nVaultwarden\nserver" shape=cylinder fillcolor="#e3f2fd" color="#1565c0"]
+  you -> ui [label="edit\ndirectly"]
+  you -> queue [label="review\nand accept"]
+  agent -> queue [label="propose\nover MCP"]
+  ui -> bw [label="write"]
+  queue -> bw [label="accepted"]
+  bw -> backups [label="encrypted backup\nbefore each write" tailport=sw]
+  bw -> server [label="write" tailport=e]
+}
+```
 
 How each part works is under [Explanation](#explanation).
 
