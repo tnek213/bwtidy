@@ -30,6 +30,10 @@ services:
       BWTIDY_BACKUP_KEEP_DAYS: ${BWTIDY_BACKUP_KEEP_DAYS:-}
       BWTIDY_BACKUP_KEEP_ALWAYS: ${BWTIDY_BACKUP_KEEP_ALWAYS:-}
       BWTIDY_FAILED_KEEP_HOURS: ${BWTIDY_FAILED_KEEP_HOURS:-}
+      ## the usage stats, off unless BWTIDY_STATS=1. The file needs a volume of its own
+      ## (docs/reference/configuration.md, Usage stats)
+      BWTIDY_STATS: ${BWTIDY_STATS:-}
+      BWTIDY_STATS_DB: ${BWTIDY_STATS_DB:-}
       ## each account's backups go to /backups/HOST/EMAIL instead of its directory in the accounts
       BWTIDY_BACKUPS_ROOT: /backups
     volumes:

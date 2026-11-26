@@ -10,3 +10,5 @@ services:
       target: app
       args:
         BWTIDY_COMMIT: ${BWTIDY_COMMIT:-}
+        ## the Kroki server that renders the diagrams of the docs, https://kroki.io when unset
+        BWTIDY_KROKI_URL: ${BWTIDY_KROKI_URL:-}

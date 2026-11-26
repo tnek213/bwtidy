@@ -110,6 +110,8 @@ class Settings:
     ## host names besides the loopback ones that /mcp answers, from BWTIDY_MCP_HOSTS
     mcp_hosts: tuple[str, ...] = ()
     policy: Policy = DEFAULT_POLICY
+    ## set by a gateway with the usage stats on: report the names and the errors to it
+    stats_report: bool = False
 
     @property
     def account(self) -> tuple[str, str] | None:
@@ -147,6 +149,7 @@ class Settings:
             secure_cookies=env_flag("BWTIDY_SECURE_COOKIES"),
             mcp_hosts=host_names(os.environ.get("BWTIDY_MCP_HOSTS", "")),
             policy=Policy.from_env(),
+            stats_report=env_flag("BWTIDY_STATS_REPORT"),
         )
 
 

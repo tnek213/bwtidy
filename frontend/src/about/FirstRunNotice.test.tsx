@@ -22,7 +22,7 @@ test('shows the notice with its two links while no account ever logged in', asyn
 
   const notice = await screen.findByRole('note', { name: 'Before you start' })
   expect(notice).toHaveTextContent(
-    'bwtidy is alpha software made with AI, with very few users so far. Read the caution on GitHub before you use ' +
+    'bwtidy is beta software made with AI, with very few users so far. Read the caution on GitHub before you use ' +
       'it on your vault. If bwtidy works for you, a thumbs up in Works for me on GitHub helps others decide.',
   )
   expectNewTab(screen.getByRole('link', { name: 'the caution on GitHub' }), CAUTION_URL)

@@ -1,8 +1,8 @@
 # bwtidy
 
-What the product is and why: [docs/spec.md](docs/spec.md). Read it before
-changing behavior. When a feature changes what the spec says, update the spec
-in the same commit. This is for the maintainer's agents. Human contributors may
+The rules of the product and their reasons, where the user docs do not state
+them: [docs/spec.md](docs/spec.md). Read it before changing behavior. When a
+feature changes what the spec says, update the spec in the same commit. This is for the maintainer's agents. Human contributors may
 leave the spec to the maintainer, so an agent reviewing a contributor's pull
 request does not ask for spec changes.
 
@@ -22,7 +22,9 @@ request does not ask for spec changes.
   script a command line over it (`scripts/docs-site` imports none of it).
 - `docs/` the user docs, from `docs/index.md` into four folders:
   `tutorial/`, `how-to/`, `reference/` and `explanation/`. Beside them
-  `docs/spec.md` (the design record), `docs/architecture.md` and
+  `docs/spec.md` (the rules and reasons the user docs do not state),
+  `docs/architecture.md`, `docs/contributing.md` (cards that lead to the
+  issue forms and the repo's contributing files, and how to add a diagram) and
   `docs/restore.md` (a how-to that every backup holds as RESTORE.md).
 - `dev/` the developer guide and the dev vault's fixture: `dev/README.md` (set
   up, the commands, the credentials), `dev/dev-vault.md` (the dev stacks, the
@@ -68,8 +70,9 @@ routes reruns it. Its checks of the refused routes and of the missing route
 to the internet are never weakened to make it pass.
 
 A change to what a user sees updates the page under `docs/` that covers it
-(reference, how-to or explanation) in the same commit, as well as
-`docs/spec.md`.
+(reference, how-to or explanation) in the same commit. `docs/spec.md` changes
+with it only where a rule, a contract or a reason it holds changes: what a
+user sees is described in the user docs alone, and the spec links there.
 
 A change that alters what a docs test in `backend/tests/e2e/docs` shows
 reruns those tests (`scripts/docs-shots -k NAME`) and commits the changed
@@ -82,7 +85,8 @@ commits the changed images as "Take the docs screenshots again" and stops the
 push, which then goes through when pushed again (dev/testing.md, "The
 pre-push hook"). A new or renamed image keeps
 `scripts/docs-lint` passing: every image is linked from some markdown file
-and every image link points to a file.
+and every image link points to a file. Every picture has a non-empty alt text that
+says what it shows.
 
 A change to an MCP tool (its name, annotations, parameters or description)
 reruns `scripts/mcp-reference` and commits the `docs/reference/mcp-tools.md`
@@ -106,15 +110,42 @@ one stack) and take about 20 minutes (e2e) and 15 minutes (integration).
 
 Each page of the user docs (in the four folders, and `docs/restore.md`) is
 one of the four kinds of https://diataxis.fr: a tutorial, a how-to, a
-reference or an explanation. Keep pages succinct: a fact lives on one page
-and others link to it. Be helpful and professional, with a relaxed tone that
-speaks to the reader as "you". UI that is used often gets a screenshot from
-the docs suite. Examples use placeholder hosts such as https://bwtidy.example.
+reference or an explanation. Keep pages succinct. A fact lives on one page
+and others link to it.
+
+Write without semicolons. A colon only introduces a list block. A sentence has
+at most one comma and a paragraph at most two.
+
+A sequence is prose, not a numbered list, because a page already runs from top
+to bottom. Numbers stay only in a tutorial or a how-to, where the reader keeps
+their place while clicking through the app.
+
+A complicated section gets a diagram when a picture makes it easier to follow,
+of the type that fits the content best.
+
+Be helpful and professional, with a relaxed tone that speaks to the reader as "you". The docs describe what happens, in the present
+or future tense, never what happened in one run. A bullet list is for parallel
+items that can be read in any order, while sentences that follow from each
+other are paragraphs, so new text follows both. UI that is used often gets a screenshot from
+the docs suite. A prerequisite, a tip or a warning that matters may go in a
+box, written as GitHub's alert (`> [!NOTE]`, `> [!TIP]` or `> [!WARNING]`),
+and a directory layout is drawn as a tree in a `text` code block. No content
+tabs and no `!!!` admonitions: GitHub shows these pages too, and every backup
+holds `docs/restore.md` as plain text, where that syntax turns into code
+blocks. Cards (`<div class="grid cards" markdown>`) are for a landing page.
+A diagram is a fenced code block whose language is a Kroki diagram type
+(`mermaid`, `plantuml`, `d2`, `graphviz` or any other type https://kroki.io/
+lists) with `alt="WHAT IT SHOWS"` after the type, as in
+```` ```mermaid alt="The gateway starts one worker per account" ````. An
+editor's Kroki preview (such as a Kroki extension of VS Code) shows it while
+you write, and the docs build turns it into a picture (dev/release.md,
+"Diagrams"). `scripts/docs-lint` reports a diagram without alt text.
+Examples use placeholder hosts such as https://bwtidy.example.
 `README.md` and `docs/index.md` share three texts, each the same in both:
 the introduction (between the comments `<!-- intro: ... -->` and
-`<!-- end of intro -->`), the alpha disclaimer (the blockquote "Alpha
-software") and the list under "At a glance". A change to one changes the
-other.
+`<!-- end of intro -->`), the beta caution (the warning box "Made
+with AI" under the heading Beta software) and the list under "At a glance". A
+change to one changes the other.
 The banner on every page of the site (`overrides/main.html`) links to the one
 in `docs/index.md`.
 A new page gets its line in the nav of `zensical.toml`, and a page links only
@@ -134,6 +165,7 @@ the site's strict build in `scripts/ci` fails (`scripts/docs-site`).
 - No semicolons or em dashes (nor ` -- ` as a dash) in text aimed at humans:
   comments, docstrings, strings, log messages, UI text, docs. Split the
   sentence or use a comma, colon or parentheses. Code syntax is fine.
+  Docs pages follow the stricter rules under Writing docs.
 - The architecture (`docs/architecture.md` and the contracts its section
   "Changing the architecture" lists) changes only when the maintainers change
   it. A change fits into it. An agent whose change does not fit stops and says

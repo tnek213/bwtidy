@@ -9,8 +9,11 @@ one only when you reveal its cell.
 A login's password and TOTP, a card's number and security code, an SSH key's
 private key, and every custom field of the hidden type. Everything else is
 plain: the name, the notes, the URIs, the username, text custom fields and
-attachment file names. A secret in a note or a text field is not protected,
-so move it to a hidden field.
+attachment file names.
+
+> [!WARNING]
+> A secret in a note or a text field is not protected, so move it to a
+> hidden field.
 
 ## In the grid
 

@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 from devlib import compose, git, snapshot, stacks
 from devlib.paths import ROOT
 from devlib.stacks import Stack
@@ -276,3 +277,35 @@ def test_the_cli_picks_the_stack_from_the_environment(monkeypatch, dev_vault):
     assert picked == [None, None, 2, Stack(3, ROOT)]
     with pytest.raises(SystemExit):
         dev_vault.main(["up"], {"BWTIDY_STACK": "two"})
+
+
+@pytest.mark.parametrize(
+    ("value", "arg"), [("https://kroki.bwtidy.example", "https://kroki.bwtidy.example"), (None, "")]
+)
+def test_up_builds_the_image_with_the_kroki_server_of_the_docs(
+    worktree, tmp_path, monkeypatch, dev_vault, value, arg
+):
+    """So the image's docs stage renders the diagrams on the server scripts/docs-site uses."""
+    if value is None:
+        monkeypatch.delenv("BWTIDY_KROKI_URL", raising=False)
+    else:
+        monkeypatch.setenv("BWTIDY_KROKI_URL", value)
+    monkeypatch.setattr(git, "commit", lambda name, root: "261111 7db8830")
+    monkeypatch.setattr(compose, "make_cert", lambda stack: None)
+    monkeypatch.setattr(compose, "vault_url", lambda env: "https://localhost:1")
+    monkeypatch.setattr(compose, "wait_alive", lambda url, cert: None)
+    stacks.env_file(tmp_path, 1).write_text("COMPOSE_PROJECT_NAME=p1\nBWTIDY_APP_PORT=1\n")
+    assert dev_vault.up(Stack(1, tmp_path)) == 0
+    [build] = [cmd for cmd in worktree if cmd[:2] == ["docker", "build"]]
+    assert f"BWTIDY_KROKI_URL={arg}" in build
+    assert build[build.index(f"BWTIDY_KROKI_URL={arg}") - 1] == "--build-arg"
+
+
+@pytest.mark.parametrize(
+    ("name", "service"), [("compose.dev.yaml", "app"), ("compose.build.yaml", "bwtidy")]
+)
+def test_the_compose_builds_pass_the_kroki_server_on(name, service):
+    build = yaml.safe_load((ROOT / name).read_text())["services"][service]["build"]
+    assert build["args"]["BWTIDY_KROKI_URL"] == "${BWTIDY_KROKI_URL:-}"
+    docs_stage = (ROOT / "Dockerfile").read_text().split(" AS docs\n")[1].split("\nFROM ")[0]
+    assert 'ARG BWTIDY_KROKI_URL=""' in docs_stage

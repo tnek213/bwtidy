@@ -1,9 +1,11 @@
-{#- The alpha disclaimer as a banner above every page, without a button to close it. A wider content
+{#- The beta disclaimer as a banner above every page, without a button to close it. A wider content
 column than the theme's, and a picture that opens larger on a click. All of it inline, from no
 CDN, as a running bwtidy serves the site offline. -#}
 {% extends "base.html" %}
 
 {% block extrahead %}
+  {#- Links and requests to other sites carry no Referer, so a self-hosted bwtidy's address stays private. -#}
+  <meta name="referrer" content="same-origin">
   <style>
     .md-banner {
       color: #1a1a1a;
@@ -23,6 +25,7 @@ CDN, as a running bwtidy serves the site offline. -#}
       max-width: none;
       margin: 0;
       line-height: 1.4;
+      text-align: center;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -71,6 +74,35 @@ CDN, as a running bwtidy serves the site offline. -#}
     .md-typeset img[data-zoom] {
       cursor: zoom-in;
     }
+    /* the link to the issue form for docs improvements: in the right sidebar below the table of
+       contents, and at the end of the content where that sidebar is hidden (the theme shows it
+       from 76.25em), never both */
+    .md-improve--sidebar {
+      display: none;
+    }
+    .md-improve--content {
+      margin-top: 2rem;
+      padding-top: .6rem;
+      border-top: .05rem solid var(--md-default-fg-color--lightest);
+      font-size: .7rem;
+    }
+    .md-improve--content .md-improve__title {
+      font-weight: 700;
+      color: var(--md-default-fg-color--light);
+    }
+    .md-improve__link {
+      display: inline-block;
+      padding: .35rem 0;
+    }
+    @media screen and (min-width: 76.25em) {
+      .md-improve--sidebar {
+        display: block;
+        margin-top: 1rem;
+      }
+      .md-improve--content {
+        display: none;
+      }
+    }
     dialog[data-zoom] {
       max-width: none;
       max-height: none;
@@ -91,10 +123,18 @@ CDN, as a running bwtidy serves the site offline. -#}
   </style>
 {% endblock %}
 
+{% block content %}
+  {{ super() }}
+  <div class="md-improve md-improve--content">
+    <div class="md-improve__title">Improve this page</div>
+    {% include "partials/improve-link.html" %}
+  </div>
+{% endblock %}
+
 {% block announce %}
   <p data-disclaimer>
-    bwtidy is alpha software made with AI, with very few users so far.
-    <a href="{{ base_url | trim("/") }}/#alpha-software">Read the disclaimer before you use it.</a>
+    bwtidy is beta software made with AI, with very few users so far.
+    <a href="{{ base_url | trim("/") }}/#beta-software">Read the disclaimer before you use it.</a>
   </p>
 {% endblock %}
 

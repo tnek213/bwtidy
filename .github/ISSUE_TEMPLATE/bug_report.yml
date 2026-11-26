@@ -7,7 +7,7 @@ body:
       value: |
         **Never paste vault contents, secrets, tokens or backups into this issue.** Describe them instead, for example "an item with three custom fields".
 
-        bwtidy is alpha software and nobody promises a response time. A security issue does not belong here: see SECURITY.md.
+        bwtidy is beta software and nobody promises a response time. A security issue does not belong here: see SECURITY.md.
   - type: input
     id: version
     attributes:

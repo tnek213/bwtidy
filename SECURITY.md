@@ -1,6 +1,6 @@
 # Security policy
 
-bwtidy is alpha software made with AI, with very few users so far, and it
+bwtidy is beta software made with AI, with very few users so far, and it
 changes the contents of a password vault. The full warning is at the top of
 [README.md](README.md).
 

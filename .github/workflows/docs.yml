@@ -26,7 +26,29 @@ jobs:
       # setup-uv publishes no major version tag, only full versions
       # v10.4.0
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
+      # the star count for the header beside the repository link, so the pages need not ask GitHub
+      # for it (scripts/docs-site), and without it the header shows only the version
+      - name: Look up the star count
+        id: stars
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count="$(gh api repos/${{ github.repository }} --jq .stargazers_count || true)"
+          case "$count" in
+            ''|*[!0-9]*)
+              echo "::warning::no star count from GitHub, the docs header shows only the version"
+              count=""
+              ;;
+          esac
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+      # the labels of the docs' diagrams need a font of GENERIC_FONTS (scripts/docs-site), and the
+      # runner has none
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-dejavu-core
       - run: scripts/docs-site build _site
+        env:
+          BWTIDY_STARS: ${{ steps.stars.outputs.count }}
       # v5.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         with:

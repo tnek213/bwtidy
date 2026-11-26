@@ -5,8 +5,8 @@ What each version of bwtidy brings, newest first. How to run a version is in
 
 ## Road to 1.0
 
-The next release is 1.0.0-beta.1. bwtidy is then feature complete for 1.0,
-and the beta is for finding bugs and for feedback from real vaults. From the
+The beta started with 1.0.0-beta.1. bwtidy is feature complete for 1.0, and
+the beta is for finding bugs and for feedback from real vaults. From the
 beta on, a stored format (the database, the bwtidy note, the backups, the
 settings) changes only with a migration.
 
@@ -27,6 +27,28 @@ The beta becomes a release candidate when all of these hold:
 The release candidate becomes 1.0.0 after another 8 weeks with no serious
 bug, counted from the release candidate. Patch releases (1.0.0-beta.2, 1.0.0-beta.3 and so on) come whenever
 something is fixed or the Bitwarden CLI has a new release.
+
+## 1.0.0-beta.1
+
+bwtidy is feature complete for 1.0 and in beta: from this version on, a
+stored format changes only with a migration. What the beta needs before 1.0
+is in [Road to 1.0](#road-to-10). If bwtidy works for you, say so in the
+[Works for me discussion](https://github.com/tnek213/bwtidy/discussions/16).
+
+What changed since 0.1.0-alpha.1:
+
+- The bwtidy note can keep a new name: the warning about a renamed note
+  offers Keep this name next to Rename it back.
+- New tutorials for templates with datatypes and for a first cleanup with
+  an AI agent over MCP, each one building on the one before.
+- Restoring a backup needs only age, Python 3 and the Bitwarden CLI, and
+  the steps cover Windows and macOS too.
+- The docs site is wider, keeps text at a readable width, opens a screenshot
+  larger on a click and links every page to a form for suggesting an
+  improvement.
+- The image builds on Debian 13 (trixie) and holds neither npm nor pip, so
+  it is smaller. Every image still has a signed provenance attestation, and
+  the published images are scanned for known vulnerabilities every day.
 
 ## 0.1.0-alpha.1
 

@@ -16,7 +16,7 @@ export default function FirstRunNotice() {
   return (
     <Alert severity="info" role="note" aria-labelledby={titleId} sx={{ mb: 2 }}>
       <AlertTitle id={titleId}>Before you start</AlertTitle>
-      bwtidy is alpha software made with AI, with very few users so far. Read{' '}
+      bwtidy is beta software made with AI, with very few users so far. Read{' '}
       <External href={CAUTION_URL}>the caution on GitHub</External> before you use it on your vault. If bwtidy works
       for you, a thumbs up in <External href={WORKS_FOR_ME_URL}>Works for me</External> on GitHub helps others decide.
     </Alert>

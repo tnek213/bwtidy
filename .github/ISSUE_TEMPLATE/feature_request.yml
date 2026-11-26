@@ -7,7 +7,7 @@ body:
       value: |
         **Never paste vault contents, secrets, tokens or backups into this issue.** Describe them instead, for example "an item with three custom fields".
 
-        bwtidy is alpha software and nobody promises a response time or that a request is built.
+        bwtidy is beta software and nobody promises a response time or that a request is built.
   - type: textarea
     id: problem
     attributes:

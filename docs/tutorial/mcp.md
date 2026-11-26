@@ -1,4 +1,4 @@
-# Clean up with an AI agent
+# Your first MCP-assisted cleanup
 
 In this tutorial you connect an AI agent to bwtidy and ask it to sort the
 logins that are in no folder. The agent looks through your vault and
@@ -19,16 +19,17 @@ The token lets your client in, and picks your account.
 
 1. Click MCP token in the app bar, then Create.
 
-   ![The app bar with the MCP token menu open and Create outlined](../images/tutorial-mcp-token-menu.png)
+    ![The app bar with the MCP token menu open and Create outlined](../images/tutorial-mcp-token-menu.png)
 
 2. Keep the lifetime of 90 days and click Create.
 3. The dialog shows the token once. Copy the token (1) and keep it where
    you can paste it in a minute, then copy the MCP URL (2) too.
 
-   ![The MCP token dialog with Copy of the token and Copy of the MCP URL outlined and numbered 1 and 2](../images/tutorial-mcp-token.png)
+    ![The MCP token dialog with Copy of the token and Copy of the MCP URL outlined and numbered 1 and 2](../images/tutorial-mcp-token.png)
 
-bwtidy keeps only a hash of the token, so close the dialog only once you
-have both.
+> [!WARNING]
+> bwtidy keeps only a hash of the token, so close the dialog only once you
+> have both.
 
 ## Switch MCP on
 

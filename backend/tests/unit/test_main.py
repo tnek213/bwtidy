@@ -3,6 +3,7 @@ the Secure cookie, bw serve on a unix socket and the stop."""
 
 import asyncio
 import copy
+import json
 import re
 import socket
 import sqlite3
@@ -11,6 +12,7 @@ import threading
 import time
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
 from pathlib import Path
 
@@ -24,9 +26,11 @@ from bwtidy.bw.client import BwClient
 from bwtidy.bw.serve import BwServeProcess
 from bwtidy.config import Settings, version_text
 from bwtidy.main import bw_serve_client, create_app
-from bwtidy.protocol import DB_FILE
+from bwtidy.protocol import DB_FILE, STATS_NAMES_PATH
 from bwtidy.protocol import SESSION_COOKIE as COOKIE
-from bwtidy.version import semver
+from bwtidy.stats import db as stats_db
+from bwtidy.stats.parse import Names
+from bwtidy.version import PRE_RELEASES, semver
 from tests.support.app_env import AppEnv
 from tests.support.fake_bw import FakeBwServe
 from tests.support.hooks import nothing_async
@@ -217,10 +221,11 @@ def test_the_installed_metadata_holds_the_version_of_pyproject():
     assert version("bwtidy") == package_version()
 
 
-def test_the_shown_version_is_semver_and_alpha_while_pyproject_is():
+def test_the_shown_version_is_semver_with_the_pre_release_of_pyproject():
     assert SEMVER.fullmatch(shown_version())
-    if re.search(r"a\d+$", package_version()):
-        assert "-alpha." in shown_version()
+    pre_release = re.search(r"(a|b|rc)\d+$", package_version())
+    if pre_release:
+        assert f"-{PRE_RELEASES[pre_release.group(1)]}." in shown_version()
 
 
 def test_health_reports_the_version_and_the_commit(monkeypatch: pytest.MonkeyPatch):
@@ -263,3 +268,67 @@ def test_serves_frontend_and_api_side_by_side(tmp_path: Path):
 def test_without_static_dir_only_api_exists():
     client = TestClient(app(None).app)
     assert client.get("/").status_code == 404
+
+
+def test_a_worker_with_the_stats_report_names_its_routes_and_tools(tmp_path: Path):
+    (tmp_path / "index.html").write_text("<h1>bwtidy</h1>")
+    env = AppEnv(Path("/nonexistent"), fake_backups=False, static_dir=tmp_path, stats_report=True)
+    report = TestClient(env.app).get(STATS_NAMES_PATH).json()
+    names = Names.from_report(report)
+    assert "list_items" in names.tools
+    assert "tools/call" in names.methods
+    assert names.ui_operation("POST", "/api/session") == "POST /api/session"
+    assert all(route["path"].startswith("/api/") for route in report["routes"])
+
+
+def test_a_worker_without_the_stats_report_has_no_names_route():
+    client = TestClient(app(None).app)
+    assert client.get(STATS_NAMES_PATH).status_code == 404
+
+
+def stats_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    path = tmp_path / "stats.db"
+    monkeypatch.setenv("BWTIDY_STATS_DB", str(path))
+    return path
+
+
+def test_the_stats_command_says_when_the_stats_are_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    path = stats_file(tmp_path, monkeypatch)
+    assert main.stats_command([]) == 1
+    assert capsys.readouterr().out == (
+        f"Usage stats are off: there is no {path}. BWTIDY_STATS=1 turns them on.\n"
+    )
+    assert not path.exists()
+
+
+def test_the_stats_command_prints_the_summary_and_the_top_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    path = stats_file(tmp_path, monkeypatch)
+    conn = stats_db.open_stats(path)
+    at = stats_db.stamp(datetime.now(UTC) - timedelta(days=3))
+    frames = '[["api/grid.py", "grid", 40]]'
+    stats_db.write(
+        conn,
+        [stats_db.Event(at, "a1", "ui", "GET /api/grid", False, 500, 9, "1.0.0")],
+        [stats_db.ErrorSeen(at, "f" * 64, "KeyError", frames, "ui", "GET /api/grid", "1.0.0")],
+        [stats_db.Sample(at, 2, 8, 1, None)],
+    )
+    conn.close()
+    assert main.stats_command([]) == 0
+    text = capsys.readouterr().out
+    assert "UI operations: 1" in text
+    assert "GET /api/grid" in text
+    assert "KeyError, ui GET /api/grid, 1 times, at api/grid.py:40 in grid" in text
+    assert "a1" not in text.split()
+    assert main.stats_command(["--json", "--days", "1"]) == 0
+    found = json.loads(capsys.readouterr().out)
+    assert found["days"] == 1
+    assert found["totals"]["failed"] == 0
+    assert found["top_errors"] == []
+    assert main.stats_command(["--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["top_errors"][0]["frames"] == [
+        ["api/grid.py", "grid", 40]
+    ]

@@ -6,8 +6,8 @@ on GitHub Pages, and publishing the image.
 ## The version
 
 The version (docs/spec.md has the rules) is written by hand in one place,
-`backend/pyproject.toml`, in Python's spelling (`0.1.0a1`).
-`frontend/package.json` repeats it in semver's spelling (`0.1.0-alpha.1`), and
+`backend/pyproject.toml`, in Python's spelling (`1.0.0b1`).
+`frontend/package.json` repeats it in semver's spelling (`1.0.0-beta.1`), and
 the lock files carry generated copies: the package `bwtidy` in
 `backend/uv.lock` in Python's spelling, the top-level `version` and
 `packages[""].version` of `frontend/package-lock.json` in semver's.
@@ -16,11 +16,18 @@ names the file and both versions. After a change to the version, `uv lock` in
 `backend/` and `demo/` (its lock holds the version of `bwtidy` too) and `npm install --package-lock-only` in `frontend/` write the
 copies in the lock files.
 
+bwtidy is in beta: feature complete for 1.0, with a stored format (the
+database, the bwtidy note, the backups, the settings) changing only with a
+migration. A new beta (`1.0.0-beta.N`) comes whenever something is fixed or
+the Bitwarden CLI has a new release. The beta becomes a release candidate
+(`1.0.0-rc.N`) when the gates of Road to 1.0 in `docs/releases.md` hold, and
+the release candidate becomes 1.0.0 after 8 weeks with no serious bug.
+
 ## The release notes
 
 `docs/releases.md` holds a few lines for each version, newest first, written
 for users: what the version brings, under a heading that starts with the
-version as `frontend/package.json` spells it (`## 0.1.0-alpha.1`). `scripts/ci`
+version as `frontend/package.json` spells it (`## 1.0.0-beta.1`). `scripts/ci`
 fails while it has no heading for the current version, so the entry goes into
 the commit that changes the version.
 
@@ -44,22 +51,105 @@ line `Written for bwtidy COMMIT.`, as every backup does in its `RESTORE.md`:
 `BWTIDY_COMMIT` (the Dockerfile's docs stage takes it as a build arg) or else
 the checkout's last commit. The page in the checkout keeps `COMMIT`.
 
+### Diagrams
+
+A page holds a diagram as a fenced code block whose language is a Kroki
+diagram type (`KROKI_TYPES` in `scripts/docs-site`, every type
+https://kroki.io/ lists) with `alt="TEXT"` after it. Before Zensical runs,
+the build turns each such block of its copy of `docs/` into a PNG beside the
+page and a Markdown picture of it with that alt text. It sends the source to
+the Kroki server that `BWTIDY_KROKI_URL` names, https://kroki.io (the free
+public one) when it is unset, and asks for SVG, as 12 of Kroki's types have
+no PNG and its PNGs are drawn at 1x. resvg (`resvg-py` in the group `docs`)
+converts the SVG at twice its size on a white background, and the picture is
+shown at half its width, so it is sharp on a HiDPI screen. A transparent
+picture would vanish in the dark color scheme. A Mermaid source gets the
+first line `%%{init: {"htmlLabels": false, ...}}%%` unless it starts with an
+init directive of its own, as resvg leaves out the HTML labels Mermaid writes
+otherwise. resvg draws the text with the system's fonts, so the Dockerfile's
+docs stage installs `fonts-dejavu-core` (in that stage only). For serif,
+sans-serif and monospace it takes the first installed font of the lists in
+`GENERIC_FONTS` of the script, as resvg's own choices (Times New Roman, Arial,
+Courier New) are missing on many Linux systems and resvg leaves out a label
+whose font it cannot find.
+
+Building docs with a diagram therefore needs one of those fonts for each
+generic family its text uses, and DejaVu covers all three. Without one the
+build fails before it writes the picture and names the page, the line, the
+family and the fonts it tried. The docs stage and the workflows `ci.yml` and
+`docs.yml` install `fonts-dejavu-core` with apt-get, which is also what you
+install on Debian or Ubuntu. Fedora has `dejavu-sans-fonts`,
+`dejavu-serif-fonts` and `dejavu-sans-mono-fonts`, Alpine `font-dejavu` and
+Arch `ttf-dejavu`. macOS and Windows have Times New Roman, Arial and Courier
+New already.
+
+A Graphviz or PlantUML picture sized in `pt` is drawn at 96 dpi, the CSS
+pixel's.
+
+Each PNG is kept in `.cache/kroki/` at the repo root (git-ignored), named
+after a hash of the type, the source and the converter's settings, and a
+later build takes it from there without asking the server. So building docs
+that hold a diagram needs a Kroki server, unless the cache has every one
+(the image's build has no cache). A server that cannot be reached or answers
+with an error fails the build, naming the page, the line and the server's
+message. A diagram without alt text fails it before any request, and
+`scripts/docs-lint` reports it already. Docs without a diagram build without
+any request. To use a Kroki server of your own, set `BWTIDY_KROKI_URL`: the
+Dockerfile's docs stage takes it as a build arg, and `scripts/dev-vault up`,
+`compose.dev.yaml` and `compose.build.yaml` pass on the one of the
+environment. `serve` shows a diagram as its code block, an editor's Kroki
+preview or a build shows the picture.
+
 The theme overrides are in `overrides/` (outside `docs/`, so they are not
 built as pages). Its `main.html` fills the theme's `announce` block with the
-alpha disclaimer banner on every page, which links to the disclaimer at the
-top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
+beta disclaimer banner on every page, one slim line with its text centered,
+which links to the disclaimer at the top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
 the theme's 61rem leaves tables little room), keeps paragraphs, list items,
 quotes and admonitions at most 80 characters wide unless they hold a picture,
 table or code block, keeps inline code on one line (in text and tables, except
 on a narrow screen where it would not fit) and frames the pictures in the
 content (a 1 px border and a small shadow, so a white screenshot shows on a
 white page), and its inline script makes a picture shown smaller than it is
-open larger in a dialog on a click (`data-zoom`). Both stay inline, as a
+open larger in a dialog on a click (`data-zoom`). It also links every page to the
+issue form `.github/ISSUE_TEMPLATE/docs_improvement.yml` (`partials/improve-link.html`
+builds the link, `partials/toc.html` puts it in the right sidebar below the table of
+contents and `main.html` at the end of the content on a narrow screen), with the
+page's source path, its address on the GitHub Pages site and the version, which
+`scripts/docs-site` hands over as `extra.bwtidy_version`. Both stay inline, as a
 running bwtidy serves the site offline: nothing comes from a CDN. Zensical's
 own lightbox (its glightbox extension) loads GLightbox from unpkg.com, so it
-stays off. After the build, `scripts/docs-site build` checks
+stays off. For the same reason the Markdown extensions in `zensical.toml` are
+those whose output needs nothing from another host: GitHub's alerts as boxes
+(`pymdownx.quotes` with `callouts`), the cards (`md_in_html` and `attr_list`)
+and their icons, which `pymdownx.emoji` draws inline from the theme's icon
+sets. An emoji shortcode such as `:smile:` would be a picture from a CDN, and
+a Mermaid diagram that Zensical draws loads its script from one, so diagrams
+become pictures at build time (see Diagrams above). After the build,
+`scripts/docs-site build` checks
 that every built HTML page has the banner (the attribute `data-disclaimer`)
-and fails naming those without it.
+and fails naming those without it. It also fails on a numbered list that
+starts at 1 again right after another one with only a picture or code block
+between them, naming the page and the line of its HTML: a step's picture, code
+block or paragraph is indented by 4 spaces under it, or the list ends there.
+And it fails on a page that has the browser fetch anything from another host
+(a script, stylesheet, icon, picture, frame or CSS `url()`), naming the page,
+the line and the URL. A link to another host is fine.
+
+The docs fetch nothing from another site and send it nothing about the host
+they are served from, as the address of a self-hosted bwtidy stays private.
+The theme's repository link in the header (`partials/source.html`) would have
+its script ask `api.github.com` for the latest release and the star count on
+every page, so the override drops the attribute that starts it
+(`data-md-component="source"`) and writes the facts at build time instead: the
+version the site is built for (`extra.bwtidy_release`, the semver alone, so a
+self-hosted bwtidy shows the version it runs) and the star count
+(`extra.bwtidy_stars`), which `scripts/docs-site` takes from the environment
+variable `BWTIDY_STARS` when it holds only digits. The workflows "Docs" and
+"Image" look the count up with `gh api` before the build (the image passes it
+as the build arg `BWTIDY_STARS`), a failed lookup only leaves it out, and a
+build without it shows only the version. `main.html` also sets the referrer
+policy `same-origin` and the issue link has `rel="noopener noreferrer"`, so a
+click on a link to another site sends no `Referer`.
 
 `scripts/ci` runs `scripts/docs-site build` after the MCP reference check.
 It fails on a page of `docs/` that the nav of `zensical.toml` leaves out,
@@ -114,7 +204,7 @@ main. The image is built for `linux/amd64` with the OCI labels `source`, `versio
 | Trigger | Tags |
 | --- | --- |
 | Push to main | `main` and the short commit (7 characters) |
-| Release | the version as `frontend/package.json` spells it (`0.1.0-alpha.1`) and `latest` |
+| Release | the version as `frontend/package.json` spells it (`1.0.0-beta.1`) and `latest` |
 
 The image builds on Debian 13 (trixie): `python:3.13-slim-trixie` is the base of the
 final stage, `node:24-trixie-slim` of the build stages. The stages `frontend`, `docs`,

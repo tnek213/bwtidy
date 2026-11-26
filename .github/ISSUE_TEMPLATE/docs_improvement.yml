@@ -1,0 +1,46 @@
+name: Docs improvement
+description: Report anything in the docs that is wrong, unclear or missing, or a typo.
+title: "Docs: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste vault contents, secrets, tokens or backups into this issue.** Describe them instead, for example "an item with three custom fields".
+
+        The link at the bottom of every docs page fills in the three fields below. Leave them empty for an issue about the docs in general.
+  - type: input
+    id: url
+    attributes:
+      label: Page address
+      description: The page on the public docs site, filled in by the link on the page.
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: bwtidy version
+      description: The version the docs were built from, filled in by the link on the page.
+    validations:
+      required: false
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: The page's source file in the repo, filled in by the link on the page.
+    validations:
+      required: false
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: What should change
+      description: What is wrong, unclear or missing, and what it should say instead if you know.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What you were trying to do when you noticed.
+    validations:
+      required: false

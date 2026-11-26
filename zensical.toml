@@ -6,6 +6,8 @@ site_description = "A web UI and MCP server for keeping a Bitwarden vault tidy"
 docs_dir = "docs"
 repo_url = "https://github.com/tnek213/bwtidy"
 repo_name = "tnek213/bwtidy"
+# the edit address of every page, which overrides/partials/improve-link.html reads the source path from
+edit_uri = "edit/main/docs/"
 # no site_url: the pages link to each other relatively, so the site works under /docs/ and /bwtidy/
 
 nav = [
@@ -39,6 +41,7 @@ nav = [
     "explanation/isolation.md",
   ] },
   { "For contributors" = [
+    "contributing.md",
     "spec.md",
     { "The architecture, a map of the code" = "architecture.md" },
   ] },
@@ -46,7 +49,7 @@ nav = [
 
 [project.theme]
 language = "en"
-# main.html there puts the alpha disclaimer as a banner above every page, widens the content and
+# main.html there puts the beta disclaimer as a banner above every page, widens the content and
 # opens a picture larger on a click
 custom_dir = "overrides"
 # the system's fonts, so a page loads nothing from another host
@@ -78,11 +81,19 @@ scheme = "slate"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 
+# only what renders without a script or a picture from another host (scripts/docs-site checks every
+# built page): an emoji shortcode such as :smile: or a mermaid block would load one from a CDN
 [project.markdown_extensions]
 admonition = {}
 attr_list = {}
 md_in_html = {}
 toc.permalink = true
+# the icons of the cards, drawn inline from the theme's own icon sets
+pymdownx.emoji.emoji_index = "zensical.extensions.emoji.twemoji"
+pymdownx.emoji.emoji_generator = "zensical.extensions.emoji.to_svg"
 pymdownx.highlight.anchor_linenums = true
 pymdownx.inlinehilite = {}
+# GitHub's alerts (> [!NOTE], > [!TIP], > [!WARNING]) as boxes, so a box also shows on GitHub
+# and reads as a quote in a backup's RESTORE.md
+pymdownx.quotes.callouts = true
 pymdownx.superfences = {}

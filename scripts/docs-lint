@@ -8,13 +8,15 @@ and ignored files never count). Links in fenced code blocks and inline code are 
 URLs with a scheme (http:, https:, data:, mailto:). A path is resolved relative to the markdown
 file that holds it (a leading / is the repo root) after a #fragment or ?query is cut off.
 
-Images: an image link is inline `![alt](path)` or `![alt](path "title")` with any alt text
-including none, reference style `![alt][ref]` with its `[ref]: path` definition, or an HTML img
-tag's src. It prints `FILE:LINE: missing image PATH` for each link to no file, and
+Images: an image link is inline `![alt](path)` or `![alt](path "title")`, reference style
+`![alt][ref]` with its `[ref]: path` definition, or an HTML img tag's src. It prints
+`FILE:LINE: missing image PATH` for each link to no file, and
 `docs/images/NAME: not linked from any markdown file` for each file in docs/images that no
-markdown file links (which markdown file links it does not matter). The alt text is never
-checked, an empty one is fine. Images are written by the docs test suite (scripts/docs-shots),
-see dev/testing.md.
+markdown file links (which markdown file links it does not matter). Every picture, also one
+that points to a URL, needs an alt text that is not empty: it prints
+`FILE:LINE: picture without alt text` for an empty or blank alt text of an inline or reference
+style picture, and for an img tag whose alt attribute is missing or empty. Images are written by
+the docs test suite (scripts/docs-shots), see dev/testing.md.
 
 Page links: every other local link, inline `[text](path)`, reference style `[text][ref]`,
 `[ref][]` or `[ref]` with a definition, or an HTML a href, must resolve to a file. It prints
@@ -29,9 +31,17 @@ targets and URLs, a semicolon, an em dash (U+2014) or ` -- ` used as a dash is r
 STYLE `semicolon`, `em dash` or `double hyphen as a dash`. The semicolon of an HTML entity
 (like `&amp;`) does not count.
 
+Diagrams: a fenced code block whose info string starts with a Kroki diagram type (```mermaid,
+```d2 and the others) needs `alt="TEXT"` after the type, as scripts/docs-site turns it into a
+picture with that alt text. One without is reported as `FILE:LINE: diagram without alt text`,
+so ci finds it before the docs build asks Kroki for any diagram. The types and the way a block is
+found come from scripts/docs-site, loaded by its path, so both read the one list.
+
 Prints nothing and exits 0 when all is well, exits 1 otherwise.
 """
 
+import importlib.machinery
+import importlib.util
 import os
 import re
 import subprocess
@@ -40,6 +50,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent.parent
+DOCS_SITE = Path(__file__).resolve().parent / "docs-site"
 IMAGES = "docs/images"
 
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
@@ -47,11 +58,13 @@ INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`)((?:(?!\n[ \t]*\n).)+?)(?<!`)\1(?!`)",
 ## the alt text may hold one level of brackets, the target is <path with spaces> or a path
 ## with an optional title after a space
 INLINE = re.compile(
-    r"!\[(?:[^\[\]]|\[[^\]]*\])*\]\(\s*(?:<([^>\n]*)>|([^\s()]*(?:\([^\s()]*\)[^\s()]*)*))"
+    r"!\[((?:[^\[\]]|\[[^\]]*\])*)\]\(\s*(?:<([^>\n]*)>|([^\s()]*(?:\([^\s()]*\)[^\s()]*)*))"
 )
 REFERENCE = re.compile(r"!\[((?:[^\[\]]|\[[^\]]*\])*)\](?:\[([^\]]*)\])?")
 DEFINITION = re.compile(r"^ {0,3}\[([^\]]+)\]:[ \t]*(?:<([^>\n]*)>|(\S*))", re.MULTILINE)
-IMG_TAG = re.compile(r"<img\b[^>]*?\bsrc\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s\"'>]+))", re.I)
+IMG_TAG = re.compile(r"<img\b[^>]*>", re.I)
+IMG_SRC = re.compile(r"\bsrc\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s\"'>]+))", re.I)
+IMG_ALT = re.compile(r"(?<![\w-])alt\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s\"'>]+))", re.I)
 ## inline link: the text may hold one level of brackets, the target is as for an image
 LINK = re.compile(
     r"\[(?:[^\[\]]|\[[^\]]*\])*\]\(\s*(?:<([^>\n]*)>|([^\s()]*(?:\([^\s()]*\)[^\s()]*)*))"
@@ -98,27 +111,37 @@ def strip_code(text: str) -> str:
     return INLINE_CODE.sub(lambda m: blank(m.group(0)), strip_fences(text))
 
 
-def image_links(text: str) -> list[tuple[int, str]]:
-    """(line, path) of every image link of a markdown text, one entry per link."""
+def image_links(text: str) -> list[tuple[int, str, bool]]:
+    """(line, path, has alt text) of every image link of a markdown text, one entry per link."""
     text = strip_code(text)
     definitions = {
         m.group(1).strip().lower(): m.group(2) or m.group(3) for m in DEFINITION.finditer(text)
     }
-    found: list[tuple[int, str]] = []
+    found: list[tuple[int, str, bool]] = []
     inline_spans: list[tuple[int, int]] = []
     for m in INLINE.finditer(text):
         inline_spans.append(m.span())
-        found.append((m.start(), m.group(1) if m.group(1) is not None else m.group(2)))
+        path = m.group(2) if m.group(2) is not None else m.group(3)
+        found.append((m.start(), path, bool(m.group(1).strip())))
     for m in REFERENCE.finditer(text):
         if any(start <= m.start() < end for start, end in inline_spans):
             continue
         ref = m.group(2) if m.group(2) else m.group(1)
         target = definitions.get(" ".join(ref.split()).lower())
         if target is not None:
-            found.append((m.start(), target))
+            found.append((m.start(), target, bool(m.group(1).strip())))
     for m in IMG_TAG.finditer(text):
-        found.append((m.start(), next(g for g in m.groups() if g is not None)))
-    links = [(text.count("\n", 0, offset) + 1, path.strip()) for offset, path in found]
+        src = IMG_SRC.search(m.group(0))
+        if src is None:
+            continue
+        alt = IMG_ALT.search(m.group(0))
+        alt_text = next((g for g in alt.groups() if g is not None), "") if alt else ""
+        found.append(
+            (m.start(), next(g for g in src.groups() if g is not None), bool(alt_text.strip()))
+        )
+    links = [
+        (text.count("\n", 0, offset) + 1, path.strip(), has_alt) for offset, path, has_alt in found
+    ]
     return sorted(links)
 
 
@@ -231,6 +254,17 @@ def tracked(root: Path, *patterns: str) -> list[Path]:
     return sorted(p for p in paths if p.is_file())
 
 
+def load_docs_site():
+    """scripts/docs-site as a module, for its KROKI_TYPES and diagrams()."""
+    ## the script has no .py suffix, so the loader must be named outright
+    loader = importlib.machinery.SourceFileLoader("docs_site", str(DOCS_SITE))
+    spec = importlib.util.spec_from_loader("docs_site", loader)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
 def lint(root: Path) -> list[str]:
     """The problems of the repo at root, one line each."""
     problems: list[str] = []
@@ -243,11 +277,18 @@ def lint(root: Path) -> list[str]:
             cache[path] = anchors(text)
         return cache[path]
 
+    docs_site = load_docs_site()
     for md in tracked(root, "*.md"):
         text = md.read_text(encoding="utf-8", errors="replace")
         rel = md.relative_to(root)
-        found: list[tuple[int, str]] = []
-        for line, link in image_links(text):
+        found: list[tuple[int, str]] = [
+            (diagram.line, "diagram without alt text")
+            for diagram in docs_site.diagrams(text)
+            if not diagram.alt
+        ]
+        for line, link, has_alt in image_links(text):
+            if not has_alt:
+                found.append((line, "picture without alt text"))
             path = local(link)
             if path is None:
                 continue

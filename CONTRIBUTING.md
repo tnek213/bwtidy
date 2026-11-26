@@ -1,9 +1,12 @@
 # Contributing
 
-bwtidy is alpha software, so expect changes: features, schemas and
-behavior move between versions. It has one maintainer for now and is meant to
-grow in the open, so issues, ideas and changes are welcome. There is no
-promise of a review time or of a change going in.
+bwtidy is beta software: its features are complete for 1.0, and a stored
+format (the database, the bwtidy note, the backups, the settings) changes only
+with a migration. Behavior may still change where a bug or feedback calls for
+it. What the beta needs before 1.0 is in
+[Road to 1.0](docs/releases.md#road-to-10). It has one maintainer for now and
+is meant to grow in the open, so issues, ideas and changes are welcome. There
+is no promise of a review time or of a change going in.
 
 Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). Report
 behavior that breaks it to tnek213.recollect098@slmail.me.
@@ -13,7 +16,9 @@ behavior that breaks it to tnek213.recollect098@slmail.me.
 Discuss a new feature first, in a "Feature request" issue or under Ideas in
 the Discussions, before you write it. Not every feature fits what bwtidy is
 for, and talking first saves you work on a change that will not go in. A bug
-fix or a docs fix can go straight to a pull request.
+fix or a docs fix can go straight to a pull request. Every docs page links to
+the "Docs improvement" issue form, with the page already filled in, for a
+suggestion that you do not write yourself.
 
 If a feature you want does not fit, you are welcome to fork: the license
 allows it.
@@ -28,10 +33,10 @@ allows it.
   proposal: open an issue first.
 - [AGENTS.md](AGENTS.md): the rules every change follows, for people and
   agents alike.
-- [docs/spec.md](docs/spec.md): what bwtidy does and why. You are welcome to
-  update it with your change but do not have to: the maintainer keeps it in
-  step. A change to what a user sees does update the page under `docs/` that
-  covers it, in the same commit.
+- [docs/spec.md](docs/spec.md): the rules and reasons the user docs do not
+  state. You are welcome to update it with your change but do not have to:
+  the maintainer keeps it in step. A change to what a user sees does update
+  the page under `docs/` that covers it, in the same commit.
 - `scripts/ci`: runs the lint, type, build and unit checks. It must pass
   before a change goes in. The CI workflow (`.github/workflows/ci.yml`) runs
   it on every push to main and every pull request.

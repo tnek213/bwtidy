@@ -1,59 +1,107 @@
 # bwtidy documentation
 
-## Alpha software
-
-> **Alpha software, made with AI.** bwtidy was written entirely by AI coding
-> agents. Several advanced models (Claude Fable, Opus and Sonnet) built it in
-> many small steps under the author's guidance, and Codex (GPT-6.2-Astra)
-> reviewed it for security and stability. No human has read every line of the
-> code. The author uses it for his own real passwords, but it has very few
-> users so far. It changes the contents of your password vault, so keep your
-> own Bitwarden export, made outside bwtidy, and expect bugs and breaking
-> changes between versions.
+## Bring order to a messy vault
 
 <!-- intro: the same text in README.md and docs/index.md -->
 
-A password vault gets messy over the years: `Password` in some items,
-`password` in others, addresses without `https://`. Bitwarden's apps show
-one item at a time, so this is hard to see and fix. bwtidy shows the whole
-vault in one grid. Tidy means items of one kind share field names and
-formats: a template says which fields, a datatype what a value looks like.
-An AI agent can propose fixes over MCP and never sees a secret value. You
-approve every change, and bwtidy backs up the vault before each write. It
-is for people who keep a large Bitwarden or Vaultwarden vault, often
-self-hosted.
+Password vaults get inconsistent over time. Some items use `Password` while
+others use `password`. Some web addresses include a protocol prefix and others
+do not. Bitwarden's apps show one item at a time. That makes these patterns
+hard to spot. **bwtidy** shows the whole vault in one grid.
+
+Templates and datatypes help you standardize items of the same kind. A
+template defines which fields an item should have. A datatype describes the
+expected format of a value. Together they help you find inconsistencies and
+tidy the vault.
+
+Use the web UI to make changes directly. You can also connect an AI agent
+through MCP. The agent can add proposed changes to a queue without seeing
+secret values. You review each proposal and decide whether to accept it. Only
+accepted proposals are written to your vault.
+
+Before each write bwtidy saves a backup of the whole vault. The backup is an
+age-encrypted ZIP stored in bwtidy's backups volume. You can restore it with
+standard tools. Your vault stays on your Bitwarden or Vaultwarden server.
+bwtidy reads and writes vault data through Bitwarden's official CLI.
+
+bwtidy is for people who want their Bitwarden or Vaultwarden vault to follow
+standards they define themselves. It helps them apply those standards
+consistently across the vault.
 
 <!-- end of intro -->
 
-New to bwtidy? [Run it](how-to/run.md), then take [the tutorial](tutorial/first-cleanup.md).
+## Beta software
+
+> [!WARNING]
+> **Made with AI.** AI coding agents wrote all of bwtidy under the author's
+> guidance. Claude Fable, Opus and Sonnet built it in many small steps. Codex
+> (GPT-6.2-Astra) reviewed it for security and stability. No human has read
+> every line. The author uses it for real passwords but the project has few
+> users so far. Because bwtidy changes your vault keep an independent Bitwarden
+> export made outside bwtidy. Expect bugs and breaking changes between
+> versions.
+
+New to bwtidy? [Run it](how-to/run.md), then follow
+[the tutorial](tutorial/first-cleanup.md).
 
 ## At a glance
 
 - **Your vault stays on your server.** bwtidy runs in one container on your
-  own machine. It reads and writes your vault on your Bitwarden or
-  Vaultwarden server only through `bw`, Bitwarden's official command-line
-  tool, exactly as Bitwarden publishes it.
-- **A backup before every change.** Before each write bwtidy saves a backup
-  of the whole vault: a zip file encrypted with [age](https://age-encryption.org),
-  with your master password as the passphrase. The backups are in bwtidy's
-  backups volume, and you can restore one with standard tools, without
-  bwtidy.
-- **Your master password.** It stays in memory while you are logged in, and
-  is wiped when you log out, 2 minutes after you close the last tab or after
-  2 hours without activity (both by default). The one stored copy is inside
-  your own vault, in bwtidy's note, so older backups stay readable after you
-  change your master password. It is never written anywhere else, never
-  logged and never given to an AI agent.
-- **One item of its own in your vault.** bwtidy keeps its settings in one
-  item, a secure note named `bwtidy`. You can rename it, and bwtidy still
-  finds it.
-- **Accounts are kept apart.** Each account is handled by its own process,
-  running as its own Linux user, so one account cannot read another's data.
-- **AI agents propose, you decide.** An AI agent connected over MCP never
-  sees secret values, and nothing it proposes is written until you approve
-  it.
-- **No telemetry.** bwtidy sends nothing to its author or anyone else. The
-  only connection it makes is to your own Bitwarden server.
+  machine. It reads and writes your vault through `bw`, Bitwarden's official
+  CLI.
+- **A backup before every write.** bwtidy saves a backup of the whole vault
+  before each write. The backup is a ZIP encrypted with age using your master
+  password as the passphrase. It lives in bwtidy's backups volume and can be
+  restored with standard tools without bwtidy.
+- **Your master password.** It remains in memory while you are logged in and is
+  wiped when you log out. It is also wiped two minutes after you close the last
+  tab or after two hours without activity. Both timings are defaults. A copy is
+  stored in bwtidy's note in your vault so older backups remain readable after
+  you change your password. It is never written elsewhere or logged and it is
+  never given to an AI agent.
+- **bwtidy's settings stay in one item.** It stores settings in a secure note
+  named `bwtidy`. You can rename the note and bwtidy will still find it.
+- **Accounts are kept apart.** Each account runs in its own process under its
+  own Linux user. One account cannot read another account's data.
+- **You control changes.** In the web UI you make changes directly. An AI agent
+  connected through MCP can add proposed changes to a queue without seeing
+  secret values. You review each proposal and choose whether to accept it. Only
+  accepted proposals are written to your vault.
+- **No telemetry.** bwtidy sends no telemetry to its author or anyone else. Its
+  vault connection is to your Bitwarden or Vaultwarden server.
+
+```graphviz alt="bwtidy runs in one container on your machine and saves an encrypted backup to its backups volume before each write. You edit items in the web UI or accept what an AI agent proposes over MCP without seeing secret values, and bwtidy writes the changes through the Bitwarden CLI to your Bitwarden or Vaultwarden server."
+digraph {
+  nodesep=0.3
+  ranksep=0.4
+  fontname="sans-serif"
+  node [fontname="sans-serif" fontsize=13 shape=box style="rounded,filled" fillcolor="#ffffff" color="#5c6bc0" margin="0.12,0.06"]
+  edge [fontname="sans-serif" fontsize=12 color="#455a64"]
+  you [label="You" fillcolor="#e8eaf6"]
+  subgraph cluster_agent {
+    label="Sees no secret values" style="rounded,dashed" color="#e65100" fontcolor="#bf360c" fontsize=12
+    agent [label="AI agent" fillcolor="#fff3e0" color="#e65100"]
+  }
+  subgraph cluster_machine {
+    label="Your machine" labeljust=l labelloc=b style="rounded,dashed" color="#2e7d32" fontcolor="#1b5e20"
+    subgraph cluster_bwtidy {
+      label="bwtidy container" labeljust=r labelloc=b style="rounded,filled" fillcolor="#f1f8e9" color="#558b2f" fontcolor="#33691e"
+      ui [label="Web UI"]
+      queue [label="Queue"]
+      bw [label="bw\nBitwarden's official CLI"]
+    }
+    backups [label="Backups volume" shape=cylinder]
+  }
+  server [label="Bitwarden or\nVaultwarden\nserver" shape=cylinder fillcolor="#e3f2fd" color="#1565c0"]
+  you -> ui [label="edit\ndirectly"]
+  you -> queue [label="review\nand accept"]
+  agent -> queue [label="propose\nover MCP"]
+  ui -> bw [label="write"]
+  queue -> bw [label="accepted"]
+  bw -> backups [label="encrypted backup\nbefore each write" tailport=sw]
+  bw -> server [label="write" tailport=e]
+}
+```
 
 How each part works is under [Explanation](#explanation).
 
@@ -66,7 +114,7 @@ Take them in order: each continues from the vault the one before left.
 - [Your first template](tutorial/template.md): make a datatype and a
   template, see the fill scores and format marks in the grid, and turn notes
   into logins with the template.
-- [Clean up with an AI agent](tutorial/mcp.md): make an MCP token, connect
+- [Your first MCP-assisted cleanup](tutorial/mcp.md): make an MCP token, connect
   your agent, and approve its proposals in the Queue.
 
 ## How-to guides
@@ -110,11 +158,11 @@ Take them in order: each continues from the vault the one before left.
 
 ## For contributors
 
-- [The spec](spec.md): what bwtidy does and why, every rule with its reason.
+- [Contributing](contributing.md): report a bug, ask for a change, improve
+  the docs, make a pull request or report a security issue.
+- [The spec](spec.md): the rules and reasons these pages do not state.
 - [The architecture](architecture.md): the map of the code, its layers and
   what each may import, who writes each kind of data and how a write flows.
-- `CONTRIBUTING.md` in the repository: where to start, and how to report a
-  bug, ask for a feature or report a security issue (`SECURITY.md`).
 - The developer guide in the repository: `dev/README.md` to set up and for
   the commands, `dev/dev-vault.md` for the dev stack, `dev/testing.md` for
   the tests and the docs screenshots, `dev/release.md` for the docs site and

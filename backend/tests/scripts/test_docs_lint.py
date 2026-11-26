@@ -24,7 +24,7 @@ def write(repo: Path, name: str, text: str = "x") -> None:
 def test_clean_repo_exits_0(repo, monkeypatch, capsys, docs_lint):
     write(repo, "docs/images/a.png")
     write(repo, "docs/images/b.png")
-    write(repo, "README.md", '![a](docs/images/a.png)\n\n![](docs/images/b.png "Title")\n')
+    write(repo, "README.md", '![a](docs/images/a.png)\n\n![b](docs/images/b.png "Title")\n')
     monkeypatch.setattr(docs_lint, "ROOT", repo)
     assert docs_lint.main([]) == 0
     assert capsys.readouterr().out == ""
@@ -65,9 +65,30 @@ def test_url_and_fragment_links_are_ignored(repo, docs_lint):
     assert docs_lint.lint(repo) == []
 
 
-def test_empty_alt_is_accepted(repo, docs_lint):
+def test_pictures_without_alt_are_reported(repo, docs_lint):
     write(repo, "a.png")
-    write(repo, "README.md", "![](a.png)\n")
+    write(
+        repo,
+        "README.md",
+        "![](a.png)\n"
+        "![   ](a.png)\n"
+        "![][r]\n"
+        '<img src="a.png">\n'
+        '<img src="a.png" alt="">\n'
+        "![](https://example.test/x.png)\n"
+        "\n[r]: a.png\n",
+    )
+    assert docs_lint.lint(repo) == [f"README.md:{n}: picture without alt text" for n in range(1, 7)]
+
+
+def test_pictures_with_alt_are_accepted(repo, docs_lint):
+    write(repo, "a.png")
+    write(
+        repo,
+        "README.md",
+        "![a](a.png)\n![b][r]\n<img src='a.png' alt='c'>\n<img alt=d src=a.png>\n"
+        "\n```md\n![](x.png)\n```\n\nSee `![](x.png)` here.\n\n[r]: a.png\n",
+    )
     assert docs_lint.lint(repo) == []
 
 
@@ -82,19 +103,19 @@ def test_link_is_resolved_relative_to_its_file(repo, docs_lint):
 def test_orphan_image_is_reported(repo, docs_lint):
     write(repo, "docs/images/linked.png")
     write(repo, "docs/images/orphan.png")
-    write(repo, "README.md", "![](docs/images/linked.png)\n")
+    write(repo, "README.md", "![l](docs/images/linked.png)\n")
     assert docs_lint.lint(repo) == ["docs/images/orphan.png: not linked from any markdown file"]
 
 
 def test_ignored_files_do_not_count(repo, monkeypatch, capsys, docs_lint):
     write(repo, ".gitignore", "node_modules/\n")
-    write(repo, "node_modules/pkg/README.md", "![](missing.png)\n")
+    write(repo, "node_modules/pkg/README.md", "![x](missing.png)\n")
     monkeypatch.setattr(docs_lint, "ROOT", repo)
     assert docs_lint.main([]) == 0
 
 
 def test_main_prints_problems_and_exits_1(repo, monkeypatch, capsys, docs_lint):
-    write(repo, "README.md", "![](gone.png)\n")
+    write(repo, "README.md", "![g](gone.png)\n")
     monkeypatch.setattr(docs_lint, "ROOT", repo)
     assert docs_lint.main([]) == 1
     assert capsys.readouterr().out == "README.md:1: missing image gone.png\n"
@@ -205,3 +226,21 @@ def test_double_hyphen_dash_is_reported(repo, docs_lint):
 def test_html_entity_is_not_a_semicolon(repo, docs_lint):
     write(repo, "README.md", "Fish &amp; chips &#169; &lt;tag&gt; &#x27;\n")
     assert docs_lint.lint(repo) == []
+
+
+def test_a_diagram_without_alt_text_is_reported(repo, docs_lint):
+    write(repo, "docs/how-to/a.md", "# A\n\nThe flow:\n\n```mermaid\ngraph TD\n  A --> B\n```\n")
+    assert docs_lint.lint(repo) == ["docs/how-to/a.md:5: diagram without alt text"]
+
+
+def test_a_diagram_with_alt_text_and_other_code_pass(repo, docs_lint):
+    write(
+        repo,
+        "docs/how-to/a.md",
+        '# A\n\n```mermaid alt="A flow"\ngraph TD\n```\n\n```python\nprint(1)\n```\n',
+    )
+    assert docs_lint.lint(repo) == []
+
+
+def test_the_diagram_types_are_the_docs_sites(docs_lint, load_script):
+    assert docs_lint.load_docs_site().KROKI_TYPES == load_script("docs-site").KROKI_TYPES

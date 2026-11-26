@@ -1,6 +1,6 @@
 [project]
 name = "bwtidy"
-version = "0.1.0a1"
+version = "1.0.0b1"
 description = "Self-hosted web UI and MCP server for keeping a Bitwarden or Vaultwarden vault consistent"
 authors = [
     { name = "Kent Larsson", email = "kent.larsson@gmail.com" }
@@ -31,10 +31,12 @@ dev = [
     "pytest>=9.0,<10",
     "pytest-testmon>=2.3.0,<3",
     "pytest-xdist>=3.8.0,<4",
+    "pyyaml>=6.0.4,<7",
     "ruff>=0.17,<0.18",
     "ty>=0.0.1,<0.1",
 ]
 docs = [
+    "resvg-py>=0.5.0,<0.6",
     "zensical==0.1.1",
 ]
 
@@ -82,7 +84,7 @@ layers = [
     "bwtidy.sections",
     "bwtidy.items",
     "bwtidy.bw",
-    "bwtidy.config | bwtidy.login_state",
+    "bwtidy.config | bwtidy.login_state | bwtidy.stats",
     "bwtidy.version | bwtidy.protocol | bwtidy.logs | bwtidy.timing | bwtidy.validation | bwtidy.passphrase | bwtidy.mcp_token | bwtidy.db",
 ]
 
@@ -105,6 +107,8 @@ forbidden_modules = [
     "bwtidy.items",
     "bwtidy.bw",
     "bwtidy.db",
+    ## the worker's side of the usage stats, which brings the MCP SDK along
+    "bwtidy.stats.report",
 ]
 
 [[tool.importlinter.contracts]]

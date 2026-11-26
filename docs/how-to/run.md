@@ -23,21 +23,21 @@ To build the image yourself instead, see
    downloading the two files from https://raw.githubusercontent.com/tnek213/bwtidy/main/,
    and make your settings file:
 
-   ```sh
-   git clone https://github.com/tnek213/bwtidy.git bwtidy && cd bwtidy
-   cp example.env .env
-   ```
+    ```sh
+    git clone https://github.com/tnek213/bwtidy.git bwtidy && cd bwtidy
+    cp example.env .env
+    ```
 
-   Every setting is a variable in `.env`, and `example.env` says what each
-   one does. The defaults are fine to start with. All of them are listed in
-   [Configuration](../reference/configuration.md).
+    Every setting is a variable in `.env`, and `example.env` says what each
+    one does. The defaults are fine to start with. All of them are listed in
+    [Configuration](../reference/configuration.md).
 
 2. Optionally pin `BWTIDY_VERSION` in `.env` to a version, then start the
    container:
 
-   ```sh
-   docker compose up -d
-   ```
+    ```sh
+    docker compose up -d
+    ```
 
 3. Open http://127.0.0.1:8765. Only that port is published, on the host's
    127.0.0.1. These docs are at http://127.0.0.1:8765/docs/, for anyone who
@@ -49,7 +49,7 @@ To build the image yourself instead, see
    and your email, then Continue. An account bwtidy does not know yet is
    offered to be created. It is kept once its Bitwarden login succeeds.
 
-   ![The account form with the server and email filled in and Continue outlined](../images/tutorial-account-form.png)
+    ![The account form with the server and email filled in and Continue outlined](../images/tutorial-account-form.png)
 
 2. bwtidy shows a Bitwarden login with the server and email filled in. Type
    your master password and click Log in. A console below the form shows
@@ -70,10 +70,11 @@ time. Several accounts can use the same URL, each kept apart from the others
 When the session ends, and what happens to your unsaved changes then, is in
 [Logging in](../explanation/login.md#the-session).
 
-Do not run `bw unlock`, `bw lock` or `bw logout` in the container while you
-are logged in to the web UI. Each of them invalidates the session key bwtidy
-uses for backups (see
-[How bwtidy uses the Bitwarden CLI](../explanation/bw-cli.md)).
+> [!WARNING]
+> Do not run `bw unlock`, `bw lock` or `bw logout` in the container while you
+> are logged in to the web UI. Each of them invalidates the session key
+> bwtidy uses for backups (see
+> [How bwtidy uses the Bitwarden CLI](../explanation/bw-cli.md)).
 
 ## Build the image yourself
 

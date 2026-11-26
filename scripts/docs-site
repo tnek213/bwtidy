@@ -10,8 +10,9 @@
                                   (ARGS go to zensical, such as --dev-addr localhost:8001)
 
 The site is zensical.toml at the repo root over the pages in docs/, with the theme overrides in
-overrides/ (its main.html puts the alpha disclaimer as a banner above every page, widens the
-content column and opens a picture larger on a click). Zensical comes
+overrides/ (its main.html puts the beta disclaimer as a banner above every page, widens the
+content column, opens a picture larger on a click and links every page to the issue form for
+docs improvements, with the version below). Zensical comes
 from the backend's dependency group `docs` (backend/pyproject.toml, pinned in backend/uv.lock), run
 through `uv run --locked --only-group docs`, so neither bwtidy nor its dependencies are needed. The
 Dockerfile's docs stage and the Pages workflow (.github/workflows/docs.yml) run `build` too.
@@ -20,9 +21,14 @@ Dockerfile's docs stage and the Pages workflow (.github/workflows/docs.yml) run 
 link out of docs/ (like one to dev/README.md) fails as well. It also fails, before Zensical runs,
 on a page of docs/ that the nav leaves out, as Zensical builds it without a way to reach it, and,
 after Zensical, on a built HTML page without the banner's marker (the attribute data-disclaimer),
-naming each such page. Zensical writes its output and its cache inside the project, so `build`
-copies zensical.toml, docs/ and overrides/ into a temp directory and builds there: nothing in the
-checkout changes and two builds never meet. `serve` runs in the checkout and leaves site/ and
+naming each such page, and on a numbered list that starts at 1 again right after another one with
+only a picture or code block between them (a step's continuation not indented enough), naming the
+page and the line of its HTML, and on a page that has the browser fetch anything from another host
+(a script, stylesheet, icon, picture, frame or CSS url() with a host of its own: a running bwtidy
+serves the site offline), naming the page, the line and the URL. A link to another host is fine.
+Zensical writes its output and its cache inside the project, so
+`build` copies zensical.toml, docs/ and overrides/ into a temp directory and builds there: nothing
+in the checkout changes and two builds never meet. `serve` runs in the checkout and leaves site/ and
 .cache/ there, both git-ignored.
 
 Every backup holds docs/restore.md as RESTORE.md, with the version of the image in place of
@@ -31,23 +37,56 @@ COMMIT on its line "Written for bwtidy COMMIT." (RESTORE_DOC_COMMIT in backups/c
 backend/pyproject.toml spelled the semver way, then the commit, from BWTIDY_COMMIT (the
 Dockerfile passes it) or else the checkout's last commit, as `0.1.0-alpha.1 (261111 7db8830)`.
 It fails when the page lacks the line. `serve` shows the page as it is.
+
+Both `build` and `serve` hand the pages that version as extra.bwtidy_version (the link to the
+docs issue form), its semver alone as extra.bwtidy_release and the repo's star count from
+BWTIDY_STARS as extra.bwtidy_stars, left out when the variable is unset or not digits only (the
+docs and image workflows look it up). The header shows the last two beside the repository link
+(overrides/partials/source.html), so the pages fetch nothing from GitHub.
+
+A diagram is a fenced code block whose info string starts with a Kroki diagram type (KROKI_TYPES,
+as in ```mermaid alt="What it shows"). Before Zensical runs, `build` turns each one of its copy of
+docs/ into a PNG beside the page and puts a Markdown picture of it in the block's place, with the
+alt text and `{ width="W" }`, W half the PNG's width. It refuses a diagram without alt text, naming
+the page and the line, before any request (scripts/docs-lint reports it as well). It POSTs the
+source to BWTIDY_KROKI_URL (https://kroki.io when unset or empty) as TYPE/svg, a Mermaid source
+with MERMAID_INIT as its first line unless it starts with an init directive of its own, and resvg
+(resvg-py of the group docs, run through uv) converts the SVG at ZOOM and DPI on BACKGROUND,
+drawing the text with the system's fonts (GENERIC_FONTS: the first installed one of each list
+stands in for serif, sans-serif and monospace). A diagram with a text that none of them draws
+(resvg would leave it out without a word) fails the build, naming the page, the line, the generic
+family and the fonts it tried. The PNG is named after a hash of the type, the source and the
+converter's settings, and kept under that hash in .cache/kroki/ at the repo root, so a later build
+finds it there and makes no request. A server that cannot be reached or answers with an error fails
+the build, naming the page, the line and the server's message. Docs without a diagram build without
+any request. `serve` shows a diagram as its code block.
 """
 
+import hashlib
+import http.client
 import importlib.util
+import json
 import os
+import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 import tomllib
+import urllib.error
+import urllib.request
 from collections.abc import Iterator
+from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
+from urllib.parse import urlsplit
 
 ## the Dockerfile's docs stage copies this script alone, so it stays free of scripts/devlib
 ROOT = Path(__file__).resolve().parent.parent
 BACKEND = ROOT / "backend"
 CONFIG = "zensical.toml"
+SERVE_CONFIG = ".zensical-serve.toml"
 DOCS = "docs"
 OVERRIDES = "overrides"
 BANNER_MARKER = "data-disclaimer"
@@ -57,7 +96,8 @@ RESTORE_PAGE = "restore.md"
 RESTORE_DOC_COMMIT = "Written for bwtidy COMMIT."
 ## what Zensical writes at the top of every site, so a directory that holds both is a build
 BUILD_MARKERS = ("index.html", "sitemap.xml")
-ZENSICAL = [
+## a command in the backend's group docs (Zensical and resvg-py), without bwtidy itself
+DOCS_GROUP = [
     "uv",
     "run",
     "--quiet",
@@ -66,8 +106,331 @@ ZENSICAL = [
     str(BACKEND),
     "--only-group",
     "docs",
-    "zensical",
 ]
+ZENSICAL = [*DOCS_GROUP, "zensical"]
+## the diagram types of Kroki, by the name its URL takes, as https://kroki.io/ lists them (its
+## "Diagram types" and https://kroki.io/cheatsheet.html). scripts/docs-lint loads this list too.
+KROKI_TYPES = (
+    "actdiag",
+    "blockdiag",
+    "bpmn",
+    "bytefield",
+    "c4plantuml",
+    "d2",
+    "dbml",
+    "ditaa",
+    "erd",
+    "excalidraw",
+    "goat",
+    "graphviz",
+    "lini",
+    "mermaid",
+    "nomnoml",
+    "nwdiag",
+    "packetdiag",
+    "pikchr",
+    "plantuml",
+    "rackdiag",
+    "seqdiag",
+    "structurizr",
+    "svgbob",
+    "symbolator",
+    "tikz",
+    "umlet",
+    "vega",
+    "vegalite",
+    "wavedrom",
+    "wireviz",
+)
+KROKI_URL = "BWTIDY_KROKI_URL"
+KROKI_DEFAULT = "https://kroki.io"
+KROKI_TIMEOUT = 60
+## relative to ROOT, read at build time
+KROKI_CACHE = Path(".cache") / "kroki"
+## Mermaid writes its labels as HTML in foreignObject elements, which resvg leaves out, unless
+## this first line has it write SVG text
+MERMAID_INIT = '%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%'
+MERMAID_HAS_INIT = re.compile(r"\s*%%\{\s*init(?:ialize)?\s*:")
+## drawn at twice its size and shown at half the width, so it is sharp on a HiDPI screen. White,
+## as a transparent picture vanishes in the dark color scheme.
+ZOOM = 2
+BACKGROUND = "#ffffff"
+## the CSS pixel's. resvg-py's default of 0 makes a size in pt or cm (as Graphviz and PlantUML
+## write them) 0, an invalid size.
+DPI = 96
+CONVERTER = f"resvg zoom={ZOOM} background={BACKGROUND} dpi={DPI}"
+## the installed fonts that may stand in for each generic family, the first one that draws wins.
+## resvg maps them to Times New Roman, Arial and Courier New, so on a system without those (the
+## Dockerfile's docs stage has DejaVu only) a label in serif or sans-serif is left out.
+GENERIC_FONTS = {
+    "serif": ["Times New Roman", "Times", "Liberation Serif", "DejaVu Serif", "Noto Serif"],
+    "sans_serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans", "Noto Sans"],
+    "monospace": ["Courier New", "Liberation Mono", "DejaVu Sans Mono", "Noto Sans Mono"],
+}
+## run in the group docs with ZOOM, BACKGROUND, DPI, the JSON of GENERIC_FONTS and then pairs of
+## an SVG and a PNG path. It converts what it can and prints a line "SVG<tab>WHY" for each SVG it
+## cannot convert or whose text no installed font draws.
+CONVERT = """
+import html
+import json
+import re
+import sys
+import xml.etree.ElementTree as ElementTree
+
+PROBE = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20">'
+    '<text x="2" y="16" font-size="16" font-family="{family}">{text}</text></svg>'
+)
+## a family no system has. resvg draws a text whose families it cannot find in the serif one,
+## so a probe with this as serif finds only the family it names.
+NOWHERE = "bwtidy no such font"
+CSS_FAMILY = re.compile(r"font-family\\s*:\\s*([^;}]+)")
+GENERIC_NAMES = {"serif": "serif", "sans-serif": "sans_serif", "monospace": "monospace"}
+
+
+def draws(render, family, fonts):
+    try:
+        text = render(svg_string=PROBE.format(family=html.escape(family), text="Mg"), **fonts)
+        empty = render(svg_string=PROBE.format(family=html.escape(family), text=""), **fonts)
+    except ValueError:
+        return False
+    return bytes(text) != bytes(empty)
+
+
+def generic_families(render, candidates):
+    chosen = {}
+    for generic, families in candidates.items():
+        probe = {"serif_family": NOWHERE}
+        found = next((family for family in families if draws(render, family, probe)), None)
+        chosen[f"{generic}_family"] = found or NOWHERE
+    chosen["font_family"] = chosen.get("serif_family", NOWHERE)
+    return chosen
+
+
+## the font-family lists of an SVG that holds text, "" for resvg's default, else none.
+def text_families(svg):
+    try:
+        root = ElementTree.fromstring(svg)
+    except ElementTree.ParseError:
+        return []
+    elements = list(root.iter())
+    texts = [e for e in elements if e.tag.rsplit("}", 1)[-1] == "text"]
+    if not any("".join(text.itertext()).strip() for text in texts):
+        return []
+    found = []
+    for element in elements:
+        if element.get("font-family"):
+            found.append(element.get("font-family"))
+        css = element.get("style") or ""
+        if element.tag.rsplit("}", 1)[-1] == "style":
+            css += " " + "".join(element.itertext())
+        found += CSS_FAMILY.findall(css)
+    return list(dict.fromkeys(family.strip() for family in found)) or [""]
+
+
+## the generic family a font-family list falls back on, serif as resvg's when it names none.
+def generic_of(family):
+    for name in family.split(","):
+        name = name.strip().strip("'\\"").lower()
+        if name in GENERIC_NAMES:
+            return name
+    return "serif"
+
+
+## why a text of the SVG would be left out for want of a font, or None when all draw.
+def missing_font(render, svg, fonts, candidates):
+    for family in text_families(svg):
+        generic = generic_of(family)
+        key = GENERIC_NAMES[generic]
+        ## the text has to draw in a font of its own list, not in resvg's serif fallback
+        probe = {**fonts, "serif_family": fonts.get(f"{key}_family", NOWHERE)}
+        if not draws(render, family, probe):
+            tried = ", ".join(candidates.get(key, []))
+            return f"no installed font draws its {generic} text, tried {tried}"
+    return None
+
+
+def main(args):
+    import resvg_py
+
+    zoom, background, dpi, candidates, *paths = args
+    candidates = json.loads(candidates)
+    render = resvg_py.svg_to_bytes
+    fonts = generic_families(render, candidates)
+    failed = False
+    for svg, png in zip(paths[::2], paths[1::2]):
+        with open(svg, "rb") as file:
+            source = file.read()
+        why = missing_font(render, source, fonts, candidates)
+        if why:
+            print(f"{svg}\\t{why}", file=sys.stderr)
+            failed = True
+            continue
+        try:
+            data = render(
+                svg_path=svg, zoom=float(zoom), background=background, dpi=float(dpi), **fonts
+            )
+        except Exception as error:
+            print(f"{svg}\\tresvg could not convert the SVG of Kroki, {error}", file=sys.stderr)
+            failed = True
+            continue
+        with open(png, "wb") as file:
+            file.write(bytes(data))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
+"""
+OPENING_FENCE = re.compile(r"^([ \t]*)(`{3,}|~{3,})[ \t]*(.*?)[ \t]*$")
+ALT = re.compile(r'\balt="([^"]*)"')
+## the rel values of a link tag that only points somewhere, so the browser never fetches its href
+LINK_ONLY = {"alternate", "author", "canonical", "help", "license", "next", "prev", "search"}
+## a URL in CSS, of url(...) or @import, whether quoted or not
+CSS_URL = re.compile(r"""(?:url\(|@import)\s*['"]?\s*([^'")\s]+)""", re.IGNORECASE)
+VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source"}
+
+
+class Node:
+    """An element of a built page: its tag, attributes, line, children and what it holds."""
+
+    def __init__(self, tag: str, attrs: dict[str, str | None], line: int) -> None:
+        self.tag = tag
+        self.attrs = attrs
+        self.line = line
+        self.children: list[Node] = []
+        self.has_text = False
+        self.has_image = False
+
+    @property
+    def classes(self) -> list[str]:
+        return (self.attrs.get("class") or "").split()
+
+    def is_picture_or_code(self) -> bool:
+        """A block that holds a picture or a code block and nothing else."""
+        if self.tag == "pre" or "highlight" in self.classes:
+            return True
+        if self.tag in ("p", "figure"):
+            return self.has_image and not self.has_text
+        return False
+
+
+class Tree(HTMLParser):
+    """The elements of an HTML page as a tree, void tags without children."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.root = Node("#root", {}, 0)
+        self.stack = [self.root]
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        node = Node(tag, dict(attrs), self.getpos()[0])
+        self.stack[-1].children.append(node)
+        if tag == "img":
+            for open_node in self.stack:
+                open_node.has_image = True
+        if tag not in VOID_TAGS:
+            self.stack.append(node)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.handle_starttag(tag, attrs)
+        if tag not in VOID_TAGS:
+            self.stack.pop()
+
+    def handle_endtag(self, tag: str) -> None:
+        for index in range(len(self.stack) - 1, 0, -1):
+            if self.stack[index].tag == tag:
+                del self.stack[index:]
+                return
+
+    def handle_data(self, data: str) -> None:
+        if data.strip():
+            for node in self.stack:
+                node.has_text = True
+
+
+def split_lists(node: Node) -> Iterator[int]:
+    """The lines of the ordered lists in node that restart at 1 right after an ordered list.
+
+    Only a picture or a code block may lie between the two, which is what a continuation that
+    the Markdown did not indent far enough turns into."""
+    previous = False
+    for child in node.children:
+        if child.tag == "ol":
+            if previous and "start" not in child.attrs:
+                yield child.line
+            previous = True
+        elif not child.is_picture_or_code():
+            previous = False
+        yield from split_lists(child)
+
+
+def broken_lists(site: Path) -> list[str]:
+    """One message per page and line of the built site where a numbered list is split."""
+    found = []
+    for page in sorted(site.rglob("*.html")):
+        tree = Tree()
+        tree.feed(page.read_text(encoding="utf-8"))
+        name = page.relative_to(site).as_posix()
+        found.extend(
+            f"{name}:{line}: an ordered list starts at 1 again after a picture or code block"
+            for line in split_lists(tree.root)
+        )
+    return found
+
+
+class Loads(HTMLParser):
+    """What an HTML page has the browser fetch: each URL with its line."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.found: list[tuple[int, str]] = []
+        self.in_style = False
+
+    def note(self, url: str) -> None:
+        self.found.append((self.getpos()[0], url.strip()))
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = {name: value or "" for name, value in attrs}
+        for name in ("src", "poster"):
+            if values.get(name):
+                self.note(values[name])
+        if tag == "object" and values.get("data"):
+            self.note(values["data"])
+        for candidate in values.get("srcset", "").split(","):
+            if candidate.strip():
+                self.note(candidate.split()[0])
+        if tag == "link" and values.get("href"):
+            rel = set(values.get("rel", "").lower().split())
+            if not rel or not rel <= LINK_ONLY:
+                self.note(values["href"])
+        for url in CSS_URL.findall(values.get("style", "")):
+            self.note(url)
+        self.in_style = tag == "style"
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "style":
+            self.in_style = False
+
+    def handle_data(self, data: str) -> None:
+        if self.in_style:
+            for url in CSS_URL.findall(data):
+                self.note(url)
+
+
+def external_loads(site: Path) -> list[str]:
+    """One message per page, line and URL of the built site that is fetched from another host."""
+    found = []
+    for page in sorted(site.rglob("*.html")):
+        loads = Loads()
+        loads.feed(page.read_text(encoding="utf-8"))
+        name = page.relative_to(site).as_posix()
+        found.extend(
+            f"{name}:{line}: loads {url} from another host"
+            for line, url in loads.found
+            if urlsplit(url).netloc
+        )
+    return found
 
 
 def nav_pages(entries: Any) -> Iterator[str]:
@@ -106,8 +469,8 @@ def last_commit() -> str | None:
     return result.stdout.strip() or None
 
 
-def site_version() -> str:
-    """The version the site is built for, as /api/health spells it."""
+def release() -> str:
+    """The version of backend/pyproject.toml as semver spells it, as /api/health does."""
     with (ROOT / "backend" / "pyproject.toml").open("rb") as file:
         version = tomllib.load(file)["project"]["version"]
     ## stdlib only, so it loads by path without bwtidy's dependencies
@@ -116,9 +479,38 @@ def site_version() -> str:
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    semver = module.semver(version)
+    return module.semver(version)
+
+
+def site_version(semver: str) -> str:
+    """The version the site is built for: the semver, then the commit when there is one."""
     commit = os.environ.get("BWTIDY_COMMIT", "").strip() or last_commit()
     return f"{semver} ({commit})" if commit else semver
+
+
+def stars() -> int | None:
+    """The repo's star count from BWTIDY_STARS, None when it is unset or not digits only."""
+    value = os.environ.get("BWTIDY_STARS", "").strip()
+    return int(value) if re.fullmatch(r"[0-9]+", value) else None
+
+
+def with_extra(config: str) -> tuple[str, str]:
+    """The config text with what the pages show from extra, and the version the site is for.
+
+    extra.bwtidy_version is the full version, for the link to the docs issue form.
+    extra.bwtidy_release (the semver alone) and extra.bwtidy_stars (left out without a count)
+    are the facts in the header beside the repository link (overrides/partials/source.html)."""
+    semver = release()
+    version = site_version(semver)
+    lines = [
+        "[project.extra]",
+        f'bwtidy_version = "{version}"',
+        f'bwtidy_release = "{semver}"',
+    ]
+    count = stars()
+    if count is not None:
+        lines.append(f"bwtidy_stars = {count}")
+    return f"{config.rstrip()}\n\n" + "\n".join(lines) + "\n", version
 
 
 def fill_in_version(docs: Path, version: str) -> bool:
@@ -176,6 +568,221 @@ def replace(target: Path, site: Path) -> None:
         shutil.rmtree(staging, ignore_errors=True)
 
 
+class Diagram(NamedTuple):
+    """A fenced code block of a Kroki diagram type: where it is and what it holds.
+
+    line is the opening fence's (counted from 1), start and end the indexes of the block's first
+    and last line. alt is "" when the info string names none."""
+
+    line: int
+    start: int
+    end: int
+    kind: str
+    alt: str
+    source: str
+    indent: str
+
+
+def closes(line: str, fence: str) -> bool:
+    """Whether line closes a code block opened by fence."""
+    stripped = line.strip()
+    return len(stripped) >= len(fence) and set(stripped) == {fence[0]}
+
+
+def diagrams(text: str) -> list[Diagram]:
+    """The fenced code blocks of a markdown text whose info string starts with a Kroki type.
+
+    A block of another language is skipped whole, so an example inside it does not count."""
+    lines = text.split("\n")
+    found = []
+    index = 0
+    while index < len(lines):
+        match = OPENING_FENCE.match(lines[index])
+        if not match:
+            index += 1
+            continue
+        indent, fence, info = match.groups()
+        end = index + 1
+        while end < len(lines) and not closes(lines[end], fence):
+            end += 1
+        words = info.split(maxsplit=1)
+        if words and words[0] in KROKI_TYPES:
+            alt = ALT.search(info)
+            body = [
+                line[len(indent) :] if line.startswith(indent) else line.lstrip()
+                for line in lines[index + 1 : end]
+            ]
+            found.append(
+                Diagram(
+                    line=index + 1,
+                    start=index,
+                    end=min(end, len(lines) - 1),
+                    kind=words[0],
+                    alt=alt.group(1).strip() if alt else "",
+                    source="\n".join(body) + "\n",
+                    indent=indent,
+                )
+            )
+        index = end + 1
+    return found
+
+
+def kroki_url(kind: str) -> str:
+    """The URL that renders a diagram of the kind as SVG, on the server BWTIDY_KROKI_URL names."""
+    base = os.environ.get(KROKI_URL, "").strip() or KROKI_DEFAULT
+    return f"{base.rstrip('/')}/{kind}/svg"
+
+
+def kroki_source(diagram: Diagram) -> str:
+    """The source as Kroki gets it: a Mermaid one with the init line that keeps its labels."""
+    if diagram.kind == "mermaid" and not MERMAID_HAS_INIT.match(diagram.source):
+        return f"{MERMAID_INIT}\n{diagram.source}"
+    return diagram.source
+
+
+def diagram_key(kind: str, source: str) -> str:
+    """The hash a picture is named and cached by: its type, its source and the converter."""
+    settings = [CONVERTER, GENERIC_FONTS]
+    return hashlib.sha256(json.dumps([kind, source, settings]).encode()).hexdigest()
+
+
+class KrokiError(Exception):
+    def __init__(self, message: str, reached: bool) -> None:
+        super().__init__(message)
+        self.reached = reached
+
+
+def fetch_svg(kind: str, source: str) -> bytes:
+    """The SVG Kroki renders of a source, a KrokiError when it cannot be reached or refuses."""
+    url = kroki_url(kind)
+    request = urllib.request.Request(
+        url,
+        data=source.encode("utf-8"),
+        method="POST",
+        headers={
+            "Content-Type": "text/plain",
+            "Accept": "image/svg+xml",
+            "User-Agent": "bwtidy-docs-site",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=KROKI_TIMEOUT) as response:
+            return response.read()
+    except urllib.error.HTTPError as error:
+        message = error.read().decode("utf-8", errors="replace").strip() or str(error.reason)
+        raise KrokiError(f"{url} answered {error.code}: {message}", reached=True) from None
+    except (OSError, http.client.HTTPException) as error:
+        reason = error.reason if isinstance(error, urllib.error.URLError) else error
+        raise KrokiError(f"{url} could not be reached: {reason}", reached=False) from None
+
+
+def convert(svgs: dict[str, bytes], cache: Path) -> dict[str, str]:
+    """Convert each SVG to a PNG in the cache under its key, why for each key that failed."""
+    cache.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="bwtidy-kroki-") as temp:
+        paths = []
+        for key, svg in svgs.items():
+            (Path(temp) / f"{key}.svg").write_bytes(svg)
+            paths += [str(Path(temp) / f"{key}.svg"), str(Path(temp) / f"{key}.png")]
+        result = subprocess.run(
+            [
+                *DOCS_GROUP,
+                "python",
+                "-c",
+                CONVERT,
+                str(ZOOM),
+                BACKGROUND,
+                str(DPI),
+                json.dumps(GENERIC_FONTS),
+                *paths,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        reasons = {}
+        for line in result.stderr.splitlines():
+            svg, tab, why = line.partition("\t")
+            if tab:
+                reasons[Path(svg).stem] = why
+        failed = {}
+        for key in svgs:
+            png = Path(temp) / f"{key}.png"
+            if png.is_file():
+                os.replace(png, cache / f"{key}.png")
+            else:
+                why = result.stderr.strip() or f"exit code {result.returncode}"
+                failed[key] = reasons.get(key, f"resvg could not convert the SVG of Kroki, {why}")
+        return failed
+
+
+def png_width(path: Path) -> int:
+    """The width of a PNG, from its IHDR chunk."""
+    return struct.unpack(">I", path.read_bytes()[16:20])[0]
+
+
+def picture(diagram: Diagram, name: str, width: int) -> str:
+    """The Markdown picture that stands in for a diagram's code block."""
+    alt = re.sub(r"([\\\[\]])", r"\\\1", diagram.alt)
+    return f'{diagram.indent}![{alt}]({name}){{ width="{width // 2}" }}'
+
+
+def render_diagrams(docs: Path) -> list[str]:
+    """Turn every diagram of the pages under docs into a PNG beside its page, the problems found.
+
+    A diagram without alt text stops it before any request. A PNG of the cache is used as it
+    is, the others come from Kroki as SVG and resvg converts them."""
+    pages = {}
+    for page in sorted(docs.rglob("*.md")):
+        found = diagrams(page.read_text(encoding="utf-8"))
+        if found:
+            pages[page] = found
+    if not pages:
+        return []
+
+    def where(page: Path, diagram: Diagram) -> str:
+        return f"{page.relative_to(docs.parent).as_posix()}:{diagram.line}"
+
+    problems = [
+        f'{where(page, d)}: diagram without alt text, write alt="WHAT IT SHOWS" after {d.kind}'
+        for page, found in pages.items()
+        for d in found
+        if not d.alt
+    ]
+    if problems:
+        return problems
+    cache = ROOT / KROKI_CACHE
+    wanted: dict[str, tuple[str, str, str]] = {}
+    for page, found in pages.items():
+        for d in found:
+            key = diagram_key(d.kind, kroki_source(d))
+            if not (cache / f"{key}.png").is_file() and key not in wanted:
+                wanted[key] = (d.kind, kroki_source(d), where(page, d))
+    svgs = {}
+    for key, (kind, source, place) in wanted.items():
+        try:
+            svgs[key] = fetch_svg(kind, source)
+        except KrokiError as error:
+            problems.append(f"{place}: Kroki could not render the {kind} diagram, {error}")
+            if not error.reached:
+                break
+    if problems:
+        return problems
+    failed = convert(svgs, cache) if svgs else {}
+    for key, why in failed.items():
+        problems.append(f"{wanted[key][2]}: {why}")
+    if problems:
+        return problems
+    for page, found in pages.items():
+        lines = page.read_text(encoding="utf-8").split("\n")
+        for d in reversed(found):
+            key = diagram_key(d.kind, kroki_source(d))
+            name = f"diagram-{key[:16]}.png"
+            shutil.copyfile(cache / f"{key}.png", page.parent / name)
+            lines[d.start : d.end + 1] = [picture(d, name, png_width(page.parent / name))]
+        page.write_text("\n".join(lines), encoding="utf-8")
+    return []
+
+
 def build(target: Path | None) -> int:
     if target is not None and (why := refusal(target)):
         print(f"docs-site: {why}, nothing was built", file=sys.stderr)
@@ -187,14 +794,20 @@ def build(target: Path | None) -> int:
         return 1
     with tempfile.TemporaryDirectory(prefix="bwtidy-docs-site-") as temp:
         project = Path(temp)
-        shutil.copy2(ROOT / CONFIG, project / CONFIG)
+        config, version = with_extra(ROOT.joinpath(CONFIG).read_text(encoding="utf-8"))
+        (project / CONFIG).write_text(config, encoding="utf-8")
         shutil.copytree(ROOT / DOCS, project / DOCS)
         shutil.copytree(ROOT / OVERRIDES, project / OVERRIDES)
-        if not fill_in_version(project / DOCS, site_version()):
+        if not fill_in_version(project / DOCS, version):
             print(
                 f"docs-site: docs/{RESTORE_PAGE} has no line {RESTORE_DOC_COMMIT!r}",
                 file=sys.stderr,
             )
+            return 1
+        problems = render_diagrams(project / DOCS)
+        for problem in problems:
+            print(f"docs-site: {problem}", file=sys.stderr)
+        if problems:
             return 1
         built = subprocess.run([*ZENSICAL, "build", "--strict"], cwd=project)
         if built.returncode != 0:
@@ -204,6 +817,21 @@ def build(target: Path | None) -> int:
             print(f"docs-site: {page} has no disclaimer banner ({BANNER_MARKER})", file=sys.stderr)
         if bare:
             return 1
+        split = broken_lists(project / "site")
+        for message in split:
+            print(
+                f"docs-site: {message}, indent what lies between its steps by 4 spaces",
+                file=sys.stderr,
+            )
+        if split:
+            return 1
+        external = external_loads(project / "site")
+        for message in external:
+            print(
+                f"docs-site: {message}, a running bwtidy serves the site offline", file=sys.stderr
+            )
+        if external:
+            return 1
         if target is not None:
             replace(target, project / "site")
             print(f"docs-site: built into {target}")
@@ -211,7 +839,16 @@ def build(target: Path | None) -> int:
 
 
 def serve(args: list[str]) -> int:
-    return subprocess.run([*ZENSICAL, "serve", *args], cwd=ROOT).returncode
+    ## a config beside zensical.toml that adds the version and the star count, as docs_dir and
+    ## custom_dir are relative to the config file
+    config = ROOT / SERVE_CONFIG
+    config.write_text(
+        with_extra(ROOT.joinpath(CONFIG).read_text(encoding="utf-8"))[0], encoding="utf-8"
+    )
+    try:
+        return subprocess.run([*ZENSICAL, "serve", "-f", str(config), *args], cwd=ROOT).returncode
+    finally:
+        config.unlink(missing_ok=True)
 
 
 def main(args: list[str]) -> int:

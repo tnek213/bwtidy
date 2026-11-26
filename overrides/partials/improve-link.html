@@ -1,0 +1,18 @@
+{#- The link that opens a new issue from the issue form for docs improvements, with the page, its
+address on the public GitHub Pages site and the version the docs were built from filled in. The
+address in the reader's browser is never used, as it can be the private host of a self-hosted
+bwtidy. The Pages address comes from repo_url (https://github.com/OWNER/REPO is served at
+https://OWNER.github.io/REPO/) and the page's path in the site, which is relative. Zensical offers no page.file, so the page's
+source path comes from page.edit_url, which zensical.toml pins to the main branch (edit_uri). -#}
+{% set parts = config.repo_url | trim("/") | split("/") %}
+{% set public = "https://" ~ parts[3] ~ ".github.io/" ~ parts[4] ~ "/" ~ page.url | trim("/") %}
+{% set public = public ~ "/" if page.url else public %}
+{% set source = page.edit_url | replace(config.repo_url | trim("/") ~ "/edit/main/", "") %}
+{% set query = [
+  "template=docs_improvement.yml",
+  "page=" ~ source | urlencode,
+  "url=" ~ public | urlencode,
+  "version=" ~ (config.extra.bwtidy_version | d("", true)) | urlencode,
+  "title=" ~ ("Docs: " ~ page.title) | urlencode,
+] | join("&") %}
+<a class="md-nav__link md-improve__link" href="{{ config.repo_url | trim('/') }}/issues/new?{{ query }}" target="_blank" rel="noopener noreferrer">Suggest an improvement to this page</a>

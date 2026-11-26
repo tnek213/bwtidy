@@ -6,15 +6,17 @@ others by plain Linux file permissions: every account gets a Linux user id
 
 ## One uid per account
 
-- The gateway runs as root, since only root can start a process as another
-  user. The container keeps only the six capabilities it needs to make and
-  own the account directories, switch to their uids and stop the workers.
-- A new account gets one more than the highest uid in use, from 70001 up
-  (`BWTIDY_UID_BASE` plus one). A backup directory that outlived its
-  account keeps its uid in use. The uids have no user names.
-- The gateway starts the account's worker as that uid, with no other groups,
-  a umask of 077 and an environment built from scratch. The worker's own
-  `bw serve` runs as the same uid.
+The gateway runs as root, since only root can start a process as another
+user. The container keeps only the six capabilities it needs to make and
+own the account directories, switch to their uids and stop the workers.
+
+A new account gets one more than the highest uid in use, from 70001 up
+(`BWTIDY_UID_BASE` plus one). A backup directory that outlived its account
+keeps its uid in use. The uids have no user names.
+
+The gateway starts the account's worker as that uid, with no other groups, a
+umask of 077 and an environment built from scratch. The worker's own `bw
+serve` runs as the same uid.
 
 ## What each uid owns
 
