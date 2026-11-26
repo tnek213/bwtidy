@@ -145,6 +145,14 @@ export const RUNTIME_CREDITS: Credit[] = [
     usedFor: 'loading and refreshing what the page shows',
     packages: ['@tanstack/react-query'],
   },
+  {
+    name: 'IBM Plex Mono',
+    url: 'https://github.com/IBM/plex',
+    language: 'CSS',
+    license: 'OFL-1.1',
+    usedFor: 'the code in the documentation',
+    packages: ['@fontsource/ibm-plex-mono'],
+  },
 ]
 
 export const TOOL_CREDITS: Credit[] = [

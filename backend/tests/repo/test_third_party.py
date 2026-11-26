@@ -144,3 +144,19 @@ def test_stale_names_names_what_differs():
 def test_the_committed_list_is_up_to_date():
     committed = json.loads(third_party.OUTPUT.read_text())
     assert third_party.stale_names(committed, third_party.collect()) == []
+
+
+def test_every_bundled_package_has_its_files_and_its_license_in_docs():
+    fonts = third_party.ROOT / "docs" / "assets" / "fonts"
+    assert {f"docs/assets/fonts/{d.name}" for d in fonts.iterdir()} <= set(third_party.BUNDLED)
+    for folder, package in third_party.BUNDLED.items():
+        files = {path.name for path in (third_party.ROOT / folder).iterdir()}
+        assert "LICENSE" in files, folder
+        assert files - {"LICENSE"}, folder
+        assert package["direct"] is True
+
+
+def test_the_list_holds_the_bundled_packages():
+    committed = json.loads(third_party.OUTPUT.read_text())
+    for package in third_party.BUNDLED.values():
+        assert package in committed

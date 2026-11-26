@@ -1,0 +1,310 @@
+/* The site's own look over the theme (Zensical, modern variant): IBM Plex Mono for code, bundled
+   with the site, and a warm ivory and deep teal palette for each of the two color schemes. The
+   palettes in zensical.toml name the colors custom, so none of the theme's named colors applies.
+   Every pair of text and background here meets WCAG 2.2 AA (backend/tests/e2e/test_docs_site.py
+   checks the main ones). */
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono/ibm-plex-mono-latin-ext-400-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono/ibm-plex-mono-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono/ibm-plex-mono-latin-ext-700-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* the theme puts --md-code-font first in its list of code fonts, before its own fallbacks */
+:root {
+  --md-code-font: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas,
+    "DejaVu Sans Mono", monospace;
+}
+
+/* Light: ivory paper with warm charcoal text, deep teal for links, the header and the selected
+   page, and a darker ivory for code and table headings. */
+[data-md-color-scheme="default"] {
+  --md-hue: 182deg;
+  --md-primary-fg-color: #0e4c4d;
+  --md-primary-fg-color--light: #2d6263;
+  --md-primary-fg-color--dark: #0a3a3b;
+  --md-primary-bg-color: #fbf8f1;
+  --md-primary-bg-color--light: #fbf8f1b3;
+  --md-accent-fg-color: #084646;
+  --md-accent-fg-color--transparent: #0b62621f;
+  --md-accent-bg-color: #fbf8f1;
+  --md-accent-bg-color--light: #fbf8f1b3;
+
+  --md-default-fg-color: #24221e;
+  --md-default-fg-color--light: #5c574d;
+  --md-default-fg-color--lighter: #24221e52;
+  --md-default-fg-color--lightest: #24221e14;
+  --md-default-bg-color: #fbf8f1;
+  --md-default-bg-color--light: #fbf8f1b3;
+  --md-default-bg-color--lighter: #fbf8f14d;
+  --md-default-bg-color--lightest: #fbf8f11f;
+
+  --md-typeset-color: #24221e;
+  --md-typeset-a-color: #0b6262;
+  --md-typeset-mark-color: #f3c34a66;
+  --md-typeset-table-color: #24221e24;
+  --md-typeset-table-color--light: #0b62620d;
+  --md-typeset-kbd-color: #fdfbf6;
+  --md-typeset-kbd-accent-color: #ffffff;
+  --md-typeset-kbd-border-color: #c9c0ad;
+
+  --md-code-fg-color: #2f3a39;
+  --md-code-bg-color: #f1ebdf;
+  --md-code-bg-color--light: #f1ebdfb3;
+  --md-code-bg-color--lighter: #f1ebdf4d;
+  --md-code-hl-color: #0b6262;
+  --md-code-hl-color--light: #0b62621a;
+  --md-code-hl-number-color: #9e3523;
+  --md-code-hl-special-color: #a12d5c;
+  --md-code-hl-function-color: #6a4690;
+  --md-code-hl-constant-color: #7d3f8c;
+  --md-code-hl-keyword-color: #0b6262;
+  --md-code-hl-string-color: #7a4f00;
+  --md-code-hl-comment-color: #6b655a;
+  --md-code-hl-operator-color: #5c574d;
+  --md-code-hl-punctuation-color: #5c574d;
+  --md-code-hl-generic-color: #5c574d;
+  --md-code-hl-variable-color: #5c574d;
+
+  --md-admonition-fg-color: #24221e;
+  --md-admonition-bg-color: #fbf8f1;
+  --md-footer-fg-color: #24221e;
+  --md-footer-bg-color: #f4efe4;
+  --md-footer-bg-color--dark: #ede6d8;
+
+  /* the search dialog draws in a shadow root of its own, from these RGB triples */
+  --color-foreground: 36 34 30;
+  --color-background: 251 248 241;
+  --color-background-subtle: 241 235 223;
+  --color-backdrop: 251 248 241;
+
+  /* the site's own: the header bar, the selected page in the navigation, the boxes and the banner */
+  --bwtidy-header-fg-color: #fbf8f1;
+  --bwtidy-header-bg-color: #0e4c4d;
+  --bwtidy-header-search-color: #fbf8f11f;
+  --bwtidy-header-search-color--hover: #fbf8f133;
+  --bwtidy-nav-active-fg-color: #0a5655;
+  --bwtidy-nav-active-bg-color: #e1eeea;
+  --bwtidy-table-head-color: #f3eee3;
+  --bwtidy-note-bg-color: #e4f0ec;
+  --bwtidy-note-icon-color: #0b6262;
+  --bwtidy-warning-bg-color: #fbf0d6;
+  --bwtidy-warning-icon-color: #9a5f00;
+  --bwtidy-banner-fg-color: #231b07;
+  --bwtidy-banner-bg-color: #f3c34a;
+}
+
+/* Dark: a deep teal night rather than black, warm ivory text, a lighter sea teal for links and the
+   selected page, and the banner a softer amber than the light one so it does not glare. */
+[data-md-color-scheme="slate"] {
+  --md-hue: 184deg;
+  --md-primary-fg-color: #12302f;
+  --md-primary-fg-color--light: #2a4746;
+  --md-primary-fg-color--dark: #0b1f1f;
+  --md-primary-bg-color: #f3eee2;
+  --md-primary-bg-color--light: #f3eee2b3;
+  --md-accent-fg-color: #a4e3d9;
+  --md-accent-fg-color--transparent: #6fcdc11f;
+  --md-accent-bg-color: #0f1c1d;
+  --md-accent-bg-color--light: #0f1c1db3;
+
+  --md-default-fg-color: #ebe5d6;
+  --md-default-fg-color--light: #a8a191;
+  --md-default-fg-color--lighter: #ebe5d652;
+  --md-default-fg-color--lightest: #ebe5d61a;
+  --md-default-bg-color: #0f1c1d;
+  --md-default-bg-color--light: #0f1c1db3;
+  --md-default-bg-color--lighter: #0f1c1d4d;
+  --md-default-bg-color--lightest: #0f1c1d1f;
+
+  --md-typeset-color: #ebe5d6;
+  --md-typeset-a-color: #6fcdc1;
+  --md-typeset-mark-color: #e0ad4552;
+  --md-typeset-table-color: #ebe5d624;
+  --md-typeset-table-color--light: #6fcdc10f;
+  --md-typeset-kbd-color: #ebe5d61f;
+  --md-typeset-kbd-accent-color: #ebe5d633;
+  --md-typeset-kbd-border-color: #0b1617;
+
+  --md-code-fg-color: #e2dbcb;
+  --md-code-bg-color: #182a2b;
+  --md-code-bg-color--light: #182a2be6;
+  --md-code-bg-color--lighter: #182a2b8a;
+  --md-code-hl-color: #6fcdc1;
+  --md-code-hl-color--light: #6fcdc11a;
+  --md-code-hl-number-color: #f0947e;
+  --md-code-hl-special-color: #f291b4;
+  --md-code-hl-function-color: #c8a8ea;
+  --md-code-hl-constant-color: #b8b2f2;
+  --md-code-hl-keyword-color: #6fcdc1;
+  --md-code-hl-string-color: #dbb76d;
+  --md-code-hl-comment-color: #a39c8c;
+  --md-code-hl-operator-color: #a8a191;
+  --md-code-hl-punctuation-color: #a8a191;
+  --md-code-hl-generic-color: #a8a191;
+  --md-code-hl-variable-color: #a8a191;
+
+  --md-admonition-fg-color: #ebe5d6;
+  --md-admonition-bg-color: #0f1c1d;
+  --md-footer-fg-color: #ebe5d6;
+  --md-footer-bg-color: #0b1617;
+  --md-footer-bg-color--dark: #081112;
+
+  --color-foreground: 235 229 214;
+  --color-background: 21 38 39;
+  --color-background-subtle: 29 51 52;
+  --color-backdrop: 11 22 23;
+
+  --bwtidy-header-fg-color: #f3eee2;
+  --bwtidy-header-bg-color: #12302f;
+  --bwtidy-header-search-color: #f3eee21a;
+  --bwtidy-header-search-color--hover: #f3eee22e;
+  --bwtidy-nav-active-fg-color: #8adbd0;
+  --bwtidy-nav-active-bg-color: #163536;
+  --bwtidy-table-head-color: #152627;
+  --bwtidy-note-bg-color: #15302f;
+  --bwtidy-note-icon-color: #6fcdc1;
+  --bwtidy-warning-bg-color: #2a2516;
+  --bwtidy-warning-icon-color: #e9b44c;
+  --bwtidy-banner-fg-color: #1a1306;
+  --bwtidy-banner-bg-color: #e0ad45;
+}
+
+/* the theme draws the headings of the dark scheme pure white, the ivory of the text fits better */
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3,
+[data-md-color-scheme="slate"] .md-typeset h4,
+[data-md-color-scheme="slate"] .md-typeset h5,
+[data-md-color-scheme="slate"] .md-typeset h6 {
+  color: #f6f1e4;
+}
+
+body {
+  color: var(--md-default-fg-color);
+  background-color: var(--md-default-bg-color);
+}
+
+.md-banner {
+  color: var(--bwtidy-banner-fg-color);
+  background-color: var(--bwtidy-banner-bg-color);
+}
+
+/* a solid bar of deep teal, in place of the theme's see-through one */
+.md-header,
+.md-tabs {
+  color: var(--bwtidy-header-fg-color);
+  background-color: var(--bwtidy-header-bg-color);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+[data-md-color-scheme] .md-header__title,
+.md-header .md-source {
+  color: var(--bwtidy-header-fg-color);
+}
+
+.md-header .md-header__button.focus-visible,
+.md-header .md-source.focus-visible,
+.md-header .md-search__button.focus-visible {
+  outline-color: var(--bwtidy-header-fg-color);
+}
+
+.md-header .md-search__button,
+.md-header .md-search__button:focus,
+.md-header .md-search__button:hover {
+  color: var(--bwtidy-header-fg-color);
+}
+
+.md-header .md-search__button:before {
+  background-color: var(--bwtidy-header-fg-color);
+}
+
+.md-header .md-search__button:after {
+  color: var(--bwtidy-header-fg-color);
+  background-color: var(--bwtidy-header-search-color);
+}
+
+@media screen and (min-width: 45em) {
+  .md-header .md-search__button {
+    background-color: var(--bwtidy-header-search-color);
+  }
+
+  .md-header .md-search__button:focus,
+  .md-header .md-search__button:hover {
+    background-color: var(--bwtidy-header-search-color--hover);
+  }
+}
+
+.md-nav--primary .md-nav__item .md-nav__link--active {
+  color: var(--bwtidy-nav-active-fg-color);
+  background-color: var(--bwtidy-nav-active-bg-color);
+}
+
+.md-typeset a:focus,
+.md-typeset a:hover {
+  text-decoration-thickness: .1em;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--bwtidy-table-head-color);
+}
+
+.md-footer-meta {
+  background-color: var(--md-footer-bg-color);
+}
+
+/* the boxes of GitHub's alerts: a note or a tip in a teal tint, a warning in an amber one */
+.md-typeset .admonition.note,
+.md-typeset .admonition.tip {
+  background-color: var(--bwtidy-note-bg-color);
+}
+
+.md-typeset .note > .admonition-title:before,
+.md-typeset .tip > .admonition-title:before {
+  background-color: var(--bwtidy-note-icon-color);
+}
+
+.md-typeset .admonition.warning {
+  background-color: var(--bwtidy-warning-bg-color);
+}
+
+.md-typeset .warning > .admonition-title:before {
+  background-color: var(--bwtidy-warning-icon-color);
+}

@@ -644,6 +644,11 @@ A package whose metadata names no license makes it stop with the package's
 name. Look the license up in the package's own repository and add it to
 `OVERRIDES` in the script, with where you checked it.
 
+A package whose files are copied into `docs/` instead (the docs site's code
+font) has its entry in `BUNDLED` of the script, keyed by its folder, which
+holds the package's `LICENSE` beside the files. `tests/repo/test_third_party.py`
+checks that every folder of `docs/assets/fonts/` has an entry and a license.
+
 ### Docs lint
 
 `scripts/docs-lint` (stdlib only, run by `scripts/ci` after the third-party

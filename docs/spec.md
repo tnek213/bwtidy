@@ -568,8 +568,12 @@ off. [architecture.md](architecture.md#the-container) says how the site is
 built. These make up its look:
 
 - a content column wider than the theme's
-- running text of at most 80 characters a line
+- running text of at most 72 characters a line
 - pictures with a thin border that open larger on a click
+- a warm ivory and deep teal palette of its own for each color scheme, its
+  text and links at WCAG 2.2 AA contrast
+- code in IBM Plex Mono, which the site carries itself
+- a footer that credits Zensical and the Diátaxis framework
 - nothing loaded from a CDN
 
 The site sends another site nothing about the host it is served from, as the
@@ -2624,15 +2628,19 @@ describe the About page and the More actions menu.
 - Every direct dependency has an entry under Thanks in
   `frontend/src/about/credits.ts` with the license that its package names.
   The direct dependencies are the `dependencies` of `frontend/package.json`
-  and of `backend/pyproject.toml`. The tools that bwtidy is built and tested
-  with stand beside them.
+  and of `backend/pyproject.toml` and the packages bundled in the docs. The
+  tools that bwtidy is built and tested with stand beside them.
 - The table of every package comes from `frontend/src/about/thirdParty.json`.
-  `scripts/third-party` writes it from the lock files, and it is committed.
+  `scripts/third-party` writes it from the lock files and the packages
+  bundled in the docs, and it is committed.
   These are the packages it holds:
   - from npm every package of `frontend/package-lock.json` that is not a dev
     package, with the project itself left out
   - from PyPI every package that `uv export --no-dev` names, with one for
     another platform (like `pywin32`) left out
+  - every package whose files the docs site carries in `docs/` (its code
+    font), from `BUNDLED` in the script, with the package's license file
+    beside those files
 - A PyPI package's license comes from the installed metadata. That is
   `License-Expression` or else a License classifier that names one license.
   For a package whose metadata names none it comes from the script's
