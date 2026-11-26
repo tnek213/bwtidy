@@ -4,7 +4,8 @@
   scripts/update-deps             update the lock files, the image digests and the action SHAs
   scripts/update-deps --dry-run   show what would change and write nothing
 
-Backend: uv lock --upgrade, within the ranges of backend/pyproject.toml. Frontend: npm update
+Backend and demo: uv lock --upgrade, within the ranges of backend/pyproject.toml and
+demo/pyproject.toml. Frontend: npm update
 within the ranges of frontend/package.json (an exact pin stays), then npm ci so node_modules
 match. The image's Bitwarden CLI (docker/bitwarden-cli): npm update --package-lock-only, as only
 the image installs it. The Dockerfile: each image keeps the tag it names and gets the digest that
@@ -32,6 +33,7 @@ from devlib import versions
 from devlib.paths import ROOT, SCRIPTS
 
 BACKEND = ROOT / "backend"
+DEMO = ROOT / "demo"
 FRONTEND = ROOT / "frontend"
 CLI = ROOT / "docker" / "bitwarden-cli"
 DOCKERFILE = ROOT / "Dockerfile"
@@ -338,12 +340,13 @@ def run(command: list[str], cwd: Path, check: bool = True) -> str:
     return result.stdout + result.stderr
 
 
-def update_backend(dry_run: bool) -> list[Change]:
-    lock = BACKEND / "uv.lock"
+def update_uv(project: Path, dry_run: bool) -> list[Change]:
+    """uv lock --upgrade in PROJECT (backend or demo), a dry run writes nothing."""
+    lock = project / "uv.lock"
     if dry_run:
-        return uv_dry_run_changes(run(["uv", "lock", "--upgrade", "--dry-run"], BACKEND))
+        return uv_dry_run_changes(run(["uv", "lock", "--upgrade", "--dry-run"], project))
     before = uv_versions(lock.read_text())
-    run(["uv", "lock", "--upgrade"], BACKEND)
+    run(["uv", "lock", "--upgrade"], project)
     return changes(before, uv_versions(lock.read_text()))
 
 
@@ -415,15 +418,21 @@ def update_actions(dry_run: bool, outside: list[str], errors: list[str]) -> list
     return found
 
 
-def outside_packages(outside: list[str], backend_changes: list[Change]) -> None:
+def outside_packages(
+    outside: list[str], backend_changes: list[Change], demo_changes: list[Change]
+) -> None:
     """Add the packages whose latest version lies outside the ranges, after the update."""
     ## in a dry run the lock is not upgraded yet, so a latest version the upgrade reaches is not
     ## outside its range
-    reached = {name: new for name, _, new in backend_changes}
-    tree = run(["uv", "tree", "--outdated", "--depth", "1", "--frozen"], BACKEND, check=False)
-    for name, locked, latest in uv_outdated(tree):
-        if reached.get(name) != latest:
-            outside.append(f"backend {name} {reached.get(name, locked)}: latest {latest}")
+    for label, project, project_changes in (
+        ("backend", BACKEND, backend_changes),
+        ("demo", DEMO, demo_changes),
+    ):
+        reached = {name: new for name, _, new in project_changes}
+        tree = run(["uv", "tree", "--outdated", "--depth", "1", "--frozen"], project, check=False)
+        for name, locked, latest in uv_outdated(tree):
+            if reached.get(name) != latest:
+                outside.append(f"{label} {name} {reached.get(name, locked)}: latest {latest}")
     for label, project in (("frontend", FRONTEND), ("bitwarden-cli", CLI)):
         answer = run(["npm", "outdated", "--json"], project, check=False)
         start = answer.find("{")
@@ -452,7 +461,8 @@ def main(args: list[str]) -> int:
     outside: list[str] = []
     errors: list[str] = []
     found = {
-        "backend (backend/uv.lock)": update_backend(dry_run),
+        "backend (backend/uv.lock)": update_uv(BACKEND, dry_run),
+        "demo (demo/uv.lock)": update_uv(DEMO, dry_run),
         "frontend (frontend/package-lock.json)": update_npm(FRONTEND, dry_run, install=True),
         "Bitwarden CLI (docker/bitwarden-cli/package-lock.json)": update_npm(
             CLI, dry_run, install=False
@@ -460,7 +470,7 @@ def main(args: list[str]) -> int:
         "images (Dockerfile)": update_images(dry_run, outside, errors),
         "actions (.github/workflows)": update_actions(dry_run, outside, errors),
     }
-    outside_packages(outside, found["backend (backend/uv.lock)"])
+    outside_packages(outside, found["backend (backend/uv.lock)"], found["demo (demo/uv.lock)"])
     if not dry_run:
         run([str(SCRIPTS / "third-party")], ROOT)
         mismatch = versions.version_mismatch()

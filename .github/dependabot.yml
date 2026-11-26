@@ -12,6 +12,15 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
 
+  - package-ecosystem: uv
+    directory: /demo
+    schedule:
+      interval: weekly
+    groups:
+      demo-uv-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
   - package-ecosystem: npm
     directory: /frontend
     schedule:

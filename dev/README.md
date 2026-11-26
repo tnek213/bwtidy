@@ -15,7 +15,8 @@ The other pages of this guide:
   and a smoke test on a real account.
 - [Releasing](release.md): the version, the release notes, the documentation
   site, GitHub Pages and publishing the image.
-- [The demo](demo.md): the design of the public demo, its containers and
+- [The demo](demo.md): the design of the public demo (the project `demo/`, with its own
+  `pyproject.toml` and `uv.lock`), its containers and
   networks, the start flow, the cleanup and its limits.
 
 ## Getting started

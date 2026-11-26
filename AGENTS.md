@@ -44,15 +44,15 @@ pull request.
 pytest and vitest.
 
 Dependencies change only through the lock files: `uv add` or `uv lock` in
-`backend/`, `npm install` in `frontend/` or `docker/bitwarden-cli/` (the
-image's Bitwarden CLI), as a dev step whose changed lock file goes into the
+`backend/` or `demo/` (the demo's own project), `npm install` in `frontend/` or
+`docker/bitwarden-cli/` (the image's Bitwarden CLI), as a dev step whose changed lock file goes into the
 commit. Every build and test installs from them locked (`uv sync --locked`,
 `uv run --locked`, `npm ci`) and fails on a lock file that is out of date
 instead of updating it, so a commit builds and tests the same anywhere. The
 Dockerfile pins its images by tag and digest, the workflows their actions by
 commit SHA (the tag in a comment above), and Dependabot proposes updates.
 A dependency is declared with a compatible range, npm's caret: `^X.Y.Z` in a
-`package.json`, a lower bound and `<X+1` in `backend/pyproject.toml`
+`package.json`, a lower bound and `<X+1` in `backend/pyproject.toml` or `demo/pyproject.toml`
 (`<0.(Y+1)` for 0.Y.Z), X.Y.Z being the version the lock holds, or an exact
 pin. `scripts/update-deps` updates everything within those ranges and lists
 what lies beyond them for a person to decide.

@@ -3,7 +3,7 @@
 
   scripts/ci                    check everything
   scripts/ci --fix              let ruff fix what it can first, then check
-  scripts/ci --quick            check everything except the two test suites (pytest, npm test)
+  scripts/ci --quick            check everything except the test suites (pytest, npm test)
   scripts/ci --quick --fix      both
 
 First it checks that frontend/package.json has the version of backend/pyproject.toml (Python's
@@ -22,11 +22,13 @@ resolves in the site). bwtidy follows Semantic Versioning 2.0.0 (https://semver.
 Backend (backend/, via uv): ruff lint, ruff format, ty, lint-imports (the import contracts of
 [tool.importlinter] in backend/pyproject.toml), pytest (tests/unit, tests/scripts and tests/repo,
 not tests/integration, that is scripts/integration, nor tests/e2e, that is scripts/e2e).
+Demo (demo/, via uv, its own pyproject.toml and uv.lock, dev/demo.md): ruff lint, ruff format, ty,
+pytest (demo/tests).
 Frontend (frontend/, via npm): oxlint, dependency-cruiser (what imports what, cycles), knip (unused
 files, exports and types), tsc + vite build, vitest.
 Only ruff can fix anything. The rest needs a human (or an agent).
 
---quick skips pytest and npm test, the two test suites and the heaviest steps (a Check has
+--quick skips pytest, demo pytest and npm test, the test suites and the heaviest steps (a Check has
 quick=False). The pre-push hook uses it for a push to a branch other than main. The CI workflow
 always runs the full checks, so a branch is fully tested before it lands.
 
@@ -46,6 +48,7 @@ from devlib import locks, versions
 from devlib.paths import ROOT, SCRIPTS
 
 BACKEND = ROOT / "backend"
+DEMO = ROOT / "demo"
 FRONTEND = ROOT / "frontend"
 FRONTEND_DIR = Path("frontend")
 
@@ -156,6 +159,10 @@ CHECKS = [
         ),
         quick=False,
     ),
+    Check("demo ruff check", DEMO, uv("ruff", "check", "."), fixable=True),
+    Check("demo ruff format", DEMO, uv("ruff", "format", "--check", "."), fixable=True),
+    Check("demo ty check", DEMO, uv("ty", "check", ".")),
+    Check("demo pytest", DEMO, uv("pytest"), quick=False),
     Check("npm lint", FRONTEND, npm("lint")),
     Check("npm lint:deps", FRONTEND, npm("lint:deps")),
     Check("npm lint:exports", FRONTEND, npm("lint:exports")),
@@ -166,6 +173,8 @@ CHECKS = [
 FIXES = [
     Check("ruff check", BACKEND, uv("ruff", "check", "--fix", ".", *SCRIPTS_CHECKED)),
     Check("ruff format", BACKEND, uv("ruff", "format", ".", *SCRIPTS_CHECKED)),
+    Check("demo ruff check", DEMO, uv("ruff", "check", "--fix", ".")),
+    Check("demo ruff format", DEMO, uv("ruff", "format", ".")),
 ]
 
 
@@ -184,7 +193,8 @@ def run(check: Check, fix: bool) -> str | None:
 
 def ensure_deps() -> None:
     ## a fresh worktree has neither .venv nor node_modules
-    subprocess.run(["uv", "sync", "--locked", "--quiet"], cwd=BACKEND, check=True)
+    for project in (BACKEND, DEMO):
+        subprocess.run(["uv", "sync", "--locked", "--quiet"], cwd=project, check=True)
     if locks.npm_install_needed(FRONTEND_DIR):
         if (FRONTEND / "node_modules").exists():
             print("ci: frontend/package-lock.json changed, running npm ci", flush=True)

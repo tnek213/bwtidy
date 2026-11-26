@@ -6,9 +6,9 @@ def ci(load_script):
     return load_script("ci")
 
 
-def test_the_quick_checks_leave_out_exactly_pytest_and_npm_test(ci):
+def test_the_quick_checks_leave_out_exactly_the_test_suites(ci):
     skipped = {c.label for c in ci.CHECKS} - {c.label for c in ci.quick_checks(True)}
-    assert skipped == {"pytest", "npm test"}
+    assert skipped == {"pytest", "demo pytest", "npm test"}
 
 
 def test_the_full_checks_are_all_of_them(ci):

@@ -20,6 +20,8 @@ on:
       - compose.dev.yaml
       - compose.build.yaml
       - dev/**
+      - demo/**
+      - compose.demo.yaml
       - backend/tests/**
       - .github/dependabot.yml
       - .github/pull_request_template.md

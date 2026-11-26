@@ -234,3 +234,31 @@ def test_the_repo_pins_every_image_by_digest_and_every_action_by_sha(deps):
             if line.strip().removeprefix("- ").startswith("uses:")
         ]
         assert len(deps.action_pins(text)) == len(uses), workflow.name
+
+
+def test_the_demo_is_a_uv_project_beside_the_backend(deps):
+    assert deps.DEMO == deps.ROOT / "demo"
+    assert (deps.DEMO / "uv.lock").is_file()
+    assert (deps.DEMO / "pyproject.toml").is_file()
+
+
+def test_update_uv_upgrades_the_lock_of_the_project_it_is_given(deps, monkeypatch, tmp_path):
+    lock = tmp_path / "uv.lock"
+    lock.write_text('version = 1\n\n[[package]]\nname = "anyio"\nversion = "4.15.1"\n')
+    calls = []
+
+    def fake_run(command, cwd, check=True):
+        calls.append((command, cwd))
+        if "--dry-run" in command:
+            return "Update anyio v4.15.1 -> v4.16.0\n"
+        lock.write_text('version = 1\n\n[[package]]\nname = "anyio"\nversion = "4.16.0"\n')
+        return ""
+
+    monkeypatch.setattr(deps, "run", fake_run)
+    assert deps.update_uv(tmp_path, dry_run=True) == [("anyio", "4.15.1", "4.16.0")]
+    assert "4.15.1" in lock.read_text()
+    assert deps.update_uv(tmp_path, dry_run=False) == [("anyio", "4.15.1", "4.16.0")]
+    assert calls == [
+        (["uv", "lock", "--upgrade", "--dry-run"], tmp_path),
+        (["uv", "lock", "--upgrade"], tmp_path),
+    ]

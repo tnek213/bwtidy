@@ -13,7 +13,7 @@ the lock files carry generated copies: the package `bwtidy` in
 `packages[""].version` of `frontend/package-lock.json` in semver's.
 `scripts/ci` fails when one of them differs from `backend/pyproject.toml`, and
 names the file and both versions. After a change to the version, `uv lock` in
-`backend/` and `npm install --package-lock-only` in `frontend/` write the
+`backend/` and `demo/` (its lock holds the version of `bwtidy` too) and `npm install --package-lock-only` in `frontend/` write the
 copies in the lock files.
 
 ## The release notes

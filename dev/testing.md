@@ -600,7 +600,7 @@ Besides lint, types, the build and the tests, `scripts/ci` runs these.
 
 Dependencies change only through the lock files, and every script installs
 from them locked (AGENTS.md, Checks): `uv sync --locked` and `uv run --locked`
-fail on a `backend/uv.lock` that is out of date, `npm ci` on a
+fail on a `backend/uv.lock` or `demo/uv.lock` that is out of date, `npm ci` on a
 `package-lock.json` that does not match its `package.json`. `scripts/ci` runs
 `npm ci` in a fresh worktree and again when `frontend/package-lock.json`
 changed since the last install (it stamps
@@ -612,7 +612,7 @@ time.
 Each dependency is declared with a compatible range in npm's caret sense
 (AGENTS.md, Checks), which `tests/repo/test_dependency_ranges.py` checks for
 `backend/pyproject.toml`. `scripts/update-deps` updates everything within the
-ranges: `uv lock --upgrade` in `backend/`, `npm update` and `npm ci` in
+ranges: `uv lock --upgrade` in `backend/` and `demo/`, `npm update` and `npm ci` in
 `frontend/`, `npm update --package-lock-only` in `docker/bitwarden-cli/` (only
 the image installs the CLI), the digest of each image the `Dockerfile` names
 (its tag stays) and the commit SHA of each action to the newest release tag
