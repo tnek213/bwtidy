@@ -117,9 +117,9 @@ blocks. Cards (`<div class="grid cards" markdown>`) are for a landing page.
 Examples use placeholder hosts such as https://bwtidy.example.
 `README.md` and `docs/index.md` share three texts, each the same in both:
 the introduction (between the comments `<!-- intro: ... -->` and
-`<!-- end of intro -->`), the beta disclaimer (the blockquote "Beta
-software") and the list under "At a glance". A change to one changes the
-other.
+`<!-- end of intro -->`), the beta caution (the warning box "Made
+with AI" under the heading Beta software) and the list under "At a glance". A
+change to one changes the other.
 The banner on every page of the site (`overrides/main.html`) links to the one
 in `docs/index.md`.
 A new page gets its line in the nav of `zensical.toml`, and a page links only

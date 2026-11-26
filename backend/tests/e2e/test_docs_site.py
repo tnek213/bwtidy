@@ -128,6 +128,9 @@ def test_the_disclaimer_banner_links_to_the_disclaimer_on_the_home(page: Page):
     banner.get_by_role("link", name="Read the disclaimer before you use it.").click()
     expect(page).to_have_url(re.compile(r"/docs/#beta-software$"))
     expect(page.locator("h2#beta-software")).to_contain_text("Beta software")
+    box = page.locator("article .admonition.warning")
+    expect(box).to_contain_text("Made with AI.")
+    expect(page.locator("h2#beta-software + .admonition.warning")).to_have_count(1)
 
 
 def test_the_disclaimer_banner_text_is_centered(page: Page):

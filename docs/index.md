@@ -1,31 +1,48 @@
 # bwtidy documentation
 
-## Beta software
-
-> **Beta software, made with AI.** bwtidy was written entirely by AI coding
-> agents. Several advanced models (Claude Fable, Opus and Sonnet) built it in
-> many small steps under the author's guidance, and Codex (GPT-6.2-Astra)
-> reviewed it for security and stability. No human has read every line of the
-> code. The author uses it for his own real passwords, but it has very few
-> users so far. It changes the contents of your password vault, so keep your
-> own Bitwarden export, made outside bwtidy, and expect bugs and breaking
-> changes between versions.
+## Bring order to a messy vault
 
 <!-- intro: the same text in README.md and docs/index.md -->
 
-A password vault gets messy over the years: `Password` in some items,
-`password` in others, addresses without `https://`. Bitwarden's apps show
-one item at a time, so this is hard to see and fix. bwtidy shows the whole
-vault in one grid. Tidy means items of one kind share field names and
-formats: a template says which fields, a datatype what a value looks like.
-An AI agent can propose fixes over MCP and never sees a secret value. You
-approve every change, and bwtidy backs up the vault before each write. It
-is for people who keep a large Bitwarden or Vaultwarden vault, often
-self-hosted.
+Password vaults get inconsistent over time. Some items use `Password` while
+others use `password`. Some web addresses include a protocol prefix and others
+do not. Bitwarden's apps show one item at a time. That makes these patterns
+hard to spot. **bwtidy** shows the whole vault in one grid.
+
+Templates and datatypes help you standardize items of the same kind. A
+template defines which fields an item should have. A datatype describes the
+expected format of a value. Together they help you find inconsistencies and
+tidy the vault.
+
+Use the web UI to make changes directly. You can also connect an AI agent
+through MCP. The agent can add proposed changes to a queue without seeing
+secret values. You review each proposal and decide whether to accept it. Only
+accepted proposals are written to your vault.
+
+Before each write bwtidy saves a backup of the whole vault. The backup is an
+age-encrypted ZIP stored in bwtidy's backups volume. You can restore it with
+standard tools. Your vault stays on your Bitwarden or Vaultwarden server.
+bwtidy reads and writes vault data through Bitwarden's official CLI.
+
+bwtidy is for people who want their Bitwarden or Vaultwarden vault to follow
+standards they define themselves. It helps them apply those standards
+consistently across the vault.
 
 <!-- end of intro -->
 
-New to bwtidy? [Run it](how-to/run.md), then take [the tutorial](tutorial/first-cleanup.md).
+## Beta software
+
+> [!WARNING]
+> **Made with AI.** AI coding agents wrote all of bwtidy under the author's
+> guidance. Claude Fable, Opus and Sonnet built it in many small steps. Codex
+> (GPT-6.2-Astra) reviewed it for security and stability. No human has read
+> every line. The author uses it for real passwords but the project has few
+> users so far. Because bwtidy changes your vault keep an independent Bitwarden
+> export made outside bwtidy. Expect bugs and breaking changes between
+> versions.
+
+New to bwtidy? [Run it](how-to/run.md), then follow
+[the tutorial](tutorial/first-cleanup.md).
 
 ## At a glance
 
