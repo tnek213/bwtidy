@@ -25,6 +25,7 @@ nav = [
     "how-to/show-hide-columns.md",
     "how-to/rename-attachment.md",
     "restore.md",
+    "how-to/run-demo.md",
   ] },
   { "Reference" = [
     "reference/ui.md",

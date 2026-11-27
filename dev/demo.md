@@ -1064,7 +1064,7 @@ vault is only a user in Vaultwarden, no process, so the pool costs almost
 nothing). 8 visitors would add 440 MiB and reach the limit with full tmpfs,
 so a bigger machine is what raises `DEMO_MAX`, by about 220 MiB each.
 
-## On the maintainer's host
+## Private, through an SSH tunnel
 
 For a host where only the maintainer may reach the demo (the demo is not
 public there). Keep the default `DEMO_BIND=127.0.0.1`, so the edge listens
