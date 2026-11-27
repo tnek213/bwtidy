@@ -80,7 +80,8 @@ MATCH_NOTE = paragraphs(
 )
 
 LIST_ITEMS = paragraphs(
-    "List the items of the vault, all of them or only those that match every filter given.",
+    "List the items of the vault that are not archived, all of them or only those that match"
+    " every filter given.",
     "Each item has:",
     bullets(
         f"`id`, {', '.join(f'`{column}`' for column in TOP_COLUMNS[:-1])} and `{TOP_COLUMNS[-1]}`.",
