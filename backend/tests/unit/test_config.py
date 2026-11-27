@@ -33,6 +33,8 @@ WORKER_VARS = [
     "BWTIDY_FAILED_KEEP_HOURS",
     "BWTIDY_BACKUPS_DIR",
     "BWTIDY_DATA_DIR",
+    "BWTIDY_PORT",
+    "BWTIDY_BW_SERVE_PORT",
 ]
 
 
@@ -70,6 +72,15 @@ def test_every_worker_setting_is_read(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert settings.idle_exit == 30
     assert settings.pending_marker == tmp_path / "pending"
     assert settings.secure_cookies is True
+
+
+def test_the_ports_have_their_defaults_unless_set(monkeypatch: pytest.MonkeyPatch):
+    settings = Settings.from_env()
+    assert (settings.port, settings.bw_serve_port) == (8000, 8087)
+    monkeypatch.setenv("BWTIDY_PORT", "65535")
+    monkeypatch.setenv("BWTIDY_BW_SERVE_PORT", "1")
+    settings = Settings.from_env()
+    assert (settings.port, settings.bw_serve_port) == (65535, 1)
 
 
 def test_the_backups_are_in_the_data_dir_unless_a_backups_dir_is_set(
@@ -164,6 +175,14 @@ def test_a_heartbeat_timeout_of_60_seconds_is_the_least(monkeypatch: pytest.Monk
         ("BWTIDY_FAILED_KEEP_HOURS", "0"),
         ("BWTIDY_FAILED_KEEP_HOURS", "-30"),
         ("BWTIDY_FAILED_KEEP_HOURS", "a day"),
+        ("BWTIDY_IDLE_EXIT", "0"),
+        ("BWTIDY_IDLE_EXIT", "-1"),
+        ("BWTIDY_IDLE_EXIT", "ten minutes"),
+        ("BWTIDY_PORT", "0"),
+        ("BWTIDY_PORT", "65536"),
+        ("BWTIDY_PORT", "http"),
+        ("BWTIDY_BW_SERVE_PORT", "-1"),
+        ("BWTIDY_BW_SERVE_PORT", "80.5"),
     ],
 )
 def test_an_unusable_value_is_refused_by_naming_the_variable(

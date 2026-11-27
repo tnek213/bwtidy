@@ -77,12 +77,16 @@ scripts/dev-vault down                    # stop every stack of the worktree
 docker ps --filter name=bwtidy-           # the containers, stack K's project ends in -K
 ```
 
+<!-- markdownlint-disable MD038 -->
+
 Only stack 1 builds the snapshot. A stack from 2 up starts from it: when there
 is none, `up` waits while stack 1 runs from a bare Vaultwarden (its `setup`
 saves one) and fails otherwise. `scripts/e2e`, `scripts/integration` and a
 `reset` of several stacks therefore run stack 1 first when there is no snapshot
 of the current HASH, then the others at once. Their output lines start with
 `stack K: `.
+
+<!-- markdownlint-enable MD038 -->
 
 `scripts/e2e` and `scripts/integration` run their whole suite on three stacks
 by default (`default_stacks` in `scripts/devlib/stacks.py`): fewer when
@@ -111,9 +115,9 @@ it imports, `compose.py`, `paths.py` and `stacks.py`, and `snapshot.py`), the
 fixtures (`dev/fixture-*.json`), the attachments (`dev/attachments/*`),
 `compose.dev.yaml`, the `Dockerfile`, the bw CLI's `package.json` and
 `package-lock.json` in `docker/bitwarden-cli/` (its version and the packages it
-brings along) and `docker/unref-share-timers.js`. An edit of a page under `dev/` leaves it.
-`up` prints the current one, `docker image ls bwtidy-dev-vaultwarden` lists all
-of them.
+brings along) and `docker/unref-share-timers.js`. An edit of a page under `dev/`
+leaves it. `up` prints the current one, `docker image ls bwtidy-dev-vaultwarden`
+lists all of them.
 
 - When the image of the current HASH exists, `up` writes it to `.dev-vault.env`
   as `BWTIDY_VW_IMAGE`, compose starts Vaultwarden from it (a fresh `vw-data`
@@ -160,6 +164,8 @@ it is made for" in `docs/spec.md`.
 
 Personal vault, 69 items imported:
 
+<!-- markdownlint-disable MD038 -->
+
 - 40 plain logins with username, password and uris (one without uris), 8 of
   them with a TOTP, 10 each in the folders Work, Home and Infra, 10 in no
   folder. Three of them are favorites: `Wiki` (Work), `Streaming video`
@@ -185,6 +191,8 @@ Personal vault, 69 items imported:
 - `Example Forge` has a passkey (`login.fido2Credentials`, a freshly
   generated P-256 key). `Example Mail`, `Online bank` and `Proxmox` have
   `passwordHistory`.
+
+<!-- markdownlint-enable MD038 -->
 
 Hidden values are custom fields of type 1. Custom field names: 26 distinct.
 

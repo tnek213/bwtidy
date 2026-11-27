@@ -96,12 +96,15 @@ function TokenLifetime({ info }: { info: McpTokenInfo }) {
     ['Last used', info.lastUsedAt === null ? 'Never' : formatTime(info.lastUsedAt)],
   ]
   return (
-    <Box component="li" role="group" sx={{ px: 2, py: 1 }} aria-label="MCP token times">
-      {rows.map(([label, value]) => (
-        <Typography key={label} variant="body2" color="text.secondary">
-          {label}: {value}
-        </Typography>
-      ))}
+    // A list item of the menu cannot be a group itself, so the group sits inside it.
+    <Box component="li" role="none" sx={{ px: 2, py: 1 }}>
+      <Box role="group" aria-label="MCP token times">
+        {rows.map(([label, value]) => (
+          <Typography key={label} variant="body2" color="text.secondary">
+            {label}: {value}
+          </Typography>
+        ))}
+      </Box>
     </Box>
   )
 }

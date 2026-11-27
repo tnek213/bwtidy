@@ -26,7 +26,8 @@ x-logging: &logging
 
 services:
   ## writes the stack's secrets (tokens, the CA and Vaultwarden's certificate) into the volume
-  ## unless it holds them already, then exits. The others wait for it.
+  ## unless it holds them already, gives them their owners and the ledger to the controller,
+  ## then exits. The others wait for it.
   init:
     <<: *demo-image
     command: ["bwtidy-demo-init"]
@@ -34,11 +35,20 @@ services:
     network_mode: none
     volumes:
       - secrets:/secrets
+      - ledger:/ledger
     read_only: true
     cap_drop:
       - ALL
+    ## root without CHOWN could not give a file the controller's group or the controller
+    cap_add:
+      - CHOWN
     security_opt:
       - no-new-privileges:true
+    ## dev/demo.md, Limits and timeouts. A Python process writing a few files, no measure of
+    ## its own (it exits in seconds): 128 MiB and 64 processes are ample.
+    mem_limit: ${DEMO_MEM_INIT:-128m}
+    memswap_limit: ${DEMO_MEM_INIT:-128m}
+    pids_limit: ${DEMO_PIDS_INIT:-64}
     logging: *logging
 
   vaultwarden:
@@ -101,12 +111,20 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    ## dev/demo.md, Limits and timeouts. Peak measured 25 MiB with 6 visitors, 42 processes.
+    ## memory: (25 + 256 for a full data tmpfs) * 1.25 = 352, rounded up to 384 MiB
+    ## processes: 42 * 1.25 = 53, rounded up to 64
+    mem_limit: ${DEMO_MEM_VAULTWARDEN:-384m}
+    memswap_limit: ${DEMO_MEM_VAULTWARDEN:-384m}
+    pids_limit: ${DEMO_PIDS_VAULTWARDEN:-64}
     logging: *logging
 
   ## the pool of ready vaults and the deletion of Vaultwarden users
   controller:
     <<: *demo-image
     command: ["bwtidy-demo-controller"]
+    ## the controller's own user of the demo image (dev/demo.md, Controller), never root
+    user: "10100:10100"
     restart: unless-stopped
     init: true
     depends_on:
@@ -124,7 +142,7 @@ services:
       - secrets:/secrets:ro
       ## every id ever used, the one thing that outlives a restart
       - ledger:/ledger
-    ## bw's state directory of each vault it seeds
+    ## the user's home and bw's state directory of each vault it seeds
     tmpfs:
       - /tmp
     networks:
@@ -145,6 +163,13 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    ## dev/demo.md, Limits and timeouts. Peak measured 226 MiB while it builds a vault, 16
+    ## processes. Its /tmp is a tmpfs that a build leaves almost empty.
+    ## memory: 226 * 1.25 = 283, rounded up to 320 MiB
+    ## processes: 16 * 1.25 = 20, rounded up to 32
+    mem_limit: ${DEMO_MEM_CONTROLLER:-320m}
+    memswap_limit: ${DEMO_MEM_CONTROLLER:-320m}
+    pids_limit: ${DEMO_PIDS_CONTROLLER:-32}
     logging: *logging
 
   ## bwtidy's gateway wrapped by bwtidy_demo, and the workers it starts
@@ -219,6 +244,13 @@ services:
     security_opt:
       - no-new-privileges:true
     stop_grace_period: 150s
+    ## dev/demo.md, Limits and timeouts. For DEMO_MAX 6 visitors, DEMO_MAX_PENDING 2 starts
+    ## in flight and a full accounts tmpfs (DEMO_ACCOUNTS_SIZE 512m).
+    ## memory: 42 idle + 6 * 220 + 2 * 100 + 512 = 2074, * 1.25 = 2593, rounded up to 2700 MiB
+    ## processes: 101 measured with 6 visitors, * 1.25 = 127, rounded up to 128
+    mem_limit: ${DEMO_MEM_DEMO:-2700m}
+    memswap_limit: ${DEMO_MEM_DEMO:-2700m}
+    pids_limit: ${DEMO_PIDS_DEMO:-128}
     logging: *logging
 
   ## the only container that is on a network with a route out and the only published port
@@ -275,6 +307,13 @@ services:
       - NET_BIND_SERVICE
     security_opt:
       - no-new-privileges:true
+    ## dev/demo.md, Limits and timeouts. Peak measured 13 MiB, 14 processes (the master, its
+    ## workers and the health check). Its tmpfs hold a few small files.
+    ## memory: 13 * 1.25 = 17, rounded up to 32 MiB
+    ## processes: 14 * 1.25 = 18, rounded up to 32
+    mem_limit: ${DEMO_MEM_EDGE:-32m}
+    memswap_limit: ${DEMO_MEM_EDGE:-32m}
+    pids_limit: ${DEMO_PIDS_EDGE:-32}
     logging: *logging
 
 networks:
@@ -284,8 +323,12 @@ networks:
   ## internal too: the edge reaches the demo here and nothing else
   front:
     internal: true
-  ## the edge's published port
+  ## the edge's published port (or the sidecar's route out, dev/demo.md)
   public:
+    driver_opts:
+      ## a fixed bridge name, so scripts/demo-egress finds this network by it on the host also
+      ## after compose makes the network anew (Docker names a bridge br- and a random id)
+      com.docker.network.bridge.name: ${DEMO_PUBLIC_BRIDGE:-br-bwtidy-demo}
 
 volumes:
   secrets:
