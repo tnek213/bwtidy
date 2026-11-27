@@ -788,6 +788,32 @@ def test_a_start_past_demo_max_gets_the_busy_note(one_vault: None):
     assert account_dirs() == []
 
 
+## --- the limits of the containers (dev/demo.md, Limits and timeouts)
+
+SERVICES = ("init", "vaultwarden", "controller", "demo", "edge")
+
+
+@pytest.mark.parametrize("service", SERVICES)
+def test_every_container_has_a_memory_and_a_process_limit(service: str):
+    memory, swap, pids = docker(
+        "inspect",
+        container(service),
+        "--format",
+        "{{.HostConfig.Memory}} {{.HostConfig.MemorySwap}} {{.HostConfig.PidsLimit}}",
+    ).split()
+    assert int(memory) > 0
+    assert swap == memory
+    assert int(pids) > 0
+
+
+## after every visitor test on purpose: it looks back at every visitor of the tests above
+## (only the test of older volumes comes later, since it recreates every container)
+@pytest.mark.parametrize("service", SERVICES)
+def test_no_container_was_killed_for_memory(service: str):
+    state = docker("inspect", container(service), "--format", "{{.State.OOMKilled}}")
+    assert state == "false"
+
+
 ## --- volumes an older version left
 
 

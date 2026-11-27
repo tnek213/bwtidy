@@ -2,7 +2,7 @@
 Writing docs), cut out of a file so the repo tests can compare them."""
 
 INTRO_START = (
-    "<!-- intro: the same text in README.md, docs/index.md and docker/hub-overview.md -->\n\n"
+    "<!-- intro: the same text in README.md, docs/index.md and\ndocker/hub-overview.md -->\n\n"
 )
 INTRO_END = "\n\n<!-- end of intro -->"
 

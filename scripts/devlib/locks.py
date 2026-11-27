@@ -1,8 +1,9 @@
 """The npm lock files: each lists what its package.json asks for, else npm ci refuses it.
 
-scripts/ci runs npm ci in a fresh worktree and whenever the frontend lock file differs from the
-one node_modules was installed from (a stamp file, see npm_install_needed), so this check finds
-a package.json changed without npm install before a build or the CI workflow does.
+scripts/ci runs npm ci in a fresh worktree and whenever the lock file of the frontend or of
+tools/markdownlint differs from the one node_modules was installed from (a stamp file, see
+npm_install_needed), so this check finds a package.json changed without npm install before a
+build or the CI workflow does.
 The backend and the demo need no such check: every uv call of the scripts runs with --locked,
 which fails on a stale backend/uv.lock or demo/uv.lock.
 """
@@ -13,8 +14,8 @@ from pathlib import Path
 
 from devlib.paths import ROOT
 
-## the npm projects of the repo: the frontend and the image's Bitwarden CLI
-NPM_PROJECTS = (Path("frontend"), Path("docker") / "bitwarden-cli")
+## the npm projects of the repo: the frontend, the image's Bitwarden CLI and markdownlint-cli2
+NPM_PROJECTS = (Path("frontend"), Path("docker") / "bitwarden-cli", Path("tools") / "markdownlint")
 FIELDS = ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies")
 
 

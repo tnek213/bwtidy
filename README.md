@@ -1,6 +1,7 @@
 # bwtidy
 
-<!-- intro: the same text in README.md, docs/index.md and docker/hub-overview.md -->
+<!-- intro: the same text in README.md, docs/index.md and
+docker/hub-overview.md -->
 
 Password vaults get inconsistent over time. Some items use `Password` while
 others use `password`. Some web addresses include a protocol prefix and others
@@ -18,9 +19,10 @@ secret values. You review each proposal and decide whether to accept it. Only
 accepted proposals are written to your vault.
 
 Before each write of your changes bwtidy saves a backup of the whole vault.
-The backup is an age-encrypted ZIP stored in bwtidy's backups volume. You can restore it with
-standard tools. Your vault stays on your Bitwarden or Vaultwarden server.
-bwtidy reads and writes vault data through Bitwarden's official CLI.
+The backup is an age-encrypted ZIP stored in bwtidy's backups volume. You can
+restore it with standard tools. Your vault stays on your Bitwarden or
+Vaultwarden server. bwtidy reads and writes vault data through Bitwarden's
+official CLI.
 
 bwtidy is for people who want their Bitwarden or Vaultwarden vault to follow
 standards they define themselves. It helps them apply those standards
@@ -39,9 +41,10 @@ consistently across the vault.
 > export made outside bwtidy. Expect bugs and breaking changes between
 > versions.
 
-Does bwtidy work for you? Give [Works for me](https://github.com/tnek213/bwtidy/discussions/16) a thumbs up.
-If you have a minute, a comment with your bwtidy version, Bitwarden or
-Vaultwarden, and roughly how many items your vault has helps others decide.
+Does bwtidy work for you? Give [Works for
+me](https://github.com/tnek213/bwtidy/discussions/16) a thumbs up. If you have a
+minute, a comment with your bwtidy version, Bitwarden or Vaultwarden, and
+roughly how many items your vault has helps others decide.
 
 bwtidy is an independent project. It is not affiliated with, endorsed by or
 sponsored by Bitwarden, Inc. Bitwarden is a trademark of Bitwarden, Inc., used
@@ -53,9 +56,9 @@ here only to say which vaults bwtidy works with.
   machine. It reads and writes your vault through `bw`, Bitwarden's official
   CLI.
 - **A backup before your changes are written.** bwtidy saves a backup of the
-  whole vault before each write of your changes. The backup is a ZIP encrypted with age using your master
-  password as the passphrase. It lives in bwtidy's backups volume and can be
-  restored with standard tools without bwtidy.
+  whole vault before each write of your changes. The backup is a ZIP encrypted
+  with age using your master password as the passphrase. It lives in bwtidy's
+  backups volume and can be restored with standard tools without bwtidy.
 - **Your master password.** It remains in memory while you are logged in and is
   wiped when you log out. It is also wiped two minutes after you close the last
   tab or after two hours without activity. Both timings are defaults. A copy is
@@ -96,8 +99,8 @@ Its overview lists the tags, the port, the volumes and the settings.
 
 ## Documentation
 
-The docs are a site at https://tnek213.github.io/bwtidy/. A running bwtidy
-serves the same site at `/docs/`, such as http://127.0.0.1:8765/docs/,
+The docs are a site at <https://tnek213.github.io/bwtidy/>. A running bwtidy
+serves the same site at `/docs/`, such as <http://127.0.0.1:8765/docs/>,
 without a login.
 
 - [The documentation site](https://tnek213.github.io/bwtidy/)
