@@ -133,14 +133,14 @@ these passphrases in its hidden fields `backup-password` and
 `older-backup-passwords`. It is a secure note named `bwtidy` unless you
 renamed it. The note keeps an earlier password only until the re-encryption
 is done, so for an older copy you may need to remember it yourself. Every
-backup that opens holds the note too. The second block below prints these
-two fields.
+backup that opens holds the note too. The program `unpack.py` below prints
+these two fields.
 
-The first block makes the directory for the decrypted files and decrypts and
-unpacks the backup there. Put the path of your backup in place of
+This block makes the restore directory `$D` for the decrypted files and
+decrypts the backup there. Put the path of your backup in place of
 `/path/to/FILE.zip.age` and its file name in place of `FILE.zip.age`. At the
-end the block prints how many items the backup holds and the id and name of
-each organization.
+end the block prints the path of `$D`, where you save the programs of the
+steps below. In Git Bash `pwd -W` prints it as a Windows path.
 
 ```sh
 export PYTHONUTF8=1
@@ -150,31 +150,49 @@ D=$(mktemp -d "$TMPFS/bwtidy-restore.XXXXXX")
 cd "$D"
 cp /path/to/FILE.zip.age .
 age -d -o backup.zip FILE.zip.age && rm FILE.zip.age
-python3 -m zipfile -e backup.zip . && rm backup.zip
-python3 -c 'import zipfile; zipfile.ZipFile("personal-export.zip").extract("data.json")'
-python3 -c '
-import json
-for name in "raw/items.json", "raw/trash.json", "raw/archived.json":
-    print(len(json.load(open(name))), "items in", name)
-for org in json.load(open("raw/organizations.json")):
-    print("organization", org["id"], org["name"])'
+echo "$D"
 ```
 
-This prints the two fields of the bwtidy note with the note's name. It finds
-the note as a personal secure note with the field `backup-password`, so a
-renamed note shows too.
+The program `unpack.py` unpacks the backup and prints how many items it
+holds. It also prints the id and name of each organization. Then it prints
+the two fields of the bwtidy note with the note's name. It finds the note as
+a personal secure note with the field `backup-password`, so a renamed note
+shows too. Save it as `unpack.py` in the restore directory (`$D`) with any
+text editor.
 
-```sh
-python3 -c '
+```python title="unpack.py"
 import json
+import os
+import zipfile
+
+
+def load(path):
+    with open(path, encoding="utf-8") as file:
+        return json.load(file)
+
+
+with zipfile.ZipFile("backup.zip") as backup:
+    backup.extractall(".")
+os.remove("backup.zip")
+with zipfile.ZipFile("personal-export.zip") as personal:
+    personal.extract("data.json")
+for name in "raw/items.json", "raw/trash.json", "raw/archived.json":
+    print(len(load(name)), "items in", name)
+for org in load("raw/organizations.json"):
+    print("organization", org["id"], org["name"])
+
 wanted = ("backup-password", "older-backup-passwords")
-for item in json.load(open("raw/items.json")):
+for item in load("raw/items.json"):
     if item.get("type") != 2 or item.get("organizationId"):
         continue
     fields = [f for f in item.get("fields") or [] if f.get("name") in wanted]
     if any(f["name"] == "backup-password" for f in fields):
         print(item["name"])
-        print(json.dumps(fields, indent=2))'
+        print(json.dumps(fields, indent=2))
+```
+
+```sh
+python3 unpack.py
 ```
 
 ## 2. Prepare an empty account
@@ -231,15 +249,30 @@ bw import bitwardenjson data.json
 ```
 
 Each organization export goes into the organization of the same name. Step 1
-printed the old ids (OLDID) with their names, and the first command below
+printed the old ids (OLDID) with their names, and the program `orgs.py`
 prints the new ones (NEWID). Run the import once for each organization with
-its two ids.
+its two ids. Save the program as `orgs.py` in the restore directory (`$D`)
+with any text editor.
+
+```python title="orgs.py"
+import json
+import shutil
+import subprocess
+
+# the full path finds bw.cmd of an npm install on Windows too
+BW = shutil.which("bw") or "bw"
+
+
+def bw(*args):
+    return json.loads(subprocess.run([BW, *args], check=True, stdout=subprocess.PIPE).stdout)
+
+
+for org in bw("list", "organizations"):
+    print(org["id"], org["name"])
+```
 
 ```sh
-bw list organizations | python3 -c '
-import json, sys
-for org in json.load(sys.stdin):
-    print(org["id"], org["name"])'
+python3 orgs.py
 bw import bitwardenjson org-OLDID-export.json --organizationid NEWID
 ```
 
@@ -306,13 +339,19 @@ digraph {
 }
 ```
 
-First write the program that pairs the items, sets the organization items'
-folders and favorites and uploads the attachments. bw names an attachment
-after its file, so the program first copies each file to its real file name
-under `upload/`.
+The program `attach.py` pairs the items, sets the organization items' folders
+and favorites and uploads the attachments. bw names an attachment after its
+file, so the program first copies each file to its real file name under
+`upload/`.
 
-```sh
-cat > attach.py <<'EOF'
+It runs on the backup items of `raw/items.json` and `raw/archived.json`. It
+leaves out the archived items in the trash, which step 6 brings back. It syncs
+bw and lists what the account has now, the archived items included. It prints a
+line for each organization item whose folder or favorite it sets. It also prints
+one for each attachment it uploads or cannot upload. Save the program as
+`attach.py` in the restore directory (`$D`) with any text editor.
+
+```python title="attach.py"
 import base64
 import json
 import os
@@ -474,14 +513,7 @@ for item in old:
             if done.returncode == 0:
                 print(f"{said} is on item {target['id']}", flush=True)
 shutil.rmtree("upload", ignore_errors=True)
-EOF
 ```
-
-Then run it on the backup items of `raw/items.json` and `raw/archived.json`.
-It leaves out the archived items in the trash, which step 6 brings back. It
-syncs bw and lists what the account has now, the archived items included. It
-prints a line for each organization item whose folder or favorite it sets. It
-also prints one for each attachment it uploads or cannot upload.
 
 ```sh
 python3 attach.py raw/items.json raw/archived.json
@@ -506,16 +538,25 @@ When every item of an organization gets such a line, check that the
 organization has the name it had in the backup (step 2). Otherwise
 upload the attachments by hand.
 
-This prints the old item (OLDID). For an item of the trash add
-`with-trash.json` of step 6 after `raw/archived.json`.
+The program `show.py` prints the old item (OLDID) from the items file you give
+it, and the commands after it look in both files of the backup items. For an
+item of the trash put `with-trash.json` of step 6 in place of `raw/items.json`.
+Save the program as `show.py` in the restore directory (`$D`) with any text
+editor.
+
+```python title="show.py"
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as file:
+    for item in json.load(file):
+        if item["id"] == sys.argv[2]:
+            print(json.dumps(item, indent=2))
+```
 
 ```sh
-python3 -c '
-import json, sys
-for name in sys.argv[2:]:
-    for item in json.load(open(name)):
-        if item["id"] == sys.argv[1]:
-            print(json.dumps(item, indent=2))' OLDID raw/items.json raw/archived.json
+python3 show.py raw/items.json OLDID
+python3 show.py raw/archived.json OLDID
 ```
 
 Its files are under `item-attachments/OLDID/`, and the old item lists their
@@ -536,22 +577,34 @@ program once more.
 
 No export holds the trash. It is only in `raw/trash.json`, and its archived
 items are in `raw/archived.json`. bw import refuses some of a trashed item's
-keys or would take them over, so the commands below drop them first. They
-import the rest into the personal vault and then run the program of step 5
-again.
+keys or would take them over, so the program `trash.py` drops them first. It
+writes the rest to `trash-import.json` and `with-trash.json`. The commands after
+it import `trash-import.json` into the personal vault and then run the program
+of step 5 again. Save the program as `trash.py` in the restore directory (`$D`)
+with any text editor.
 
-```sh
-python3 -c '
+```python title="trash.py"
 import json
-archived = json.load(open("raw/archived.json"))
-trash = json.load(open("raw/trash.json")) + [i for i in archived if i.get("deletedDate")]
+
+
+def load(path):
+    with open(path, encoding="utf-8") as file:
+        return json.load(file)
+
+
+archived = load("raw/archived.json")
+trash = load("raw/trash.json") + [i for i in archived if i.get("deletedDate")]
 dropped = ("deletedDate", "folderId", "organizationId", "collectionIds")
 moved = [{k: v for k, v in item.items() if k not in dropped} for item in trash]
-with open("trash-import.json", "w") as file:
+with open("trash-import.json", "w", encoding="utf-8") as file:
     items = [{k: v for k, v in item.items() if k != "id"} for item in moved]
     json.dump({"encrypted": False, "items": items}, file)
-with open("with-trash.json", "w") as file:
-    json.dump(json.load(open("raw/items.json")) + moved, file)'
+with open("with-trash.json", "w", encoding="utf-8") as file:
+    json.dump(load("raw/items.json") + moved, file)
+```
+
+```sh
+python3 trash.py
 bw import bitwardenjson trash-import.json
 python3 attach.py with-trash.json raw/archived.json
 ```
@@ -566,27 +619,50 @@ web vault if that is where they belong.
 ## 7. Check and clean up
 
 The account must now have as many items and attachments as the backup. The
-block below prints one line for the account and one for the backup, and the
-two must show the same numbers. Each "not uploaded" line of step 5 is one
-missing attachment. If you imported the trash in step 6, `with-trash.json`
-takes the place of `raw/items.json`. Then set
-`ITEMS="with-trash.json raw/archived.json"` in place of the first line below.
+program `check.py` syncs bw and prints one line for the account and one for the
+backup items of the files you give it. The two must show the same numbers. Each
+"not uploaded" line of step 5 is one missing attachment. If you imported the
+trash in step 6, put `with-trash.json` in place of `raw/items.json` after
+`python3 check.py`.
 
-After the count the block logs bw out. It deletes `$D` with every decrypted
-file and the npm CLI of step 3.
+After the count the commands log bw out. They delete `$D` with every
+decrypted file and the npm CLI of step 3. Save the program as `check.py` in
+the restore directory (`$D`) with any text editor.
+
+```python title="check.py"
+import json
+import shutil
+import subprocess
+import sys
+
+# the full path finds bw.cmd of an npm install on Windows too
+BW = shutil.which("bw") or "bw"
+
+
+def bw(*args):
+    return json.loads(subprocess.run([BW, *args], check=True, stdout=subprocess.PIPE).stdout)
+
+
+def load(path):
+    with open(path, encoding="utf-8") as file:
+        return json.load(file)
+
+
+def count(items):
+    items = [item for item in items if not item.get("deletedDate")]
+    return len(items), sum(len(item.get("attachments") or []) for item in items)
+
+
+subprocess.run([BW, "sync"], check=True, stdout=subprocess.DEVNULL)
+# bw list items leaves out the archived items
+account = bw("list", "items") + bw("list", "items", "--archived")
+backup = [item for path in sys.argv[1:] for item in load(path)]
+print("the account: %d items, %d attachments" % count(account))
+print("the backup:  %d items, %d attachments" % count(backup))
+```
 
 ```sh
-ITEMS="raw/items.json raw/archived.json"
-bw sync
-bw list items > account.json
-bw list items --archived > account-archived.json
-python3 -c '
-import json, sys
-def count(names):
-    items = [i for name in names for i in json.load(open(name)) if not i.get("deletedDate")]
-    return len(items), sum(len(item.get("attachments") or []) for item in items)
-print("the account: %d items, %d attachments" % count(["account.json", "account-archived.json"]))
-print("the backup:  %d items, %d attachments" % count(sys.argv[1:]))' $ITEMS
+python3 check.py raw/items.json raw/archived.json
 bw logout
 cd ~ && rm -rf "$D" ${CLI:+"$CLI"}
 unset BW_SESSION BITWARDENCLI_APPDATA_DIR

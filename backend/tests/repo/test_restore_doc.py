@@ -5,20 +5,21 @@ package to install. What it does against a real account is test_backup_import.py
 """
 
 import ast
+import re
 import sys
 from pathlib import Path
 
 import pytest
 
-from tests.support.restore_doc import attach_program, commands
+from tests.support.restore_doc import programs
 
 ROOT = Path(__file__).resolve().parents[3]
 TEXT = (ROOT / "docs" / "restore.md").read_text()
 ## the oldest python3 still found on a stock machine (macOS has 3.9 with its developer tools)
 OLDEST = (3, 8)
-PROGRAMS = {"attach.py": attach_program(TEXT)} | {
-    f"python3 -c #{i}": source for i, source in enumerate(commands(TEXT), 1)
-}
+PROGRAMS = programs(TEXT)
+SHELL = re.compile(r"^```sh\n(.*?)^```$", re.DOTALL | re.MULTILINE)
+RUNS = re.compile(r"\bpython3 (\S+\.py)\b")
 
 
 def imported(tree: ast.Module) -> set[str]:
@@ -32,8 +33,29 @@ def imported(tree: ast.Module) -> set[str]:
 
 
 def test_the_document_has_its_programs():
-    ## attach.py, step 1 (data.json, the counts, the note), 4, 5 (by hand), 6 and 7
-    assert len(PROGRAMS) == 8
+    assert set(PROGRAMS) == {"unpack.py", "orgs.py", "attach.py", "show.py", "trash.py", "check.py"}
+
+
+def test_the_shell_blocks_hold_no_python():
+    ## the programs are files of their own, so each one is shown once as Python
+    assert "python3 -c" not in TEXT
+    assert "<<" not in TEXT
+
+
+def test_the_shell_blocks_run_the_programs_of_the_page():
+    run = {name for block in SHELL.findall(TEXT) for name in RUNS.findall(block)}
+    assert run == set(PROGRAMS)
+
+
+@pytest.mark.parametrize("name", sorted(PROGRAMS))
+def test_each_program_opens_its_files_as_utf_8(name):
+    ## Windows opens a file in its code page, PYTHONUTF8 aside
+    calls = [
+        node
+        for node in ast.walk(ast.parse(PROGRAMS[name]))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "open"
+    ]
+    assert all(any(k.arg == "encoding" for k in call.keywords) for call in calls), name
 
 
 @pytest.mark.parametrize("name", sorted(PROGRAMS))
