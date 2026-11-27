@@ -1,6 +1,6 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest'
-import { jsonResponse, type mockFetch, waitForPolls } from '../test-utils.tsx'
+import { advanceClock, jsonResponse, type mockFetch, waitForPolls } from '../test-utils.tsx'
 import { type CellMarks, noCellMarks } from './cellMarks.ts'
 import { type CellFormat, cellFormats, FORMAT_CLASSES, liveFormatText } from './formats.ts'
 import { columnDef } from './columns.tsx'
@@ -339,7 +339,7 @@ test('the secret dialog of a cell without a datatype sends no check', async () =
   fireEvent.doubleClick(cell('near', 'fields.BIOS password'), { detail: 2 })
   const dialog = await screen.findByRole('dialog')
   fireEvent.change(within(dialog).getByLabelText('New value'), { target: { value: 'x' } })
-  await act(() => vi.advanceTimersByTimeAsync(400))
+  await advanceClock(400)
   expect(fetchMock.mock.calls.filter(([path]) => String(path).includes('/check'))).toEqual([])
 })
 
@@ -373,7 +373,7 @@ test('a refused check shows nothing and blocks nothing', async () => {
   fireEvent.doubleClick(cell('near', 'fields.BIOS password'), { detail: 2 })
   const dialog = await screen.findByRole('dialog')
   fireEvent.change(within(dialog).getByLabelText('New value'), { target: { value: 'x' } })
-  await act(() => vi.advanceTimersByTimeAsync(400))
+  await advanceClock(400)
   expect(within(dialog).queryByRole('status')).toBeNull()
   expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
 })

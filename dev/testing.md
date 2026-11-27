@@ -137,11 +137,14 @@ Frontend tests time out at 10 s (`testTimeout` in `frontend/vite.config.ts`),
 Testing Library's `findBy` and `waitFor` at 5 s. A test that waits on a poll
 or a delay (the auto-commit's 1 s poll, the Bitwarden login's 500 ms, a
 debounced check) runs on `vi.useFakeTimers({ shouldAdvanceTime: true })` and
-moves the clock with `vi.advanceTimersByTimeAsync` or `waitForPolls` from
-`src/test-utils.tsx` instead of waiting in real time. `scripts/ci` caps
-vitest's workers: when the 1 minute load average is above half the cores, it
-sets `VITEST_MAX_WORKERS` to half the cores, else vitest uses all cores but
-one. A `VITEST_MAX_WORKERS` you set yourself wins.
+moves the clock with `advanceClock` or `waitForPolls` from
+`src/test-utils.tsx` instead of waiting in real time. Both move it outside
+`act` and settle in `act` after, because AG Grid waits for each header it
+mounts on zero delay timeouts. Inside `act` that wait spins on the fake clock
+for a second of real time. `scripts/ci` caps vitest's workers: when the 1
+minute load average is above half the cores, it sets `VITEST_MAX_WORKERS` to
+half the cores, else vitest uses all cores but one. A `VITEST_MAX_WORKERS` you
+set yourself wins.
 
 ## Vault values in a failure
 

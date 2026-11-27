@@ -1,7 +1,7 @@
 import { createTheme } from '@mui/material'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest'
-import { jsonResponse } from '../test-utils.tsx'
+import { advanceClock, jsonResponse } from '../test-utils.tsx'
 import { REVEAL_MS } from './reveal.ts'
 import { noCellMarks } from './cellMarks.ts'
 import { columnDef } from './columns.tsx'
@@ -147,7 +147,7 @@ test('a secret cell shows the mask and reveals the value on click for 30 seconds
     expect.objectContaining({ method: 'GET' }),
   )
 
-  await act(() => vi.advanceTimersByTimeAsync(REVEAL_MS))
+  await advanceClock(REVEAL_MS)
 
   expect(within(secret).getByTestId('secret-value')).toHaveTextContent('•'.repeat(8))
   expect(screen.queryByText('hunter2')).toBeNull()
@@ -1096,7 +1096,7 @@ test('Rare fields is off at 0, and setting N shows the rare fields as JSON and h
   fireEvent.click(within(rare).getByRole('button', { name: 'Reveal fields.BIOS Password' }))
   await waitFor(() => expect(rare).toHaveTextContent('{ "BIOS Password": "s3cret", "vlan": "20" }'))
   // Hidden again after 30 seconds, like a masked cell.
-  await act(() => vi.advanceTimersByTimeAsync(REVEAL_MS))
+  await advanceClock(REVEAL_MS)
   await waitFor(() => expect(rare).toHaveTextContent('{ "BIOS Password": , "vlan": "20" }'))
   expect(cell('item-3', 'rareFields')).toHaveTextContent('{ "brand": "Visa" }')
 
