@@ -87,6 +87,14 @@ REMOVE = f"() => document.querySelectorAll('[{OVERLAY}]').forEach(e => e.remove(
 ## a menu or popover grows in, measured before its transition ends its box is too small
 SETTLE = "() => Promise.allSettled(document.getAnimations().map(a => a.finished))"
 
+## A click that Playwright retries (its target covered, say by a menu still closing) scrolls the
+## target into view with a forced alignment. A switch's input is three times as wide as the switch
+## and its root hides the overflow, so the root scrolls and its track and thumb sit up to 38 px to
+## the left, clipped. A user cannot scroll that box, the shot scrolls it back.
+UNSCROLL_SWITCHES = """() => {
+  document.querySelectorAll('.MuiSwitch-root').forEach(root => root.scrollTo(0, 0))
+}"""
+
 ## the grid lays out its horizontal scrollbar a moment after its rows show, a shot before that
 ## shows one row more at the bottom
 GRID_SCROLLBAR = """() => {
@@ -241,6 +249,7 @@ def shot(
     directory.mkdir(parents=True, exist_ok=True)
     try:
         page.evaluate(HIDE)
+        page.evaluate(UNSCROLL_SWITCHES)
         page.evaluate(SETTLE)
         rect = clip(frame, [(describe(loc), box_of(loc)) for loc in around], view, margin)
         drawn = marks(highlight, view)

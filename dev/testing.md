@@ -523,6 +523,13 @@ leaves `docs/images` as it was.
   the About page, which change with every commit). A hidden element keeps its
   room, but in the app bar it takes none, so the build commit's width does not
   move the buttons after it.
+- The shot also scrolls every switch back to its start. A click that
+  Playwright retries (its target covered, say by a menu that is still
+  closing) scrolls the target into view with a forced alignment. A switch's
+  input is three times as wide as the switch and its root hides the
+  overflow, so the root scrolls and the track and thumb sit to the left,
+  clipped. A user cannot scroll that box. `test_docs_shot_switches.py` in
+  the e2e suite shows it on the grid's toolbar.
 - The docs tests' Chromium runs with `--disable-partial-raster` (their
   `conftest.py`): a partial raster draws the grid's rounded corners a few
   pixels differently from run to run. A shot of the whole grid calls
