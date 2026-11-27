@@ -8,38 +8,20 @@ The versions of bwtidy follow [Semantic Versioning](https://semver.org) with
 
 Changes on main that are not yet in a versioned Docker image.
 
-- Restore a vault from a backup on Windows with PowerShell
-  ([#230](https://github.com/tnek213/bwtidy/pull/230))
+Nothing yet.
 
-- Refuse an email or a server too long for an account's directory name with
-  a clear message, where the first login failed with an error before
-  ([#227](https://github.com/tnek213/bwtidy/pull/227))
-- Say in the docs and in the description of the MCP tool list_items that
-  bwtidy shows only the items that are not archived
-  ([#225](https://github.com/tnek213/bwtidy/pull/225))
-- Find the archived items of an account without premium, with their
-  attachments, in every backup
-  ([#224](https://github.com/tnek213/bwtidy/pull/224))
-- Restore a change of an item you archived since, which then stays archived,
-  and keep a folder that still holds archived items from being deleted
-  ([#220](https://github.com/tnek213/bwtidy/pull/220))
-- Find archived items and their attachments in every backup, those in the
-  trash too. A restore brings their attachments back
-  ([#201](https://github.com/tnek213/bwtidy/pull/201))
-- Run version 2026.11.0 of the Bitwarden CLI, which the image builds from
-  Bitwarden's source ([#108](https://github.com/tnek213/bwtidy/pull/108))
-- Read the usage stats with `bwtidy stats` in the container as the docs say.
-  The image did not find the command before
-  ([#209](https://github.com/tnek213/bwtidy/pull/209))
+## 1.0.0-beta.3
 
-## 1.0.0-beta.2
+2026-11-27 · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/v1.0.0-beta.3)
+· [All changes](https://github.com/tnek213/bwtidy/compare/v1.0.0-beta.1...v1.0.0-beta.3)
 
-No stored format changed since 1.0.0-beta.1. Act on the breaking changes
+No stored format changed since 1.0.0-beta.1. 1.0.0-beta.2 was never
+published, and its changes are in this release. Act on the breaking changes
 below, then pull the new image and start it.
 
 ### Breaking changes
 
-- Pull `1.0.0-beta.2` or `latest` if you run an earlier image. Every earlier
+- Pull `1.0.0-beta.3` or `latest` if you run an earlier image. Every earlier
   image is withdrawn from Docker Hub: 0.1.0-alpha.1, 1.0.0-beta.1 and each
   `main` and commit tag from before this release. They carried Bitwarden's npm
   build of the Bitwarden CLI, which includes code under the Bitwarden License
@@ -81,6 +63,28 @@ below, then pull the new image and start it.
   ([#47](https://github.com/tnek213/bwtidy/pull/47), [#147](https://github.com/tnek213/bwtidy/pull/147),
   [#149](https://github.com/tnek213/bwtidy/pull/149), [#151](https://github.com/tnek213/bwtidy/pull/151),
   [#164](https://github.com/tnek213/bwtidy/pull/164))
+- Restore a vault from a backup on Windows with PowerShell
+  ([#230](https://github.com/tnek213/bwtidy/pull/230))
+- Refuse an email or a server too long for an account's directory name with
+  a clear message, where the first login failed with an error before
+  ([#227](https://github.com/tnek213/bwtidy/pull/227))
+- Say in the docs and in the description of the MCP tool list_items that
+  bwtidy shows only the items that are not archived
+  ([#225](https://github.com/tnek213/bwtidy/pull/225))
+- Find the archived items of an account without premium, with their
+  attachments, in every backup
+  ([#224](https://github.com/tnek213/bwtidy/pull/224))
+- Restore a change of an item you archived since, which then stays archived,
+  and keep a folder that still holds archived items from being deleted
+  ([#220](https://github.com/tnek213/bwtidy/pull/220))
+- Find archived items and their attachments in every backup, those in the
+  trash too. A restore brings their attachments back
+  ([#201](https://github.com/tnek213/bwtidy/pull/201))
+- Run version 2026.11.0 of the Bitwarden CLI, which the image builds from
+  Bitwarden's source ([#108](https://github.com/tnek213/bwtidy/pull/108))
+- Read the usage stats with `bwtidy stats` in the container as the docs say.
+  The image did not find the command before
+  ([#209](https://github.com/tnek213/bwtidy/pull/209))
 
 ## 1.0.0-beta.1
 
