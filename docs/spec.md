@@ -384,7 +384,7 @@ account directory. So `ROOT` can be any mount apart from the account data.
       file is read with the rules of the MCP token file (see MCP below).
       Without a file to trust the account counts as logged out.
     - `firstRun` is true when no account directory has both its SQLite file
-      and no `.pending`. The SQLite file must be a regular file reached without
+      and no `.pending`. The SQLite file must be a regular file and not itself
       a symlink, and only its existence counts. `firstRun` is the same for
       every browser (see The account form).
     - Without a routing cookie `account` is null and the rest is false, apart
@@ -613,12 +613,12 @@ routed by its `Authorization: Bearer TOKEN` alone.
   directory whose `app/mcp-token.sha256` holds that hash on its first line,
   compared with `hmac.compare_digest`. The files are read as root on every
   request because there are few of them.
-- A token file counts only when it is a regular file owned by the account's
-  uid and reached without a symlink. So a worker cannot point the gateway at
-  another account's hash. The same rules hold for `app/bw-login-state` and
-  `app/delete-requested`, which are the only other files the gateway reads
-  from an account directory. When two accounts hold the same hash, neither is
-  used.
+- A token file counts only when the file itself is a regular file and not a
+  symlink, and the account's uid owns it. The owner check is why a worker
+  cannot point the gateway at another account's hash. The same rules hold for
+  `app/bw-login-state` and `app/delete-requested`, which are the only other
+  files the gateway reads from an account directory. When two accounts hold
+  the same hash, neither is used.
 - No token or no match gets 401 with the worker's own text `bwtidy MCP needs
   a token. Create one in the web UI.` and `WWW-Authenticate: Bearer`.
 - A match whose token expired gets 401 `bwtidy MCP token expired. Create a
