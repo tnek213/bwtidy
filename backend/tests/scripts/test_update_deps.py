@@ -379,3 +379,54 @@ def test_update_uv_upgrades_the_lock_of_the_project_it_is_given(deps, monkeypatc
         (["uv", "lock", "--upgrade", "--dry-run"], tmp_path),
         (["uv", "lock", "--upgrade"], tmp_path),
     ]
+
+
+@pytest.fixture
+def cli_dir(deps, monkeypatch, tmp_path):
+    package = {"name": "x", "private": True, "dependencies": {"@bitwarden/cli": "2026.11.0"}}
+    (tmp_path / "package.json").write_text(json.dumps(package))
+    source = {
+        "repository": "https://github.com/bitwarden/clients",
+        "tag": "cli-v2026.10.0",
+        "commit": SHA,
+    }
+    (tmp_path / "source.json").write_text(json.dumps(source, indent=2) + "\n")
+    monkeypatch.setattr(deps, "CLI", tmp_path)
+    return tmp_path
+
+
+def test_a_new_cli_version_writes_the_tag_and_the_commit_it_names(deps, cli_dir, monkeypatch):
+    asked = []
+    ## an annotated tag lists its own object first and the commit it names as ^{}
+    listing = f"{'c' * 40}\trefs/tags/cli-v2026.11.0\n{SHA2}\trefs/tags/cli-v2026.11.0^{{}}\n"
+    monkeypatch.setattr(deps, "run", lambda command, cwd: asked.append(command) or listing)
+    errors: list[str] = []
+    before = (cli_dir / "source.json").read_text()
+    change = ("https://github.com/bitwarden/clients", f"cli-v2026.10.0 {SHA[:7]}")
+    found = deps.update_cli_source(True, errors)
+    assert found == [(*change, f"cli-v2026.11.0 {SHA2[:7]}")]
+    assert (cli_dir / "source.json").read_text() == before
+    assert deps.update_cli_source(False, errors) == found
+    assert errors == []
+    assert json.loads((cli_dir / "source.json").read_text()) == {
+        "repository": "https://github.com/bitwarden/clients",
+        "tag": "cli-v2026.11.0",
+        "commit": SHA2,
+    }
+    assert asked[0][:3] == ["git", "ls-remote", "https://github.com/bitwarden/clients"]
+    assert "refs/tags/cli-v2026.11.0" in asked[0]
+    ## a lightweight tag names the commit itself, and a source.json at it stays as it is
+    listing = f"{SHA2}\trefs/tags/cli-v2026.11.0\n"
+    assert deps.update_cli_source(False, errors) == []
+    assert errors == []
+
+
+def test_a_cli_version_without_its_tag_fails_naming_it(deps, cli_dir, monkeypatch):
+    monkeypatch.setattr(deps, "run", lambda command, cwd: "")
+    before = (cli_dir / "source.json").read_text()
+    errors: list[str] = []
+    assert deps.update_cli_source(False, errors) == []
+    assert len(errors) == 1
+    assert "no tag cli-v2026.11.0" in errors[0]
+    assert "@bitwarden/cli 2026.11.0" in errors[0]
+    assert (cli_dir / "source.json").read_text() == before

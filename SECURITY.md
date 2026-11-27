@@ -13,10 +13,10 @@ Only the newest release and the `main` branch.
 
 ## The Bitwarden CLI
 
-The image runs the Bitwarden CLI exactly as Bitwarden publishes it, and a new
-release of the CLI is followed by a bwtidy patch release, usually within a few
-weeks. A vulnerability in the CLI or in the packages it brings along is
-Bitwarden's to fix: report it to Bitwarden.
+The image runs the open source build of the Bitwarden CLI, built from
+Bitwarden's source without changes. A new release of the CLI is followed by a
+bwtidy patch release, usually within a few weeks. A vulnerability in the CLI or
+in the packages it brings along is Bitwarden's to fix: report it to Bitwarden.
 
 ## Verifying the image
 

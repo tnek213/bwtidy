@@ -24,11 +24,17 @@ flowchart LR
 
 ## Which version of the CLI
 
-bwtidy uses the CLI exactly as Bitwarden publishes it on npm and aims to ship
-its latest version. A new release of the CLI is followed by a bwtidy patch
-release, usually within a few weeks and sometimes later. Bitwarden is
-responsible for the security of the CLI and the packages it brings along, so
-report an issue in them to Bitwarden.
+bwtidy ships the open source build of the CLI and aims to ship its latest
+version. The image builds it from Bitwarden's source
+(<https://github.com/bitwarden/clients>) at the tag of that release and changes
+nothing in it. Bitwarden's npm package is not used because it also bundles code
+under the Bitwarden License, which is not an open source license. The open
+source build is all of the CLI that bwtidy needs.
+
+A new release of the CLI is followed by a bwtidy patch release, usually within
+a few weeks and sometimes later. Bitwarden is responsible for the security of
+the CLI and the packages it brings along, so report an issue in them to
+Bitwarden.
 
 ## `bw serve` for reads and writes
 

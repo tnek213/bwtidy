@@ -679,7 +679,10 @@ Each dependency is declared with a compatible range in npm's caret sense
 ranges: `uv lock --upgrade` in `backend/` and `demo/`, `npm update` and `npm ci`
 in `frontend/`, `npm update --package-lock-only` in `docker/bitwarden-cli/`
 (only the image installs the CLI) and in `tools/markdownlint/` (`scripts/ci`
-installs it again once its lock file changed), the digest of each image that the
+installs it again once its lock file changed), the tag and the commit in
+`docker/bitwarden-cli/source.json` (`git ls-remote` of the tag `cli-vVERSION`
+for the version `package.json` pins, an error when Bitwarden has no such tag),
+the digest of each image that the
 `Dockerfile`, `demo/Dockerfile` and `compose.demo.yaml` name (its tag stays) and
 the commit SHA of each action to the newest release tag of its major version.
 Then it runs `scripts/third-party` and the version check, prints what changed
@@ -687,6 +690,15 @@ per ecosystem and lists the updates beyond the ranges (new majors, newer image
 tags) without applying them. `scripts/update-deps --dry-run` shows the same and
 writes nothing. It never commits and never changes the version of bwtidy, review
 and commit what it changed as any other change.
+
+The CLI's version is an exact pin, so a new one is a change by hand or a
+Dependabot pull request. Bump it in `docker/bitwarden-cli/package.json`, run
+`npm install` there and then `scripts/update-deps`, or set the tag and its
+commit in `source.json` by hand. `tests/repo/test_bitwarden_cli_source.py`
+fails while the tag is not `cli-v` plus that version, so a Dependabot bump
+fails ci until `source.json` follows. `tests/integration/test_bw_cli_build.py`
+checks the image: its bw is that version, its build bundles no module under
+`bitwarden_license/` and its `SOURCE` file names the pinned commit.
 
 After a change to the dependencies (`npm install` in `frontend/`, `uv add` or
 `uv lock` in `backend/`), run `scripts/third-party` and commit the

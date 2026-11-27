@@ -325,6 +325,12 @@ no tests. It also holds the built frontend and bw with
 has answered. `docs/restore.md` sits at `/app/docs/restore.md` because every
 backup holds it as its RESTORE.md. The docs site sits at `/app/site`.
 
+That bw is the open source build of the Bitwarden CLI. The
+`bitwarden-cli-source` stage builds it from the commit of Bitwarden's source
+that `docker/bitwarden-cli/source.json` pins. The `bitwarden-cli` stage puts
+that build in place of the npm package's own and installs the packages it
+brings along from `docker/bitwarden-cli/package-lock.json`.
+
 The `docs` stage builds that site with `scripts/docs-site build` from
 `zensical.toml` and `docs/` as well as `overrides/main.html`, which shows the
 beta disclaimer as a banner on every page. It uses the Zensical of the

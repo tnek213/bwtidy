@@ -65,6 +65,10 @@ Dependencies change only through the lock files (`backend/uv.lock`, `demo/uv.loc
 and the changed lock file goes into the change. Every build and test uses them
 locked and fails when one is out of date. `scripts/update-deps` updates every
 dependency within its declared range and lists the updates beyond it.
+The image builds the Bitwarden CLI from the source that
+`docker/bitwarden-cli/source.json` pins. A new version of the CLI goes into
+`docker/bitwarden-cli/package.json` (then `npm install` there), and
+`scripts/update-deps` then sets the tag and the commit in `source.json`.
 [AGENTS.md](AGENTS.md) has the details.
 
 ## Commits

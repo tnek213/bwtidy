@@ -82,6 +82,7 @@ DURATIONS = {
     "test_generator.py": 33,
     "test_seed.py": 31,
     "test_grid.py": 19,
+    "test_bw_cli_build.py": 4,
     "test_gateway.py": 1,
 }
 ## the order of pytest's own summary line
