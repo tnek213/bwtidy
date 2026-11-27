@@ -19,6 +19,7 @@ services:
     ## empty values leave the gateway's own defaults (docs/spec.md, Gateway)
     environment:
       BWTIDY_MCP_HOSTS: ${BWTIDY_MCP_HOSTS:-}
+      BWTIDY_BW_BIN: ${BWTIDY_BW_BIN:-}
       BWTIDY_SECURE_COOKIES: ${BWTIDY_SECURE_COOKIES:-}
       BWTIDY_MAX_PENDING: ${BWTIDY_MAX_PENDING:-}
       BWTIDY_MAX_WORKERS: ${BWTIDY_MAX_WORKERS:-}

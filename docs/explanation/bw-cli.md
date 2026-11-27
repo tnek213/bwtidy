@@ -83,6 +83,39 @@ uses the same state. It also invalidates the session key that the backups
 get. So [Run bwtidy](../how-to/run.md#log-in-the-first-time) asks you to
 leave these commands alone while you are logged in.
 
+## Run your own Bitwarden CLI
+
+The image's default is Bitwarden's open source build of the CLI at the version
+the image pins. It is what bwtidy is tested with. Leave `BWTIDY_BW_BIN` empty
+to use it.
+
+To use another CLI, mount an executable into the container read-only and set
+`BWTIDY_BW_BIN` in `.env` to its absolute path in the container. The gateway
+passes it on to every worker. The file must be readable and executable by every
+uid, as each worker runs as its account's uid. In `compose.yaml`:
+
+```yaml
+services:
+  bwtidy:
+    volumes:
+      - /path/on/the/host/bw:/opt/bw/bw:ro
+```
+
+and in `.env`:
+
+```text
+BWTIDY_BW_BIN=/opt/bw/bw
+```
+
+This is at your own risk:
+
+- Another version can behave differently, and bwtidy does not support it.
+- The image starts the CLI through a small wrapper of its own. Without it each
+  `bw` command stays alive for about 2 seconds after its answer.
+- You check the license of the build you bring. Bitwarden's npm package and
+  its releases that are not `bw-oss` include code under the Bitwarden License.
+  Its `bw-oss` builds do not.
+
 ## For developers
 
 bwtidy prefers one long-running `bw serve` to separate `bw` commands because

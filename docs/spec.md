@@ -268,6 +268,9 @@ behind some of them:
 - `BWTIDY_IDLE_EXIT` is passed on so that a test can shorten it.
   `BWTIDY_MCP_HOSTS` is passed on so that the public host name passes the
   worker's DNS rebinding check (see MCP and the queue).
+  `BWTIDY_BW_BIN` is passed on so that an operator can run a Bitwarden CLI of
+  their own, mounted into the container, at their own risk. When it is unset
+  the worker runs the image's `bw`.
 
 ### Account key
 
