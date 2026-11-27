@@ -47,6 +47,41 @@ candidate when all of these hold:
 The release candidate becomes 1.0.0 after another 8 weeks with no serious
 bug, counted from the release candidate.
 
+## 1.0.0-beta.2
+
+The image now carries Bitwarden's open source build of the Bitwarden CLI,
+built from Bitwarden's source. The earlier images carried Bitwarden's npm
+build, which includes code under the Bitwarden License. Those images are
+withdrawn from Docker Hub: 0.1.0-alpha.1, 1.0.0-beta.1 and every `main` and
+commit tag from before this release. Pull `1.0.0-beta.2` or `latest`.
+
+No stored format changed since 1.0.0-beta.1, so the upgrade needs nothing
+else: pull the new image and start it. If you want to run another Bitwarden
+CLI, `BWTIDY_BW_BIN` can now name your own. [Run your own Bitwarden
+CLI](explanation/bw-cli.md#run-your-own-bitwarden-cli) says how and what you
+take on.
+
+What changed since 1.0.0-beta.1:
+
+- The Bitwarden CLI in the image is Bitwarden's open source build. You can
+  point every worker at a CLI of your own with `BWTIDY_BW_BIN`.
+- The web UI works with a screen reader and a keyboard, and the docs have an
+  accessibility statement.
+- You can turn on usage stats that stay on your machine. They are off by
+  default, and the file is on its own volume (`bwtidy-stats`) so it is
+  writable. The gateway now checks its number settings when it starts.
+- The restore page promises only what a restore brings back.
+- The MCP tools use one name for the secure note type, and the attachment and
+  folder dialogs compare names without regard to case.
+- A demo mode runs bwtidy against its own Vaultwarden, with limits on what
+  its containers can reach and use. The docs explain how to run a public
+  demo.
+- The docs have a new warm theme, a rewritten landing page and better
+  writing and diagrams on every page. Diagrams are drawn at build time, and
+  the screenshots no longer catch the toolbar mid layout.
+- The docs say which image tags are scanned every day and how a
+  contributor's signed commits are merged.
+
 ## 1.0.0-beta.1
 
 bwtidy is feature complete for 1.0 and enters its beta. From this version on,

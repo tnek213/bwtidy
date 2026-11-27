@@ -267,6 +267,9 @@ The template editor opens from New template and from Edit.
   the coordinate is not needed for a match and ✕ removes the row.
 - Save saves the template. A coordinate that no item has gets a light warning
   background.
+- Save keeps the editor open with the reason for the name of another template,
+  also when only its case or the spaces around it differ (Straße and STRASSE
+  count as one name). A template can take its own name in another case.
 - A New field name that equals a field of the vault apart from case and
   spaces is offered as that field instead.
 

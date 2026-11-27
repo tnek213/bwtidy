@@ -59,7 +59,7 @@ export function coordinateColumn(coordinate: TemplateCoordinate): string {
   return coordinate.kind === 'field' ? fieldColumn(coordinate.name) : `${FIELDS_PREFIX}${coordinate.pattern}`
 }
 
-// A field name as names are compared: without surrounding spaces, ignoring case (folded_name of
+// A field or template name as names are compared: without surrounding spaces, ignoring case (folded_name of
 // the backend).
 export function foldedName(name: string): string {
   return caseFold(name.trim())

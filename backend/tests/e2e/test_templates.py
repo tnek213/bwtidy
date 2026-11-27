@@ -273,6 +273,37 @@ def test_delete_a_template(templated: Page, api: Api):
     assert [t["name"] for t in stored(api)] == ["Web login", "Disk key", "Plain note"]
 
 
+def test_the_editor_refuses_a_name_that_differs_only_in_case(templated: Page, api: Api):
+    page = templated
+    templates_page(page)
+    page.get_by_role("button", name="New template").click()
+    editor = page.get_by_role("dialog", name="New template")
+    editor.get_by_label("Name").fill("web login")
+    pick(editor, "Type", "Secure note")
+    add_new_field(editor, "e2e case host", "Text")
+    editor.get_by_role("button", name="Save").click()
+    ## the editor's own message names the template it clashes with, nothing goes to the backend
+    clash = editor.get_by_text("There is already a template named Web login.", exact=True)
+    expect(clash).to_be_visible()
+    expect(page.get_by_text("Saving", exact=True)).to_have_count(0)
+    editor.get_by_role("button", name="Cancel").click()
+    expect(editor).to_be_hidden()
+    assert stored(api) == TEMPLATES
+
+
+def test_a_template_takes_its_own_name_in_another_case(templated: Page, api: Api):
+    page = templated
+    templates_page(page)
+    page.get_by_role("button", name="Edit Disk key").click()
+    editor = page.get_by_role("dialog", name="Edit Disk key")
+    editor.get_by_label("Name").fill("DISK KEY")
+    editor.get_by_role("button", name="Save").click()
+    expect(editor).to_be_hidden()
+    expect(template_row(page, "DISK KEY")).to_be_visible()
+    names = [t["name"] for t in stored(api)]
+    assert names == ["Web login", "DISK KEY", "API token", "Plain note"]
+
+
 def test_a_copy_of_a_template_warns_that_the_first_takes_every_match(templated: Page, api: Api):
     page = templated
     templates_page(page)
