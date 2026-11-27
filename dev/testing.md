@@ -589,16 +589,20 @@ reader takes them in order, so `test_tutorials.py` holds one test for each,
 in the order of the docs, each continuing from the vault the one before left.
 Its module-scoped fixture `one_vault` puts the vault back once, after the
 last, and a tutorial whose predecessor did not pass in the run skips
-(`-k test_tutorials` runs them all). Each carries the marker `tutorial`
-with its page, and `tests/repo/test_tutorial_order.py` checks that their
-order is the one of the docs' nav and that only that fixture puts the vault
-back. Times, backup names and backup sizes differ from run to run, and a
-hidden cell (`data-shot-hide`) keeps its width, so the table still sizes its
-column by the real text. A shot that shows them
-routes the API through `FixedValues` (`docs_shots.py`, through `page.route`)
-instead of hiding the cells: it maps them onto fixed ones, times in their
-order. `test_tutorials.py` does so for its Queue and Change log shots,
-`test_explanation.py` for its Change log row.
+(`-k test_tutorials` runs them all). Before the first tutorial the fixture
+deletes the dev account and makes it again (`dev_account_anew` in
+`support/accounts.py`). The tutorials then start from the empty Queue and
+Change log of a reader's new account, whatever docs tests left there before,
+so `-k test_tutorials` takes the same images as the full run. Each tutorial
+test carries the marker `tutorial` with its page, and
+`tests/repo/test_tutorial_order.py` checks that their order is the one of
+the docs' nav and that only that fixture puts the vault back. Times, backup
+names and backup sizes differ from run to run, and a hidden cell
+(`data-shot-hide`) keeps its width, so the table still sizes its column by
+the real text. A shot that shows them routes the API through `FixedValues`
+(`docs_shots.py`, through `page.route`) instead of hiding the cells: it maps
+them onto fixed ones, times in their order. `test_tutorials.py` does so for
+its Queue and Change log shots, `test_explanation.py` for its Change log row.
 
 The full run deletes every image in `docs/images` first, so an image no test
 takes any more is gone. A run of some tests (`-k NAME` or a test path)

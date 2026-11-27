@@ -8,7 +8,10 @@ templates and datatypes of the bwtidy note. A test whose predecessor did not pas
 skips, so a run of one later tutorial alone takes no image (-k test_tutorials runs them all).
 Each test carries the marker tutorial with its docs page, and tests/repo/test_tutorial_order.py
 checks that their order is the one of zensical.toml and docs/index.md. The other docs tests are
-in files of their own, so they run before or after these on the seeded vault.
+in files of their own, so they run before or after these on the seeded vault. Those before leave
+queue entries, change log rows and backups, so one_vault makes the dev account anew before the
+first tutorial: the Queue and the Change log show what a reader's new account has, on a run of
+the tutorials alone as on the full run.
 
 No AI client runs here: test_mcp makes the proposals an agent would make for the tutorial's
 prompt through the real MCP endpoint with the token of the dialog (mcp_caller), so the Queue
@@ -31,6 +34,7 @@ from typing import Any
 
 import pytest
 from playwright.sync_api import Browser, Page, Route, expect
+from support.accounts import dev_account_anew
 from support.api import COMMIT_TIMEOUT, Api, app_api, rows_by_name
 from support.elsewhere import active_ids, last_change_id, put_back
 from support.login import EMAIL, PASSWORD, SERVER
@@ -72,12 +76,14 @@ def wait_saved(api: Api, path: str) -> dict[str, Any]:
 
 @pytest.fixture(scope="module")
 def one_vault(browser: Browser, base_url: str) -> Iterator[list[str]]:
-    """The vault of the tutorials, put back once after the last, with the bwtidy note's
-    templates and datatypes. Yields the names of the tests that passed, in their order.
+    """The vault of the tutorials on the dev account made anew, put back once after the last,
+    with the bwtidy note's templates and datatypes. Yields the names of the tests that passed,
+    in their order.
 
     The session ends afterwards, so the next unlock loads the vault again: the app has not seen
     what put_back deleted.
     """
+    dev_account_anew(browser, base_url)
     with app_api(browser, base_url) as api:
         since = last_change_id(api)
         active_before = active_ids(api)
