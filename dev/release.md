@@ -203,7 +203,7 @@ main. The image is built for `linux/amd64` with the OCI labels `source`, `versio
 
 | Trigger | Tags |
 | --- | --- |
-| Push to main | `main` and the short commit (7 characters) |
+| Push to main | `main` and the short commit (the first 7 characters of its hash) |
 | Release | the version as `frontend/package.json` spells it (`1.0.0-beta.1`) and `latest` |
 
 The image builds on Debian 13 (trixie): `python:3.13-slim-trixie` is the base of the

@@ -64,7 +64,10 @@ jobs:
           set -euo pipefail
           image=docker.io/tnek213/bwtidy
           version="$(node -p "require('./frontend/package.json').version")"
-          short="$(git rev-parse --short=7 HEAD)"
+          revision="$(git rev-parse HEAD)"
+          # cut, as git abbreviates a hash to more than 7 characters when 7 are ambiguous, and
+          # scripts/prune-tags deletes only tags of exactly 7
+          short="${revision::7}"
           if [ "$EVENT_NAME" = release ]; then
             if [ "$RELEASE_TAG" != "v$version" ]; then
               echo "the release tag is $RELEASE_TAG but frontend/package.json has version $version, so the tag must be v$version" >&2
@@ -79,7 +82,7 @@ jobs:
           fi
           {
             echo "commit=$(git log -1 --format='%cd %h' --date=format:%y%m%d)"
-            echo "revision=$(git rev-parse HEAD)"
+            echo "revision=$revision"
             echo "version=$version"
             echo "tags=$tags"
           } >> "$GITHUB_OUTPUT"
