@@ -45,6 +45,63 @@ and merge in the web UI. It would also let a merge commit bring unsigned
 commits onto main without a warning, even from `gh pr merge N --merge`
 without `--admin`. That is why the rule has no bypass.
 
+### The CLI pin of Dependabot's pull requests
+
+Dependabot's pull request for a new Bitwarden CLI changes only
+`docker/bitwarden-cli/package.json` and its lock file. The workflow
+"Dependabot CLI pin" (`.github/workflows/dependabot-cli-pin.yml`) adds the rest
+by itself. It runs `scripts/update-deps --cli-pin`, which writes the tag and
+the commit in `docker/bitwarden-cli/source.json` and the version in the docs
+that state it. It commits them as `github-actions[bot]` with the subject "Pin
+the Bitwarden CLI source to cli-vVERSION".
+
+The workflow makes the commit with its `GITHUB_TOKEN`, so GitHub holds the
+`pull_request` runs of that commit until someone with write access approves
+them. Click "Approve workflows to run" in the merge box. Once `ci` passes on
+the new commit you merge with a merge commit as usual.
+
+Dependabot's commits and the workflow's commit are signed, as Protect main
+requires. A run of `ci` started by hand (`workflow_dispatch`) would not count
+for the required check, which takes only the runs of a pull request or push
+event. Only a GitHub App or personal token could skip the approval.
+
+The workflow runs on `pull_request_target` when Dependabot opens, updates or
+reopens a pull request into main from a branch of this repo that starts with
+`dependabot/npm_and_yarn/docker/bitwarden-cli/`. That event runs main's copy
+of the workflow with a token that can write, so the workflow runs nothing from
+the pull request. It is safe for these reasons:
+
+- It reads the pull request again through the API and stops unless it is open
+  and goes into main from a branch of this repo with that prefix whose author
+  is `dependabot[bot]`. A run by hand takes the number of the pull request and
+  makes the same check.
+- It checks out main into `main/` and the pull request's head into `head/`,
+  both without credentials. It runs only main's `scripts/update-deps` with
+  `--root head`, which reads and writes a fixed list of data files there.
+  `tests/repo/test_dependabot_cli_pin_workflow.py` checks that no step runs a
+  file of `head/`.
+- The version must be plain `X.Y.Z` before it reaches a git ref, a doc or the
+  subject. The script asks only `https://github.com/bitwarden/clients` and
+  refuses a file that is a symbolic link.
+- Its token has only `contents: write` for the commit and
+  `pull-requests: read`. The workflow uses no secret.
+- It sends the files that the script changed to the API (GraphQL
+  `createCommitOnBranch`), and GitHub signs the commit it makes there. A commit
+  made with `GITHUB_TOKEN` starts no run of this workflow again.
+
+A pull request that pins the source already gets no commit. When Dependabot
+rebases its pull request (`@dependabot rebase`) the commit goes away and the
+workflow adds it again. Run it by hand from the workflow's page ("Run
+workflow" with the pull request's number), or write the pin in a checkout of
+the branch:
+
+```sh
+scripts/update-deps --cli-pin             # this checkout
+scripts/update-deps --cli-pin --root DIR  # another checkout, DIR
+```
+
+Check a change to the workflow with actionlint, as for the docs workflow below.
+
 ## The version
 
 The version (docs/spec.md has the rules) is written by hand in one place,

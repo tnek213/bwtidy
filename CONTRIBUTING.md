@@ -68,7 +68,8 @@ dependency within its declared range and lists the updates beyond it.
 The image builds the Bitwarden CLI from the source that
 `docker/bitwarden-cli/source.json` pins. A new version of the CLI goes into
 `docker/bitwarden-cli/package.json` (then `npm install` there), and
-`scripts/update-deps` then sets the tag and the commit in `source.json`.
+`scripts/update-deps --cli-pin` then sets the tag and the commit in
+`source.json` and the version in the docs.
 [AGENTS.md](AGENTS.md) has the details.
 
 ## Commits

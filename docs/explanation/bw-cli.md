@@ -2,8 +2,8 @@
 
 bwtidy never talks to your Bitwarden server itself. Every read and every
 write of your vault goes through the official Bitwarden CLI
-(`@bitwarden/cli`) at version 2026.10.0, which the image carries. Bitwarden's
-own code decrypts and encrypts your vault. The server sees a CLI client like
+(`@bitwarden/cli`) in the version that the image carries. Bitwarden's own code
+decrypts and encrypts your vault. The server sees a CLI client like
 any other.
 
 ```mermaid alt="The account's worker reaches the Bitwarden CLI in two ways. A long-running bw serve takes the reads and writes, and single bw commands run the login and the backups. Both share the CLI state in the account's bw directory and send requests to your Bitwarden server."
