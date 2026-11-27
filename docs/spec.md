@@ -2142,7 +2142,8 @@ flowchart TD
   raw/
   ├── items.json                         GET /list/object/items, the exact objects the app PUTs
   ├── trash.json                         bw list items --trash
-  ├── archived.json                      GET /list/object/items?archived=true, then with trash=true
+  ├── archived.json                      GET /list/object/items?archived=true, then with trash=true,
+  │                                      then GET /object/item/<id> for each exported item not listed
   ├── folders.json
   ├── collections.json
   └── organizations.json
@@ -2161,6 +2162,23 @@ flowchart TD
   `raw/archived.json` holds every archived item with those in the trash.
   `bw export` leaves out only the trash, so the personal export holds an
   archived item with its `archivedDate`. An organization export holds none.
+- bw asks for archived items only when the account has premium from any
+  source. An account whose premium ended after it archived items has none.
+  Then bw drops `archived=true` and lists the items that are not archived, so
+  `BwClient.list_archived` keeps only the items with an `archivedDate`. The
+  exports still hold the archived items and `GET /object/item/<id>` answers
+  them. So a backup takes the item ids of the personal export's `data.json`
+  and of the organization exports. It gets each one that no listing has into
+  `raw/archived.json`, and its attachments are downloaded and checked like the
+  others. Such an item without an `archivedDate` (or one bw serve does not
+  find) fails the backup at the step "archived items", as the backup would
+  lack its attachments.
+- The fingerprint counts those items fetched by id not at all, as the
+  cache's listing lacks them too and a backup would never match it. Without
+  premium a client unarchives an item it edits, so they change only by
+  leaving the archive, which the listings see.
+- Without premium the archived items in the trash are in no listing and no
+  export, so a backup lacks them.
 - A second attachment with the same file name on one item is stored as
   `<attachmentId>-<fileName>`. The id is put in front again while that name is
   taken.

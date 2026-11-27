@@ -95,6 +95,8 @@ class FakeBwServe:
         ## the archived items, those in the trash with a deletedDate: only archived=true lists
         ## them, with trash=true those in the trash
         self.archived: list[dict[str, Any]] = []
+        ## without premium the real bw drops archived=true and lists what is not archived
+        self.premium = True
         ## attachment bytes by (item id, attachment id), and the uploads as (item id, file name).
         ## Like Vaultwarden, an upload or a delete of an attachment leaves the revisionDate as
         ## it is, unless attachment_revisions asks for a new one each, as a server could
@@ -195,7 +197,7 @@ class FakeBwServe:
             return fail("Vault is locked.")
         if (method, path) == ("GET", "/list/object/items"):
             trash = request.url.params.get("trash") == "true"
-            if request.url.params.get("archived") == "true":
+            if request.url.params.get("archived") == "true" and self.premium:
                 return listing([i for i in self.archived if bool(i.get("deletedDate")) == trash])
             if trash:
                 return listing(self.trashed)
@@ -220,10 +222,10 @@ class FakeBwServe:
             self.created.append(item)
             self.items.append(item)
             return ok(item)
-        ## like the real bw serve, GET answers a trashed item too, with its deletedDate
+        ## like the real bw serve, GET answers a trashed or an archived item too
         if method == "GET" and path.startswith("/object/item/"):
             item_id = path.removeprefix("/object/item/")
-            found = [i for i in self.items + self.trashed if i.get("id") == item_id]
+            found = [i for i in self.items + self.trashed + self.archived if i.get("id") == item_id]
             return ok(found[0]) if found else fail("Not found.")
         if method == "DELETE" and path.startswith("/object/item/"):
             item_id = path.removeprefix("/object/item/")
