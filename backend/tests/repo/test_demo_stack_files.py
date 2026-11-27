@@ -57,6 +57,18 @@ def test_only_the_public_network_has_a_route_out():
     assert "internal" not in networks["public"]
 
 
+def test_the_public_bridge_has_a_fixed_name_that_scripts_demo_egress_accepts():
+    public = blocks(COMPOSE, "networks")["public"]
+    match = re.search(
+        r"^      com\.docker\.network\.bridge\.name: \$\{DEMO_PUBLIC_BRIDGE:-([^}]+)\}$",
+        public,
+        re.MULTILINE,
+    )
+    assert match, public
+    ## the kernel's limit for an interface name, and what scripts/demo-egress takes
+    assert re.fullmatch(r"[A-Za-z0-9._-]{1,15}", match[1])
+
+
 def test_only_the_edge_is_on_the_public_network():
     services = blocks(COMPOSE, "services")
     assert {name: listed(block, "networks") for name, block in services.items()} == {
