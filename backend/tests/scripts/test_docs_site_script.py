@@ -600,6 +600,151 @@ def test_an_svg_without_text_needs_no_font(docs_site):
     assert missing_font(docs_site, set(), svg) is None
 
 
+def fitted(docs_site, svg: str) -> str:
+    """The SVG as the converter hands it to resvg, with the families it names fitted."""
+    fit = converter(docs_site)["with_generic_families"]
+    return fit(svg.encode(), docs_site.NAMED_FONTS).decode()
+
+
+## a d2 style sheet: a text class in an embedded font, and the @font-face resvg does not load
+D2_STYLE = (
+    '.d2-1 .text-bold { font-family: "d2-1-font-bold"; }\n'
+    '@font-face { font-family: d2-1-font-bold; src: url("data:font/woff;base64,AAAA"); }\n'
+    '.d2-1 .text-mono { font-family: "d2-1-font-mono-italic"; }\n'
+)
+
+
+def test_a_named_font_gets_the_generic_family_that_stands_in_for_it(docs_site):
+    texts = [f'<text font-family="{family}">A</text>' for family in ("Arial", "helvetica")]
+    texts += ['<text style="font-family: Courier; font-size: 9px">A</text>']
+    svg = fitted(docs_site, svg_with("".join(texts), "#m{font-family:Times}"))
+    assert 'font-family="Arial, sans-serif"' in svg
+    assert 'font-family="helvetica, sans-serif"' in svg
+    assert 'style="font-family: Courier, monospace; font-size: 9px"' in svg
+    assert "#m{font-family: Times, serif}" in svg
+
+
+def test_a_generic_family_in_another_case_is_written_as_resvg_knows_it(docs_site):
+    """As Graphviz writes Helvetica, which resvg would draw in the serif font."""
+    svg = fitted(docs_site, svg_with('<text font-family="Helvetica,sans-Serif">A</text>'))
+    assert 'font-family="Helvetica, sans-serif"' in svg
+
+
+def test_an_svg_whose_families_all_draw_as_meant_stays_as_it_is(docs_site):
+    svg = svg_with(
+        '<text font-family="Times,serif">A</text><text font-family="No Such Font">B</text>',
+        '#m{font-family:"trebuchet ms",verdana,arial,sans-serif;}',
+    )
+    assert fitted(docs_site, svg) == svg
+
+
+def test_a_font_d2_embeds_gets_its_generic_family_weight_and_style(docs_site):
+    text = '<g class="d2-1"><text class="text-bold">A</text></g>'
+    svg = fitted(docs_site, svg_with(text, D2_STYLE))
+    assert '.text-bold { font-family: "d2-1-font-bold", sans-serif; font-weight: bold; }' in svg
+    assert "@font-face { font-family: d2-1-font-bold; src:" in svg
+    expected = '"d2-1-font-mono-italic", monospace; font-style: italic; }'
+    assert f".text-mono {{ font-family: {expected}" in svg
+
+
+def missing_after_fitting(docs_site, installed: set[str], svg: str) -> str | None:
+    return missing_font(docs_site, installed, fitted(docs_site, svg))
+
+
+def test_a_named_font_draws_in_the_stand_in_of_its_generic_family(docs_site):
+    svg = svg_with('<text font-family="Helvetica">A</text>', D2_STYLE)
+    assert missing_after_fitting(docs_site, {"DejaVu Sans", "DejaVu Sans Mono"}, svg) is None
+    assert "draws its sans-serif text" in (missing_after_fitting(docs_site, {"Arimo"}, svg) or "")
+
+
+def test_a_named_font_without_a_generic_family_has_to_be_installed(docs_site):
+    """resvg would draw it in the serif font without a word."""
+    svg = svg_with('<text font-family="No Such Font">A</text>')
+    assert missing_after_fitting(docs_site, {"DejaVu Serif"}, svg) == (
+        "no installed font draws its text in No Such Font, and it names no generic family "
+        "(serif, sans-serif or monospace) to fall back on"
+    )
+    assert missing_after_fitting(docs_site, {"No Such Font"}, svg) is None
+
+
+def test_a_font_the_svg_embeds_is_named_as_the_cause(docs_site):
+    style = "@font-face{font-family:Fancy;src:url(x)} text{font-family:Fancy}"
+    svg = svg_with("<text>A</text>", style)
+    assert missing_after_fitting(docs_site, {"DejaVu Serif"}, svg) == (
+        "no installed font draws its text in Fancy, Fancy is a font the SVG embeds and resvg "
+        "does not load, and it names no generic family (serif, sans-serif or monospace) to fall "
+        "back on"
+    )
+
+
+def label(attributes: str, style: str = "", text: str = "Label") -> str:
+    """An SVG of one text in a group of the class d2-1, at 120 by 40."""
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">'
+        f'<style>{style}</style><g class="d2-1"><text x="4" y="30" font-size="24" {attributes}>'
+        f"{text}</text></g></svg>"
+    )
+
+
+def drawn(docs_site, cache: Path, svgs: dict[str, str]) -> dict[str, bytes]:
+    """The PNG the script's own conversion makes of each SVG, with the system's fonts."""
+    assert docs_site.convert({key: svg.encode() for key, svg in svgs.items()}, cache) == {}
+    return {key: (cache / f"{key}.png").read_bytes() for key in svgs}
+
+
+def test_helvetica_and_arial_are_drawn_in_a_sans_serif_font(tmp_path, docs_site):
+    pngs = drawn(
+        docs_site,
+        tmp_path,
+        {
+            "helvetica": label('font-family="Helvetica,sans-Serif"'),
+            "arial": label('font-family="Arial"'),
+            "sans": label('font-family="sans-serif"'),
+            "serif": label('font-family="serif"'),
+            "empty": label('font-family="serif"', text=""),
+        },
+    )
+    assert pngs["helvetica"] not in (pngs["serif"], pngs["empty"])
+    assert pngs["arial"] == pngs["sans"]
+
+
+def test_d2_labels_are_drawn_in_bold_sans_serif(tmp_path, docs_site):
+    """d2 draws its labels in the bold Source Sans Pro it embeds, which resvg does not load."""
+    pngs = drawn(
+        docs_site,
+        tmp_path,
+        {
+            "d2": label('class="text-bold"', D2_STYLE),
+            "bold": label('font-family="sans-serif" font-weight="bold"'),
+            "serif": label('font-family="serif" font-weight="bold"'),
+            "empty": label('class="text-bold"', D2_STYLE, text=""),
+        },
+    )
+    assert pngs["d2"] == pngs["bold"]
+    assert pngs["d2"] not in (pngs["serif"], pngs["empty"])
+
+
+def test_a_diagram_in_a_font_the_svg_embeds_alone_fails_the_build(
+    repo, monkeypatch, capsys, kroki, docs_site
+):
+    style = "@font-face{font-family:Fancy;src:url(x)} text{font-family:Fancy}"
+    kroki.answer = label("", style)
+    write(repo, "docs/how-to/run.md", GRAPHVIZ_PAGE)
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 1
+    err = capsys.readouterr().err
+    assert (
+        "docs-site: docs/how-to/run.md:5: no installed font draws its text in Fancy, "
+        "Fancy is a font the SVG embeds and resvg does not load"
+    ) in err
+
+
+def test_the_cache_key_changes_with_the_named_fonts(monkeypatch, docs_site):
+    before = docs_site.diagram_key("graphviz", "digraph { a }")
+    monkeypatch.setattr(docs_site, "NAMED_FONTS", {**docs_site.NAMED_FONTS, "serif": ["Georgia"]})
+    assert docs_site.diagram_key("graphviz", "digraph { a }") != before
+
+
 def test_a_diagram_whose_text_no_font_draws_fails_the_build(
     repo, monkeypatch, capsys, kroki, docs_site
 ):
