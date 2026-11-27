@@ -316,9 +316,13 @@ pins (see [Publishing the image](release.md#publishing-the-image)). The stage
 `node_modules` that `npm ci` installs from
 `docker/bitwarden-cli/package-lock.json`. The bundle leaves those packages out
 like the npm build does, so it loads rxjs from the same paths and the preload's
-pattern still matches. Bitwarden's release binary `bw-oss-linux` is not used:
-it is a pkg executable that ignores `NODE_OPTIONS`, so the preload could not
-run and every command would take 2 seconds longer.
+pattern still matches. It does bundle Bitwarden's SDK
+(`@bitwarden/sdk-internal`, compiled to WebAssembly). The file `SOURCE` beside
+`build/` names the source of the build and of the SDK, and the folder
+`sdk-internal` there keeps the SDK's `package.json`, `VERSION` and `LICENSE`.
+Bitwarden's release binary `bw-oss-linux` is not used: it is a pkg executable
+that ignores `NODE_OPTIONS`, so the preload could not run and every command
+would take 2 seconds longer.
 
 ## Trying the web login
 

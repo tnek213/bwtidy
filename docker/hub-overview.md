@@ -191,7 +191,9 @@ License. The full text is in
 The container image includes the open source build of the Bitwarden CLI.
 Bitwarden, Inc. licenses it separately under GPL-3.0. The image builds it from
 Bitwarden's source (<https://github.com/bitwarden/clients>) at the tag
-`cli-v2026.11.0`.
+`cli-v2026.11.0`. The CLI bundles Bitwarden's SDK (also GPL-3.0) from
+<https://github.com/bitwarden/sdk-internal>. The file `SOURCE` beside the CLI
+in the image names the commit of each.
 
 The About page of a running bwtidy lists every third-party package that
 bwtidy ships with its license. Like every image this one also holds other
