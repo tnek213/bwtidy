@@ -122,6 +122,8 @@ without a login.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): how everyone taking part behaves, and
   where to report what breaks it
 - [SECURITY.md](SECURITY.md): how to report a security issue, privately
+- [ACCESSIBILITY.md](ACCESSIBILITY.md): what works with a keyboard and a screen
+  reader, what does not, and how to report a barrier
 - [The developer guide](dev/README.md): set up, the dev vault, the tests, releasing
 - [AGENTS.md](AGENTS.md): the rules every change follows and the checks it
   must pass
