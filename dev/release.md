@@ -288,8 +288,16 @@ The image builds on Debian 13 (trixie): `python:3.13-slim-trixie` is the base of
 the final stage, `node:24-trixie-slim` of the build stages. The stages
 `frontend`, `docs`, `bitwarden-cli` (`npm ci` in `docker/bitwarden-cli/`) and
 `backend` (the venv) build what the final stage `app` copies: the node binary,
-the CLI's `node_modules`, the venv, the static files and the docs site. npm, uv,
-uv's cache and the backend's sources stay in the build stages. The app stage
+the CLI's `node_modules`, the venv, the static files and the docs site. The
+stage `bitwarden-cli-source` builds the CLI itself, Bitwarden's open source
+build, from the commit of `bitwarden/clients` that
+`docker/bitwarden-cli/source.json` pins (`npm ci` and `npm run build:oss:prod`
+in `apps/cli`). It fails when the tag no longer names that commit or when the
+build bundles a module under `bitwarden_license/`, and `bitwarden-cli` puts its
+`apps/cli/build` in place of the npm package's build, with a `SOURCE` file that
+names the repository, the tag and the commit and the GPL-3.0 text beside it.
+npm, git, uv, uv's cache, the monorepo and the backend's sources stay in the
+build stages. The app stage
 also removes pip, which comes with the base image: nothing in the image runs it,
 and a scanner would report on its vendored packages.
 

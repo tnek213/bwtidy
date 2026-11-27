@@ -13,12 +13,55 @@ RUN npm ci --no-fund --no-audit
 COPY frontend/ ./
 RUN npm run build
 
-## the Bitwarden CLI and every package it brings along, as its own lock file pins them. npm stays
-## in this stage: the app stage takes node and the installed tree only.
+## the open source build of the Bitwarden CLI, built from Bitwarden's source at the commit
+## docker/bitwarden-cli/source.json pins. Bitwarden's npm package is their commercial build, which
+## bundles code under the Bitwarden License. git and the monorepo's tree stay in this stage.
+FROM node AS bitwarden-cli-source
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+COPY docker/bitwarden-cli/source.json /src/source.json
+WORKDIR /src/clients
+## a tag can move, so the build fetches the pinned commit and fails while the tag names another one
+RUN repository="$(node -p 'require("/src/source.json").repository')" \
+    && tag="$(node -p 'require("/src/source.json").tag')" \
+    && commit="$(node -p 'require("/src/source.json").commit')" \
+    && tagged="$(git ls-remote "$repository" "refs/tags/$tag" "refs/tags/$tag^{}" \
+        | awk -v ref="refs/tags/$tag" '$2 == ref { plain = $1 } $2 == ref "^{}" { peeled = $1 } END { print peeled ? peeled : plain }')" \
+    && if [ "$tagged" != "$commit" ]; then \
+        echo "The tag $tag of $repository names the commit '$tagged', source.json pins $commit" >&2; \
+        exit 1; \
+    fi \
+    && git init --quiet \
+    && git fetch --quiet --depth 1 "$repository" "$commit" \
+    && git checkout --quiet FETCH_HEAD \
+    && rm -rf .git
+## no install scripts: they build native modules of the desktop app and of tools such as nx and
+## set up git hooks, the CLI's webpack build needs none of them
+RUN npm ci --ignore-scripts --no-fund --no-audit
+RUN cd apps/cli && npm run build:oss:prod
+## a module under bitwarden_license in the bundle stops the build. The pattern names the source
+## folders, as the bundled package.json names bitwarden_license/bit-cli/webpack.config.js in its
+## build:bit scripts, a plain string and no code.
+RUN if grep -o 'bitwarden_license/bit-c[a-z]*/src/[^"]*' apps/cli/build/*.js; then \
+        echo "apps/cli/build includes code under the Bitwarden License (the modules above)" >&2; \
+        exit 1; \
+    fi
+## where the CLI's corresponding source is, for the image to say so beside the build
+RUN node -e 'const s = require("/src/source.json"); console.log(`The build of the Bitwarden CLI is its open source build (GPL-3.0, LICENSE_GPL.txt), built from ${s.repository} at the tag ${s.tag}, commit ${s.commit}.`)' > /src/SOURCE
+
+## the Bitwarden CLI and every package it brings along, as its own lock file pins them, its build
+## replaced by the open source one. npm stays in this stage: the app stage takes node and the
+## installed tree only.
 FROM node AS bitwarden-cli
 WORKDIR /usr/local/lib/bitwarden-cli
 COPY docker/bitwarden-cli/package.json docker/bitwarden-cli/package-lock.json ./
 RUN npm ci --no-fund --no-audit
+## the npm package's build is the one with code under the Bitwarden License, and its package.json
+## names a LICENSE.txt the package does not hold
+RUN rm -rf node_modules/@bitwarden/cli/build
+COPY --from=bitwarden-cli-source /src/clients/apps/cli/build node_modules/@bitwarden/cli/build
+COPY --from=bitwarden-cli-source /src/SOURCE /src/clients/LICENSE_GPL.txt node_modules/@bitwarden/cli/
 
 FROM python:3.13-slim-trixie@sha256:7249d5587b78209a006dc4a3b5340678f84ea729239193aa559962cd8c1fce50 AS python
 

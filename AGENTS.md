@@ -63,6 +63,14 @@ in a `package.json`, a lower bound and `<X+1` in `backend/pyproject.toml` or
 holds, or an exact pin. `scripts/update-deps` updates everything within those
 ranges and lists what lies beyond them for a person to decide.
 
+The image builds the Bitwarden CLI from Bitwarden's source, the commit that
+`docker/bitwarden-cli/source.json` pins (the Dockerfile's stage
+`bitwarden-cli-source`), and takes the packages it brings along from
+`docker/bitwarden-cli/package-lock.json`. To bump the CLI, set the version of
+`@bitwarden/cli` in `docker/bitwarden-cli/package.json`, run `npm install` there
+and then `scripts/update-deps`, which sets the tag `cli-vVERSION` and its commit
+in `source.json` (or set them by hand).
+
 `scripts/e2e` runs the browser tests in `backend/tests/e2e` against a fresh
 dev vault (see dev/testing.md). A change to what the UI does comes with an e2e
 test there.

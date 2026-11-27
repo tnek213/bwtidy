@@ -86,8 +86,8 @@ publishes its web page on port 8765 of the host's 127.0.0.1 and keeps each
 account's data in a volume at `/data/accounts`, and its backups at
 `/backups`.
 
-bwtidy runs the Bitwarden CLI exactly as Bitwarden publishes it and follows
-its new releases (see
+bwtidy ships the open source build of the Bitwarden CLI and follows its new
+releases (see
 [Which version of the CLI](docs/explanation/bw-cli.md#which-version-of-the-cli)).
 
 [Run bwtidy](docs/how-to/run.md) shows how to run it. It goes from pulling
@@ -146,8 +146,11 @@ details. The full text is in LICENSE.
 bwtidy changes the contents of a password vault. Keep your own Bitwarden
 export, made outside bwtidy, before you use it on a vault you care about.
 
-The container image includes the official Bitwarden CLI, which Bitwarden, Inc.
-licenses separately under its own terms (GPL-3.0).
+The container image includes the open source build of the Bitwarden CLI.
+Bitwarden, Inc. licenses it separately under GPL-3.0. The image builds it from
+Bitwarden's source (<https://github.com/bitwarden/clients>) at the tag
+`cli-v2026.10.0`. Bitwarden's npm package is not used because it includes code
+under the Bitwarden License.
 
 The About page (About bwtidy in the app bar's menu, More actions) shows the
 license, links the source code and thanks the projects bwtidy is built on,

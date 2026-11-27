@@ -30,7 +30,8 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
 
-  # the Bitwarden CLI of the image, pinned to one version in its package.json
+  # the Bitwarden CLI of the image, pinned to one version in its package.json. A bump also needs
+  # the tag and the commit of that version in source.json, which scripts/update-deps writes.
   - package-ecosystem: npm
     directory: /docker/bitwarden-cli
     schedule:

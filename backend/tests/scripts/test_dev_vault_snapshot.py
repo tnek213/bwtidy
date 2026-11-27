@@ -41,6 +41,7 @@ def test_inputs_are_the_seeding_code_the_stack_and_the_fixtures_and_attachments(
         "docker/unref-share-timers.js",
         "docker/bitwarden-cli/package.json",
         "docker/bitwarden-cli/package-lock.json",
+        "docker/bitwarden-cli/source.json",
     } <= names
     assert "dev/fixture-personal.json" in names
     assert "dev/fixture-org.json" in names

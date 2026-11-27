@@ -170,8 +170,8 @@ account's worker under that account's own uid.
 [How accounts are kept apart](https://tnek213.github.io/bwtidy/explanation/isolation/)
 explains it.
 
-bwtidy runs the Bitwarden CLI exactly as Bitwarden publishes it and follows
-its new releases (see
+bwtidy ships the open source build of the Bitwarden CLI and follows its new
+releases (see
 [Which version of the CLI](https://tnek213.github.io/bwtidy/explanation/bw-cli/#which-version-of-the-cli)).
 
 Every image carries a signed build provenance attestation. It shows the
@@ -188,8 +188,10 @@ bwtidy is free software under version 3 of the GNU Affero General Public
 License. The full text is in
 [LICENSE](https://github.com/tnek213/bwtidy/blob/main/LICENSE).
 
-The container image includes the official Bitwarden CLI. Bitwarden, Inc.
-licenses it separately under its own terms (GPL-3.0).
+The container image includes the open source build of the Bitwarden CLI.
+Bitwarden, Inc. licenses it separately under GPL-3.0. The image builds it from
+Bitwarden's source (<https://github.com/bitwarden/clients>) at the tag
+`cli-v2026.10.0`.
 
 The About page of a running bwtidy lists every third-party package that
 bwtidy ships with its license. Like every image this one also holds other

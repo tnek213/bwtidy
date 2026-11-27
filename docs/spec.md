@@ -52,6 +52,11 @@ behind them:
 - The Bitwarden CLI (`@bitwarden/cli`) is pinned to 2026.10.0 in
   `docker/bitwarden-cli/`. Its lock file fixes every package the CLI brings
   along.
+- The image ships the CLI's open source build, built from Bitwarden's source
+  at the commit that `docker/bitwarden-cli/source.json` pins. That is the
+  tag `cli-v` plus the pinned version. Bitwarden's npm package is their
+  commercial build, which bundles code under the Bitwarden License. A
+  build that bundles a module under `bitwarden_license/` fails.
 - bwtidy talks to `bw serve` instead of running one `bw` call per operation,
   because every CLI call pays for a Node startup. The login and the backups
   still run the CLI (see Backups).
