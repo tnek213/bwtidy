@@ -1,8 +1,8 @@
 # Releasing
 
 How a pull request is merged into main, the version and its release notes,
-the documentation site and its publishing on GitHub Pages, and publishing the
-image.
+releasing a version, the documentation site and its publishing on GitHub
+Pages, and publishing the image.
 
 ## Merging pull requests
 
@@ -60,6 +60,20 @@ The workflow makes the commit with its `GITHUB_TOKEN`, so GitHub holds the
 them. Click "Approve workflows to run" in the merge box. Once `ci` passes on
 the new commit you merge with a merge commit as usual.
 
+With `--pr N`, the number of the pull request that the workflow passes, the
+script also writes the pull request's release note under `## Unreleased` in
+`docs/releases.md`: the bullet "Run the Bitwarden CLI VERSION in the image"
+with the link to pull request N. It takes the place of "Nothing yet." and is
+written once: a run again changes nothing, and a bullet of the same pull
+request for another version is replaced. So the pull request passes the check
+of its release note
+([The release note of a pull request](#the-release-note-of-a-pull-request))
+once the commit is in. Dependabot's other pull requests have the labels
+`dependencies` and `no release note` (`.github/dependabot.yml`), as the
+release notes leave a routine bump out. Setting labels replaces Dependabot's
+default `dependencies`, so the list keeps it. The pull requests for the CLI
+keep that default alone.
+
 Dependabot's commits and the workflow's commit are signed, as Protect main
 requires. A run of `ci` started by hand (`workflow_dispatch`) would not count
 for the required check, which takes only the runs of a pull request or push
@@ -77,12 +91,14 @@ the pull request. It is safe for these reasons:
   makes the same check.
 - It checks out main into `main/` and the pull request's head into `head/`,
   both without credentials. It runs only main's `scripts/update-deps` with
-  `--root head`, which reads and writes a fixed list of data files there.
+  `--root head`, which reads and writes a fixed list of data files there
+  (`docs/releases.md` among them).
   `tests/repo/test_dependabot_cli_pin_workflow.py` checks that no step runs a
   file of `head/`.
 - The version must be plain `X.Y.Z` before it reaches a git ref, a doc or the
-  subject. The script asks only `https://github.com/bitwarden/clients` and
-  refuses a file that is a symbolic link.
+  subject, and the number of the pull request plain digits before it reaches
+  the release notes. The script asks only `https://github.com/bitwarden/clients`
+  and refuses a file that is a symbolic link.
 - Its token has only `contents: write` for the commit and
   `pull-requests: read`. The workflow uses no secret.
 - It sends the files that the script changed to the API (GraphQL
@@ -114,7 +130,8 @@ the lock files carry generated copies: the package `bwtidy` in
 names the file and both versions. After a change to the version, `uv lock` in
 `backend/` and `demo/` (its lock holds the version of `bwtidy` too) and
 `npm install --package-lock-only` in `frontend/` write the copies in the lock
-files.
+files. `scripts/release prepare` does all of it for a release
+([To release](#to-release)).
 
 bwtidy is in beta: feature complete for 1.0, with a stored format (the
 database, the bwtidy note, the backups, the settings) changing only with a
@@ -126,16 +143,18 @@ candidate becomes 1.0.0 after 8 weeks with no serious bug.
 
 ## The release notes
 
-`docs/releases.md` is the release notes page of the docs site, and the body of
-each GitHub release is copied from its version's entry. It is written for the
+`docs/releases.md` is the release notes page of the docs site, and the workflow
+"Release" writes each version's entry into the body of its GitHub release
+([To release](#to-release)). It is written for the
 people who run bwtidy, in one format that `scripts/ci` checks (the check
 "versions"). The rules below hold for anyone who changes bwtidy, a person or an
 AI agent.
 
 When your pull request changes something a user sees, write its bullet under
-`## Unreleased` in the same pull request. The maintainer turns Unreleased into
-the version's entry when releasing (To release in
-[Publishing the image](#publishing-the-image)).
+`## Unreleased` in the same pull request. CI checks that it does
+([The release note of a pull request](#the-release-note-of-a-pull-request)).
+`scripts/release prepare` turns Unreleased into the version's entry when
+releasing ([To release](#to-release)).
 
 The page:
 
@@ -231,6 +250,83 @@ current version (`frontend/package.json`), the metadata lines and their
 links, the `###` headings and the pull request links that end each bullet.
 It compares each date with the tags `v*` of the checkout, so it needs them:
 in a clone without tags, `git fetch --tags` first.
+
+## To release
+
+A release takes a pull request that prepares the version, its merge and a tag.
+The workflow "Release" (`.github/workflows/release.yml`) does the rest:
+
+1. On a branch off main, run `scripts/release prepare VERSION`, with the
+   version as `frontend/package.json` spells it (`1.0.0-beta.3`). It renames
+   `## Unreleased` to `## VERSION` with its metadata line, dated today (UTC)
+   and linking the version below, and puts a new `## Unreleased` with
+   "Nothing yet." above it. It bumps the version in `backend/pyproject.toml`
+   and `frontend/package.json` and refreshes the lock files as
+   [The version](#the-version) says. Then it runs the check of the release
+   notes and prints the files to commit.
+2. Commit them as "Release bwtidy VERSION" in a pull request and merge it the
+   same day (UTC), as the tag must have the date of the entry.
+3. Run `scripts/release tag VERSION`. It fetches origin and refuses unless
+   main's version is VERSION, its entry is dated the UTC date of main's last
+   commit and the tag `vVERSION` does not exist. Then it tags that commit with
+   the annotated tag `vVERSION` and pushes the tag.
+
+When the dates differ, the merge came a day later. Run
+`scripts/release prepare VERSION` again in a new pull request, which writes
+today's date into the entry of a version without a tag, and tag after its
+merge.
+
+`prepare` refuses a new version while Unreleased says "Nothing yet.", as the
+version would name no change. A version that is the current one already and
+has no tag (written by hand, or prepared on an earlier day) keeps its entry
+and the version files. The bullets of Unreleased join the entry, under its
+`###` headings where it has them, and its metadata line gets today's date in
+place of an older one.
+
+### The workflow Release
+
+On a push of a tag `v*` its job `release` checks out the tag with the whole
+history and its tags. It runs the check of the release notes
+(`scripts/release lint`, the check "versions" of `scripts/ci`) and checks the
+tag as `scripts/release tag` does (`scripts/release check-tag VERSION`). Then
+it creates the GitHub release `vVERSION` titled "bwtidy VERSION" with
+`gh release create --verify-tag`, as a pre-release when the version has a
+pre-release suffix. Its body is what `scripts/release notes VERSION` prints:
+the version's entry without its heading and metadata line, every relative
+link made absolute on the docs site (<https://tnek213.github.io/bwtidy/>,
+which serves a page `X.md` at `X/`). Run it to see the body before you tag. A
+run again after a failure finds the release and writes its body instead.
+
+Then its job `image` calls the workflow "Image" with the version, which pushes
+the image as `VERSION` and `latest`
+([Publishing the image](#publishing-the-image)). GitHub starts no workflow
+from an event that a workflow's `GITHUB_TOKEN` causes, so "Image" would never
+see the release published, and "Release" calls it instead. Only the job
+`release` and the job `sync` below can write to the repository's contents,
+`image` has the permissions of the provenance attestation.
+
+On every push to main that changes `docs/releases.md` or the workflow, and by
+hand ("Run workflow"), its job `sync` writes the notes of each version of
+`docs/releases.md` that has a GitHub release into its body where they differ.
+So a correction goes into `docs/releases.md` alone, and its merge brings it to
+GitHub.
+
+Check a change to the workflow with actionlint, as for the docs workflow below.
+
+### The release note of a pull request
+
+The job `ci` of `.github/workflows/ci.yml` checks on every pull request that a
+change a user sees has its bullet, with `scripts/release check-pr` and the
+pull request's base, head and labels. It fails when the pull request changes
+a path of `USER_VISIBLE` in `scripts/devlib/release.py` but leaves
+`## Unreleased` of `docs/releases.md` as it was where the branch left main.
+Those paths are `backend/` without its tests, `frontend/` without its tests,
+`docker/` without the Docker Hub overview, `Dockerfile`, `compose.yaml` and
+`example.env`. The label `no release note` passes such a pull request, for a
+change that no user notices (a refactor, a routine dependency bump). The
+check runs after `scripts/ci` and whatever it found, and the workflow runs
+again when a label is added or removed (the `pull_request` types `labeled` and
+`unlabeled`).
 
 ## The documentation site
 
@@ -433,14 +529,15 @@ docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12
 
 The workflow "Image" (`.github/workflows/image.yml`) builds the Dockerfile's target
 `app` and pushes it to `docker.io/tnek213/bwtidy` on Docker Hub. It runs on every
-push to main, on every published GitHub release (pre-releases too) and by hand on
-main. The image is built for `linux/amd64` with the OCI labels `source`, `version`,
-`revision` and `licenses`. The tags depend on the trigger:
+push to main, for every release (pre-releases too), when the workflow "Release"
+calls it with the version (`workflow_call`), and by hand on main. The image is
+built for `linux/amd64` with the OCI labels `source`, `version`, `revision` and
+`licenses`. The tags depend on the trigger:
 
 | Trigger | Tags |
 | --- | --- |
 | Push to main | `main` and the short commit (the first 7 characters of its hash) |
-| Release | the version as `frontend/package.json` spells it (`1.0.0-beta.1`) and `latest` |
+| Release (a call from "Release") | the version as `frontend/package.json` spells it (`1.0.0-beta.1`) and `latest` |
 
 The image builds on Debian 13 (trixie): `python:3.13-slim-trixie` is the base of
 the final stage, `node:24-trixie-slim` of the build stages. The stages
@@ -469,12 +566,13 @@ and a scanner would report on its vendored packages.
 A push to main that changes only files the image never copies (the
 `paths-ignore` list in the workflow: `README.md`, the other top-level docs, the
 Docker Hub overview, the compose files, `dev/`, the tests, the other workflows,
-`scripts/prune-tags`) builds nothing. Keep that list in step with the
-Dockerfile's `COPY` lines: a file the image copies must never be on it. A push
-to main never moves `latest`. The workflow fails, saying why, when the release
-tag is not `v` plus the version in `frontend/package.json`, when it is run by
-hand on another branch, or when the repository secret `DOCKERHUB_TOKEN` is
-missing. The job skips while the repository is private.
+`scripts/prune-tags`, `scripts/release`) builds nothing. Keep that list in step
+with the Dockerfile's `COPY` lines: a file the image copies must never be on it.
+A push to main never moves `latest`. The workflow fails, saying why, when the
+version of a release or its tag is not the version in `frontend/package.json`
+(or `v` plus it), when it is run by hand on another branch, or when the
+repository secret `DOCKERHUB_TOKEN` is missing. The job skips while the
+repository is private.
 
 Set it up once:
 
@@ -483,17 +581,8 @@ Set it up once:
 - Make a Docker Hub personal access token with Read and Write and store it as the
   repository secret: `gh secret set DOCKERHUB_TOKEN --repo tnek213/bwtidy`.
 
-To release:
-
-1. In `docs/releases.md`, rename `## Unreleased` to `## VERSION`, add its
-   metadata line with the date of the release day (UTC) and put a new
-   `## Unreleased` with "Nothing yet." above it
-   ([The release notes](#the-release-notes)).
-2. Bump the version in `backend/pyproject.toml` and `frontend/package.json`
-   and update the lock files as [The version](#the-version) says, in the same
-   commit as the entry, then push.
-3. Publish a GitHub release with the tag `vVERSION`, its notes the text of
-   the version's entry. That pushes `VERSION` and `latest`.
+A release pushes `VERSION` and `latest` once its tag is pushed
+([To release](#to-release)).
 
 Every pushed image gets a signed SLSA build provenance attestation
 (`actions/attest-build-provenance`), stored on GitHub and pushed next to the

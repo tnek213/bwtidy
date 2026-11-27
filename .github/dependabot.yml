@@ -1,10 +1,14 @@
 # Weekly updates of every locked dependency, so the lock files, the image digests and the action
 # SHAs do not go stale. Minor and patch updates come as one pull request per ecosystem and
-# directory, a new major version as a pull request of its own.
+# directory, a new major version as a pull request of its own. Their pull requests have the label
+# "no release note", as the release notes leave a routine bump out (dev/release.md), and
+# Dependabot's own label dependencies, which a list of labels replaces. Those of the Bitwarden CLI
+# keep only dependencies, as dependabot-cli-pin.yml writes their release note.
 version: 2
 updates:
   - package-ecosystem: uv
     directory: /backend
+    labels: [dependencies, "no release note"]
     schedule:
       interval: weekly
     groups:
@@ -14,6 +18,7 @@ updates:
 
   - package-ecosystem: uv
     directory: /demo
+    labels: [dependencies, "no release note"]
     schedule:
       interval: weekly
     groups:
@@ -23,6 +28,7 @@ updates:
 
   - package-ecosystem: npm
     directory: /frontend
+    labels: [dependencies, "no release note"]
     schedule:
       interval: weekly
     groups:
@@ -31,7 +37,8 @@ updates:
         update-types: [minor, patch]
 
   # the Bitwarden CLI of the image, pinned to one version in its package.json. Its pull requests get
-  # the pin commit from dependabot-cli-pin.yml by themselves and merge once ci passes on it.
+  # the pin commit, with their release note, from dependabot-cli-pin.yml by themselves and merge
+  # once ci passes on it.
   - package-ecosystem: npm
     directory: /docker/bitwarden-cli
     schedule:
@@ -45,6 +52,7 @@ updates:
   # package.json
   - package-ecosystem: npm
     directory: /tools/markdownlint
+    labels: [dependencies, "no release note"]
     schedule:
       interval: weekly
     groups:
@@ -54,6 +62,7 @@ updates:
 
   - package-ecosystem: docker
     directory: /
+    labels: [dependencies, "no release note"]
     schedule:
       interval: weekly
     groups:
@@ -64,6 +73,7 @@ updates:
   # the demo image's own Dockerfile: its uv. Its base is our own image, a build argument.
   - package-ecosystem: docker
     directory: /demo
+    labels: [dependencies, "no release note"]
     schedule:
       interval: weekly
     groups:
@@ -76,6 +86,7 @@ updates:
   # compose.dev.yaml in the same pull request, by hand: a repo test keeps the two the same.
   - package-ecosystem: docker-compose
     directory: /
+    labels: [dependencies, "no release note"]
     schedule:
       interval: weekly
     groups:
@@ -85,6 +96,7 @@ updates:
 
   - package-ecosystem: github-actions
     directory: /
+    labels: [dependencies, "no release note"]
     schedule:
       interval: weekly
     groups:

@@ -345,10 +345,12 @@ def test_the_repo_pins_every_image_by_digest_and_every_action_by_sha(deps):
         assert [f"{r.image}:{r.tag}" for r in refs if r.digest is None] == [], path.name
     for workflow in deps.WORKFLOWS.glob("*.yml"):
         text = workflow.read_text()
+        ## a workflow of this repo (uses: ./.github/workflows/...) is no action to pin
         uses = [
             line
             for line in text.splitlines()
             if line.strip().removeprefix("- ").startswith("uses:")
+            and not line.strip().removeprefix("- ").startswith("uses: ./")
         ]
         assert len(deps.action_pins(text)) == len(uses), workflow.name
 
@@ -413,6 +415,7 @@ def cli_root(deps, tmp_path):
     (tmp_path / "README.md").write_text(README)
     (tmp_path / "docker" / "hub-overview.md").write_text(README)
     (tmp_path / "docs" / "restore.md").write_text(RESTORE)
+    (tmp_path / "docs" / "releases.md").write_text("# Release notes\n\n## Unreleased\n")
     return tmp_path
 
 
