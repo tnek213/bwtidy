@@ -2664,6 +2664,11 @@ token in [Connect an MCP client](how-to/mcp.md).
 - `propose_rename_attachment` sends the item's `revisionDate` and the
   attachment's name now as `shownFileName`. An attachment id the item does
   not have is an error.
+- The item type is one word in every tool: `login`, `note`, `card`,
+  `identity` or `sshKey`, as the grid shows it and `list_items` answers it.
+  Reason: an agent copies the type of an item it listed into a proposal.
+  `propose_create_item` and `propose_convert_item` also take `secureNote`,
+  Bitwarden's own word, which an agent may know from `bw`.
 - `propose_create_item` proposes a `createItem`, `generate_secrets` as its
   `generateColumns`. MCP never gives a secret value and has two choices per
   secret field: left blank (it counts as not set in the fill scores and goes

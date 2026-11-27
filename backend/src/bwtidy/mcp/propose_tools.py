@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel, Field
 
-from bwtidy.items.coordinates import URI_MATCHES, Coordinate, Value, parse
+from bwtidy.items.coordinates import ITEM_TYPES, URI_MATCHES, Coordinate, Value, parse
 from bwtidy.mcp.texts import ItemId
 from bwtidy.mcp.vault import AgentVault, Visible, dump
 from bwtidy.operations import (
@@ -34,8 +34,11 @@ from bwtidy.operations import (
 from bwtidy.queue.view import TYPE_WORDS, plural, summarize_create, summarize_rename_attachment
 from bwtidy.sections.matching import find_template
 
-## the item type words propose_create_item takes
-CREATE_TYPES = {"login": 1, "secureNote": 2, "card": 3, "identity": 4, "sshKey": 5}
+## the item type words the propose tools take, the ones list_items answers, so an agent can
+## copy the type of an item it listed
+CREATE_TYPES = {name: number for number, name in ITEM_TYPES.items()}
+## Bitwarden's own word for a secure note, which an agent may know from bw
+TYPE_ALIASES = {"secureNote": 2}
 
 ## what propose_create_item answers for an SSH key, which needs a private key MCP cannot give
 SSH_KEY_REFUSAL = (
@@ -43,6 +46,14 @@ SSH_KEY_REFUSAL = (
     " takes one. Use propose_convert_item on an item that holds the key (for example a secure"
     " note with the key in notes), mapping its private key from that item's column"
 )
+
+
+def _type_number(word: str) -> int:
+    number = CREATE_TYPES.get(word) or TYPE_ALIASES.get(word)
+    if number is None:
+        raise ToolError(f"unknown type {word!r}, use one of {', '.join(CREATE_TYPES)}")
+    return number
+
 
 ItemIds = Annotated[list[str], Field(description="Item ids from list_items")]
 Reason = Annotated[
@@ -330,18 +341,14 @@ async def propose_apply_template(
 async def propose_convert_item(
     vault: AgentVault,
     item_id: ItemId,
-    type: Annotated[
-        str, Field(description="The new type: login, secureNote, card, identity or sshKey")
-    ],
+    type: Annotated[str, Field(description="The new type: login, note, card, identity or sshKey")],
     mapping: Annotated[
         dict[str, str] | None,
         Field(description="{target column: the item's column}, default none"),
     ] = None,
     reason: Reason = None,
 ) -> str:
-    new_type = CREATE_TYPES.get(type)
-    if new_type is None:
-        raise ToolError(f"unknown type {type!r}, use one of {', '.join(CREATE_TYPES)}")
+    new_type = _type_number(type)
     item = vault.item(item_id)
     op = ConvertItem(
         kind="convertItem",
@@ -416,7 +423,7 @@ async def propose_create_item(
     name: Annotated[str, Field(description="The new item's name")],
     type: Annotated[
         str | None,
-        Field(description="login, secureNote, card or identity, when no template"),
+        Field(description="login, note, card or identity, when no template"),
     ] = None,
     template: Annotated[
         str | None, Field(description="Template name from list_templates, when no type")
@@ -451,11 +458,7 @@ async def propose_create_item(
     ] = None,
     reason: Reason = None,
 ) -> str:
-    item_type = None
-    if type is not None:
-        item_type = CREATE_TYPES.get(type)
-        if item_type is None:
-            raise ToolError(f"unknown type {type!r}, use one of {', '.join(CREATE_TYPES)}")
+    item_type = _type_number(type) if type is not None else None
     stored = find_template(vault.templates()[0], template) if template is not None else None
     if item_type == CREATE_TYPES["sshKey"] or (stored is not None and stored.type == 5):
         raise ToolError(SSH_KEY_REFUSAL)
