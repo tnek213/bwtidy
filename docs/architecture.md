@@ -323,7 +323,9 @@ The `app` stage holds the backend's source with its installed dependencies but
 no tests. It also holds the built frontend and bw with
 `docker/unref-share-timers.js`, which makes a bw command exit as soon as it
 has answered. `docs/restore.md` sits at `/app/docs/restore.md` because every
-backup holds it as its RESTORE.md. The docs site sits at `/app/site`.
+backup holds it as its RESTORE.md. The docs site sits at `/app/site`. The
+venv's `bwtidy` command is linked into `/usr/local/bin` for `bwtidy stats`,
+so the image's own python3 stays first on PATH.
 
 That bw is the open source build of the Bitwarden CLI. The
 `bitwarden-cli-source` stage builds it from the commit of Bitwarden's source

@@ -137,6 +137,9 @@ RUN chmod 644 /usr/local/lib/bwtidy/unref-share-timers.js \
 RUN mkdir -p /data/accounts
 
 COPY --from=backend /app/backend/.venv /app/backend/.venv
+## for `docker compose exec bwtidy bwtidy stats` (docs/reference/configuration.md). A link of the
+## one command, not the venv's bin on PATH, so python3 (the health check's) stays the image's own.
+RUN ln -s /app/backend/.venv/bin/bwtidy /usr/local/bin/bwtidy
 COPY --from=frontend /src/frontend/dist /app/static
 ## every backup holds it as RESTORE.md (collect.RESTORE_DOC)
 COPY docs/restore.md /app/docs/restore.md
