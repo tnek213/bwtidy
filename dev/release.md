@@ -120,16 +120,117 @@ bwtidy is in beta: feature complete for 1.0, with a stored format (the
 database, the bwtidy note, the backups, the settings) changing only with a
 migration. A new beta (`1.0.0-beta.N`) comes whenever something is fixed or
 the Bitwarden CLI has a new release. The beta becomes a release candidate
-(`1.0.0-rc.N`) when the gates of Road to 1.0 in `docs/releases.md` hold, and
-the release candidate becomes 1.0.0 after 8 weeks with no serious bug.
+(`1.0.0-rc.N`) when the gates of Road to 1.0
+(`docs/explanation/road-to-1.0.md`) hold, and the release candidate becomes
+1.0.0 after 8 weeks with no serious bug.
 
 ## The release notes
 
-`docs/releases.md` holds a few lines for each version, newest first, written
-for users: what the version brings, under a heading that starts with the
-version as `frontend/package.json` spells it (`## 1.0.0-beta.1`). `scripts/ci`
-fails while it has no heading for the current version, so the entry goes into
-the commit that changes the version.
+`docs/releases.md` is the release notes page of the docs site, and the body of
+each GitHub release is copied from its version's entry. It is written for the
+people who run bwtidy, in one format that `scripts/ci` checks (the check
+"versions"). The rules below hold for anyone who changes bwtidy, a person or an
+AI agent.
+
+When your pull request changes something a user sees, write its bullet under
+`## Unreleased` in the same pull request. The maintainer turns Unreleased into
+the version's entry when releasing (To release in
+[Publishing the image](#publishing-the-image)).
+
+The page:
+
+- The file is `docs/releases.md`, a page of the docs site. There is no
+  `CHANGELOG.md` at the repo root.
+- It opens with `# Release notes` and two sentences. The first says that the
+  versions follow Semantic Versioning with `-alpha.N`, `-beta.N` and `-rc.N`
+  pre-releases. The second links to Road to 1.0, which lives in
+  `docs/explanation/road-to-1.0.md`.
+- `## Unreleased` is always the first `##` heading. Its first line is the
+  sentence "Changes on main that are not yet in a versioned Docker image."
+  Then come either bullets (with the same `###` headings a version may have)
+  or the line "Nothing yet." alone.
+- Each version has a bare heading `## VERSION`, the version as
+  `frontend/package.json` spells it (`## 1.0.0-beta.1`), newest first. Each
+  version is there once, and no other `##` heading is used.
+
+The metadata line of a version comes right below its heading:
+
+```markdown
+YYYY-MM-DD · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/vVERSION) · [All changes](https://github.com/tnek213/bwtidy/compare/vPREVIOUS...vVERSION)
+```
+
+- PREVIOUS is the next older version heading of the file. The oldest version
+  has no All changes part.
+- The date is the UTC date of the commit that the tag `vVERSION` points at:
+  `TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%d 'vVERSION^{commit}'`.
+- The line may wrap like any other text (a line break before a `·`), as text
+  is wrapped at 80 characters.
+- The newest version may have no metadata line while its tag does not exist
+  yet (prepared, not released). Every version below it has a tag.
+
+The entry of a version:
+
+- An optional short paragraph comes first, then the bullets.
+- Ordinary changes are one flat list, with no nested bullets. An entry with a
+  warning heading orders its headings `### Breaking changes`, `### Security`
+  and `### Deprecated` (only those with bullets), then puts the flat list
+  under `### Other changes`. Without a warning heading there is no
+  `### Other changes` and no other `###` heading. No other heading level is
+  used inside an entry.
+- Breaking changes: anything that can stop an existing setup after an upgrade,
+  such as a stored format that needs a migration, a setting that is now refused
+  or a removed option. The bullet says what to do.
+- Security: only a fixed vulnerability or exposure, where readers should
+  update. A new protection (a scan, a provenance attestation, hardening) is an
+  ordinary bullet.
+- Deprecated: something that still works but will go away.
+
+The bullets:
+
+- Scope: a bullet covers a change to how people use, run, secure or recover
+  bwtidy. Routine docs polish, CI, tests, refactors and contributor process
+  are left out. A new tutorial or how-to page that lets people do something
+  new counts.
+- Voice: tell the reader what they can now do, action first ("Use the web UI
+  with a screen reader or a keyboard."). A fix or a removal says what changed
+  for them ("Find archived items and their attachments in every backup
+  again."). A Breaking bullet starts with what to do. Use plain words and no
+  internal names unless the reader types them.
+- Every bullet ends with its pull request links in one pair of parentheses,
+  several separated by a comma and a space:
+  `([#23](https://github.com/tnek213/bwtidy/pull/23), [#35](https://github.com/tnek213/bwtidy/pull/35))`.
+  Every change reaches main through a pull request, so every bullet has at
+  least one.
+- Links to other docs pages stay relative, as the page is on the docs site.
+  The GitHub release body gets them as absolute URLs.
+
+An entry with a breaking change:
+
+```markdown
+## 1.0.0-beta.3
+
+2026-12-01 · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/v1.0.0-beta.3) · [All changes](https://github.com/tnek213/bwtidy/compare/v1.0.0-beta.2...v1.0.0-beta.3)
+
+### Breaking changes
+
+- Set `BWTIDY_EXAMPLE` before you start the new image, as bwtidy now refuses
+  to start without it ([#41](https://github.com/tnek213/bwtidy/pull/41))
+
+### Other changes
+
+- Use the web UI with a screen reader or a keyboard
+  ([#23](https://github.com/tnek213/bwtidy/pull/23), [#35](https://github.com/tnek213/bwtidy/pull/35))
+- Find archived items and their attachments in every backup again
+  ([#40](https://github.com/tnek213/bwtidy/pull/40))
+```
+
+`scripts/ci` reports every rule the page breaks, each as
+`docs/releases.md:LINE: what is wrong`. It checks the `#` heading,
+Unreleased with its sentence, the version headings with their order, the
+current version (`frontend/package.json`), the metadata lines and their
+links, the `###` headings and the pull request links that end each bullet.
+It compares each date with the tags `v*` of the checkout, so it needs them:
+in a clone without tags, `git fetch --tags` first.
 
 ## The documentation site
 
@@ -377,7 +478,9 @@ Set it up once:
 
 To release:
 
-1. Write the version's entry at the top of `docs/releases.md`
+1. In `docs/releases.md`, rename `## Unreleased` to `## VERSION`, add its
+   metadata line with the date of the release day (UTC) and put a new
+   `## Unreleased` with "Nothing yet." above it
    ([The release notes](#the-release-notes)).
 2. Bump the version in `backend/pyproject.toml` and `frontend/package.json`
    and update the lock files as [The version](#the-version) says, in the same

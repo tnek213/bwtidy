@@ -56,7 +56,9 @@ allows it.
 Work only against the dev stack, never against a real vault.
 
 The pull request template (`.github/pull_request_template.md`) holds the
-checklist for a pull request.
+checklist for a pull request. A pull request with a user-visible change adds
+its bullet under Unreleased in `docs/releases.md`, as
+[The release notes](dev/release.md#the-release-notes) says.
 
 Dependencies change only through the lock files (`backend/uv.lock`, `demo/uv.lock`,
 `frontend/package-lock.json`, `docker/bitwarden-cli/package-lock.json`,

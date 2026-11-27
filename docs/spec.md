@@ -2641,8 +2641,9 @@ describe the About page and the More actions menu.
 - `frontend/package.json` repeats the version in semver's spelling, though
   nothing reads it. The lock files carry generated copies. `scripts/ci` fails
   when one of them differs from pyproject's. It also fails when the release
-  notes (`docs/releases.md`) have no heading for the version, because every
-  release tells its users what it brings.
+  notes (`docs/releases.md`) have no entry for the version or break their
+  format (`dev/release.md`, The release notes), because every release tells
+  its users what it brings in a form they can scan.
 - The image knows the commit it was built from as the committer date (YYMMDD)
   and the short git hash with a space between, like `261028 f2f4299`. It
   comes from the build arg `BWTIDY_COMMIT`, which is empty without it since
