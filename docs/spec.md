@@ -260,6 +260,10 @@ behind some of them:
   display limits and the datatype pattern limits. A value that cannot be used
   stops the gateway and the app at the start with an error that names the
   variable.
+- Every number setting of the gateway, and `BWTIDY_IDLE_EXIT`, is checked at
+  the start against the values that Configuration names. Reason: a typo in
+  `.env` stops the gateway with an error that names the variable, not with a
+  traceback or a limit under which no account can open.
 - `BWTIDY_IDLE_EXIT` is passed on so that a test can shorten it.
   `BWTIDY_MCP_HOSTS` is passed on so that the public host name passes the
   worker's DNS rebinding check (see MCP and the queue).

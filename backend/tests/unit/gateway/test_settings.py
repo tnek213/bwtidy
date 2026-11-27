@@ -6,7 +6,13 @@ from pathlib import Path
 import pytest
 
 from bwtidy.config import SettingsError
-from bwtidy.gateway.settings import GatewaySettings, passed_on_from_env
+from bwtidy.gateway.settings import (
+    DEFAULT_MAX_PENDING,
+    DEFAULT_MAX_WORKERS,
+    DEFAULT_UID_BASE,
+    GatewaySettings,
+    passed_on_from_env,
+)
 from tests.support.gateway_env import make_env
 
 
@@ -51,19 +57,66 @@ def test_a_bad_timeout_or_retention_stops_the_gateway_at_the_start(
         GatewaySettings.from_env()
 
 
-@pytest.mark.parametrize("base", ["0", "-1"])
-def test_a_uid_base_below_one_stops_the_gateway_at_the_start(
-    monkeypatch: pytest.MonkeyPatch, base: str
+## each number setting with the words of its error and a value it reads. A uid base below 1
+## could hand root to a worker, a limit of 0 could never create the first account or start a worker
+NUMBERS = {
+    "BWTIDY_UID_BASE": ("a whole number of at least 1", "1"),
+    "BWTIDY_MAX_PENDING": ("a whole number of at least 1", "1"),
+    "BWTIDY_MAX_WORKERS": ("a whole number of at least 1", "1"),
+    "BWTIDY_PORT": ("a whole number from 1 to 65535", "65535"),
+    "BWTIDY_IDLE_EXIT": ("a positive number of seconds", "0.5"),
+}
+
+
+BAD_NUMBERS = [
+    (name, value)
+    for name in NUMBERS
+    for value in ("ten", "0", "-1", "2.5")
+    if not (name == "BWTIDY_IDLE_EXIT" and value == "2.5")
+]
+
+
+@pytest.mark.parametrize(("name", "value"), BAD_NUMBERS)
+def test_a_bad_number_setting_stops_the_gateway_at_the_start_naming_it(
+    monkeypatch: pytest.MonkeyPatch, name: str, value: str
 ):
-    monkeypatch.setenv("BWTIDY_UID_BASE", base)
-    with pytest.raises(SettingsError, match="BWTIDY_UID_BASE"):
+    monkeypatch.setenv(name, value)
+    expected = NUMBERS[name][0]
+    with pytest.raises(SettingsError, match=f"^{name} must be {expected}$"):
         GatewaySettings.from_env()
 
 
-@pytest.mark.parametrize("base", ["1", "70000"])
-def test_a_uid_base_of_one_or_more_is_read(monkeypatch: pytest.MonkeyPatch, base: str):
-    monkeypatch.setenv("BWTIDY_UID_BASE", base)
-    assert GatewaySettings.from_env().uid_base == int(base)
+def test_a_port_above_65535_stops_the_gateway_at_the_start(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("BWTIDY_PORT", "65536")
+    with pytest.raises(SettingsError, match="BWTIDY_PORT"):
+        GatewaySettings.from_env()
+
+
+def test_a_good_number_setting_is_read(monkeypatch: pytest.MonkeyPatch):
+    for name, (_, value) in NUMBERS.items():
+        monkeypatch.setenv(name, value)
+    settings = GatewaySettings.from_env()
+    assert settings.uid_base == 1
+    assert settings.max_pending == 1
+    assert settings.max_workers == 1
+    assert settings.port == 65535
+    assert settings.passed_on["BWTIDY_IDLE_EXIT"] == "0.5"
+
+
+@pytest.mark.parametrize("value", [None, "", " "])
+def test_an_unset_or_blank_number_setting_has_its_default(
+    monkeypatch: pytest.MonkeyPatch, value: str | None
+):
+    for name in NUMBERS:
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+    settings = GatewaySettings.from_env()
+    assert settings.uid_base == DEFAULT_UID_BASE == 70000
+    assert settings.max_pending == DEFAULT_MAX_PENDING == 2
+    assert settings.max_workers == DEFAULT_MAX_WORKERS == 8
+    assert settings.port == 8000
 
 
 def test_the_backups_root_is_read_from_the_environment(monkeypatch: pytest.MonkeyPatch):
