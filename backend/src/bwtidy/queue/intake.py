@@ -292,10 +292,10 @@ def store_refused_secret(
         operation["folderName"] = MASKED
         moved = [items[item_id] for item_id in op.itemIds if item_id in items]
     else:
-        ## an item in the trash would get the folder's name too
+        ## an item in the trash or the archive would get the folder's name too
         column = "folder"
         operation["newName"] = MASKED
-        moved = in_folder([*q.cache.items, *q.cache.trashed], op.folderId)
+        moved = in_folder([*q.cache.items, *q.cache.set_aside()], op.folderId)
     rows = [row(item, column, flatten(item, lookups).get(parse(column)), MASKED) for item in moved]
     if isinstance(op, RenameFolder):
         summary = (

@@ -96,7 +96,8 @@ Restore on a row puts its items back as that backup holds them, after a
 dialog that says what happens to each one. A restore is a write like any
 other. It gets a backup and a row of its own, so you can undo it in turn.
 An item deleted for good after the backup comes back as a new item without
-its passkeys and password history. [The web UI](../reference/ui.md#change-log)
+its passkeys and password history. An item you archived after the backup
+stays archived. [The web UI](../reference/ui.md#change-log)
 says what Restore does on each kind of row.
 
 ## When a write fails

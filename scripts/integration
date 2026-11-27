@@ -72,6 +72,7 @@ DURATIONS = {
     "test_reencrypt.py": 85,
     "test_normalize.py": 81,
     "test_to_fill.py": 78,
+    "test_archived.py": 77,
     "test_set_uris.py": 75,
     "test_gateway.py --root": 440,
     "test_mcp.py": 53,

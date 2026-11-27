@@ -12,6 +12,7 @@ import pytest
 import bwtidy.backups.reader as reader
 from tests.support.app_env import AppEnv, zip_backup
 from tests.support.fake_bw import fail
+from tests.support.queue_helpers import enqueue_ui, entry
 from tests.support.sample_vault import CARD, LOGIN
 from tests.support.writes_helpers import (
     PHONE,
@@ -561,3 +562,122 @@ def test_restore_of_a_create_item_trashes_the_new_item(renv: AppEnv):
     assert response.status_code == 200, response.text
     assert [i["id"] for i in env.bw.trashed] == [new_id]
     assert new_id not in env.revisions()
+
+
+def archive(env: AppEnv, item_id: str, *, trash: bool = False) -> dict[str, Any]:
+    """Archive an item in the fake bw serve, as another device would: only archived=true lists
+    it then, with trash=true when it is in the trash too. Answers the archived item."""
+    item = env.item(item_id)
+    env.bw.items.remove(item)
+    archived = {**item, "archivedDate": "2026-10-26T13:00:00.000Z"}
+    if trash:
+        archived["deletedDate"] = "2026-10-26T14:00:00.000Z"
+    env.bw.archived.append(archived)
+    env.reload()
+    return archived
+
+
+def test_restore_puts_an_archived_item_back_and_keeps_it_archived(renv: AppEnv):
+    """bw serve lists an archived item in no listing but archived=true, and the restore does
+    not take it for gone: it makes no second copy beside it."""
+    env = renv
+    assert env.post(env.set_leaf("login-1", "login.username", "changed")).status_code == 200
+    [row] = env.change_log()
+    archived = archive(env, "login-1")
+    plan = env.plan(row["id"])
+    assert plan.status_code == 200, plan.text
+    assert plan.json()["operation"]["revisionDates"] == {"login-1": archived["revisionDate"]}
+    assert [(i["action"], i["text"]) for i in plan.json()["items"]] == [
+        ("put", "put back as before (it stays archived)")
+    ]
+    ## the login created the tool note
+    made = len(env.bw.created)
+    response = env.post(plan.json()["operation"])
+    assert response.status_code == 200, response.text
+    assert len(env.bw.created) == made
+    assert env.bw.restored == []
+    [after] = env.bw.archived
+    assert after["login"]["username"] == LOGIN["login"]["username"]
+    assert after["archivedDate"] == archived["archivedDate"]
+    assert "login-1" not in {i["id"] for i in env.bw.items}
+
+
+def test_restore_takes_an_archived_item_out_of_the_trash_and_keeps_it_archived(renv: AppEnv):
+    env = renv
+    assert env.post(env.set_leaf("login-1", "login.username", "changed")).status_code == 200
+    [row] = env.change_log()
+    archive(env, "login-1", trash=True)
+    plan = env.plan(row["id"])
+    assert plan.status_code == 200, plan.text
+    assert plan.json()["operation"]["revisionDates"] == {}
+    assert [(i["action"], i["text"]) for i in plan.json()["items"]] == [
+        ("untrash", "take out of the trash and put back as before (it stays archived)")
+    ]
+    ## the login created the tool note
+    made = len(env.bw.created)
+    response = env.post(plan.json()["operation"])
+    assert response.status_code == 200, response.text
+    assert len(env.bw.created) == made
+    assert env.bw.restored == ["login-1"]
+    [after] = env.bw.archived
+    assert after["login"]["username"] == LOGIN["login"]["username"]
+    assert after["archivedDate"] and not after.get("deletedDate")
+
+
+def test_an_archived_item_changed_after_the_plan_is_a_conflict(renv: AppEnv):
+    env = renv
+    assert env.post(env.set_leaf("login-1", "notes", "changed")).status_code == 200
+    [row] = env.change_log()
+    archived = archive(env, "login-1")
+    plan = env.plan(row["id"])
+    assert plan.status_code == 200, plan.text
+    archived["revisionDate"] = "2026-10-26T17:00:00.000Z"
+    response = env.post(plan.json()["operation"])
+    assert response.status_code == 409, response.text
+    assert [c["itemId"] for c in response.json()["conflicts"]] == ["login-1"]
+    assert env.bw.put[1:] == []
+
+
+def test_restore_of_a_create_item_trashes_the_new_item_when_it_is_archived(renv: AppEnv):
+    env = renv
+    response = env.post(create(type=1, name="Short lived", generatePassword=True))
+    assert response.status_code == 200, response.text
+    [row] = env.change_log()
+    [new_id] = row["createdItemIds"]
+    archive(env, new_id)
+    plan = env.plan(row["id"])
+    assert plan.status_code == 200, plan.text
+    assert [(i["action"], i["text"]) for i in plan.json()["items"]] == [
+        ("trash", "move to the trash")
+    ]
+    assert env.post(plan.json()["operation"]).status_code == 200
+    [after] = env.bw.archived
+    assert after["id"] == new_id
+    assert after["archivedDate"] and after["deletedDate"]
+
+
+def test_restore_refuses_an_archived_item_whose_organization_changed(renv: AppEnv):
+    """A PUT cannot move it back, and the copy a restore would make is not archived."""
+    env = renv
+    assert env.post(env.set_leaf("login-1", "notes", "changed")).status_code == 200
+    [row] = env.change_log()
+    archived = archive(env, "login-1")
+    archived["organizationId"] = "o1"
+    env.reload()
+    plan = env.plan(row["id"])
+    assert plan.status_code == 422
+    assert "login-1 is archived and its organization changed" in plan.json()["detail"]
+
+
+def test_the_queue_shows_the_restore_of_an_archived_item(renv: AppEnv):
+    env = renv
+    assert env.post(env.set_leaf("login-1", "login.username", "changed")).status_code == 200
+    [row] = env.change_log()
+    archive(env, "login-1")
+    response = enqueue_ui(env, env.plan(row["id"]).json()["operation"])
+    assert response.status_code == 201, response.text
+    [entry_id] = response.json()["ids"]
+    assert [(r["itemId"], r["column"], r["after"]) for r in entry(env, entry_id)["diff"]] == [
+        ("login-1", "restore", "put back as before (it stays archived)"),
+        ("login-1", "login.username", LOGIN["login"]["username"]),
+    ]
