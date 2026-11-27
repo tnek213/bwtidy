@@ -89,8 +89,9 @@ A backup holds these parts:
 
 - the personal vault as `bw export --format zip` makes it
 - one JSON export for each organization
-- every attachment of every item, also those in the trash
+- every attachment of every item, also those in the trash and the archive
 - the raw listings of the items and the trash as bwtidy reads them
+- a raw listing of the archived items, which the other listings leave out
 - the raw listings of the folders, collections and organizations
 - `RESTORE.md` with the steps that bring a lost vault back
 

@@ -186,6 +186,7 @@ def test_the_decrypted_copy_in_ram_goes_with_the_file(
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("raw/items.json", "[]")
         archive.writestr("raw/trash.json", "[]")
+        archive.writestr("raw/archived.json", "[]")
     reader._last = BackupContents(old, buffer.getvalue())
     assert logged_in.delete(f"/api/backups/{old}").status_code == 204
     assert reader._last is None

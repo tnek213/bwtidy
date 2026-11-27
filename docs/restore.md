@@ -94,8 +94,9 @@ backup.zip                    the backup FILE.zip.age, decrypted in step 1
 │   └── <itemId>/
 │       └── <fileName>        every attachment by the id of its item
 ├── raw/
-│   ├── items.json            every active item as bwtidy saw it
-│   ├── trash.json            the trash, which no export holds
+│   ├── items.json            every active item as bwtidy saw it, the archived ones left out
+│   ├── trash.json            the trash, which no export holds, the archived items left out
+│   ├── archived.json         every archived item, also those in the trash
 │   ├── folders.json
 │   ├── collections.json
 │   └── organizations.json
@@ -149,7 +150,7 @@ python3 -m zipfile -e backup.zip . && rm backup.zip
 python3 -c 'import zipfile; zipfile.ZipFile("personal-export.zip").extract("data.json")'
 python3 -c '
 import json
-for name in "raw/items.json", "raw/trash.json":
+for name in "raw/items.json", "raw/trash.json", "raw/archived.json":
     print(len(json.load(open(name))), "items in", name)
 for org in json.load(open("raw/organizations.json")):
     print("organization", org["id"], org["name"])'
@@ -316,8 +317,8 @@ import subprocess
 import sys
 
 # what an import makes anew, and what the key compares by name instead
-LEFT_OUT = {"id", "revisionDate", "creationDate", "deletedDate", "organizationId",
-            "collectionIds", "folderId", "attachments"}
+LEFT_OUT = {"id", "revisionDate", "creationDate", "deletedDate", "archivedDate",
+            "organizationId", "collectionIds", "folderId", "attachments"}
 
 
 # the full path finds bw.cmd of an npm install on Windows too
@@ -389,11 +390,13 @@ def members(item):
         yield attachment["id"], attachment["fileName"], member
 
 
-old = load(sys.argv[1])
+# an item of the trash comes back only through step 6, which drops its deletedDate
+old = [item for path in sys.argv[1:] for item in load(path) if not item.get("deletedDate")]
 old_names = Names("the backup", load("raw/folders.json"), load("raw/collections.json"),
                   load("raw/organizations.json"))
 subprocess.run([BW, "sync"], check=True, stdout=subprocess.DEVNULL)
-new = bw("list", "items")
+# bw list items leaves out the archived items
+new = bw("list", "items") + bw("list", "items", "--archived")
 new_names = Names("the account", bw("list", "folders"), bw("list", "collections"),
                   bw("list", "organizations"))
 
@@ -470,13 +473,14 @@ shutil.rmtree("upload", ignore_errors=True)
 EOF
 ```
 
-Then run it on the backup items of `raw/items.json`. It syncs bw and lists
-what the account has now. It prints a line for each organization item whose
-folder or favorite it sets. It also prints one for each attachment it uploads
-or cannot upload.
+Then run it on the backup items of `raw/items.json` and `raw/archived.json`.
+It leaves out the archived items in the trash, which step 6 brings back. It
+syncs bw and lists what the account has now, the archived items included. It
+prints a line for each organization item whose folder or favorite it sets. It
+also prints one for each attachment it uploads or cannot upload.
 
 ```sh
-python3 attach.py raw/items.json
+python3 attach.py raw/items.json raw/archived.json
 ```
 
 A failed upload or `bw edit item` prints bw's error. Then run the program
@@ -498,15 +502,16 @@ When every item of an organization gets such a line, check that the
 organization has the name it had in the backup (step 2). Otherwise
 upload the attachments by hand.
 
-This prints the old item (OLDID). For an item of the trash put
-`with-trash.json` of step 6 in place of `raw/items.json`.
+This prints the old item (OLDID). For an item of the trash add
+`with-trash.json` of step 6 after `raw/archived.json`.
 
 ```sh
 python3 -c '
 import json, sys
-for item in json.load(open(sys.argv[1])):
-    if item["id"] == sys.argv[2]:
-        print(json.dumps(item, indent=2))' raw/items.json OLDID
+for name in sys.argv[2:]:
+    for item in json.load(open(name)):
+        if item["id"] == sys.argv[1]:
+            print(json.dumps(item, indent=2))' OLDID raw/items.json raw/archived.json
 ```
 
 Its files are under `item-attachments/OLDID/`, and the old item lists their
@@ -525,15 +530,17 @@ program once more.
 
 ## 6. Import the trash if you want it
 
-No export holds the trash. It is only in `raw/trash.json`. bw import refuses
-some of a trashed item's keys or would take them over, so the commands below
-drop them first. They import the rest into the personal vault and then run
-the program of step 5 again.
+No export holds the trash. It is only in `raw/trash.json`, and its archived
+items are in `raw/archived.json`. bw import refuses some of a trashed item's
+keys or would take them over, so the commands below drop them first. They
+import the rest into the personal vault and then run the program of step 5
+again.
 
 ```sh
 python3 -c '
 import json
-trash = json.load(open("raw/trash.json"))
+archived = json.load(open("raw/archived.json"))
+trash = json.load(open("raw/trash.json")) + [i for i in archived if i.get("deletedDate")]
 dropped = ("deletedDate", "folderId", "organizationId", "collectionIds")
 moved = [{k: v for k, v in item.items() if k not in dropped} for item in trash]
 with open("trash-import.json", "w") as file:
@@ -542,15 +549,15 @@ with open("trash-import.json", "w") as file:
 with open("with-trash.json", "w") as file:
     json.dump(json.load(open("raw/items.json")) + moved, file)'
 bw import bitwardenjson trash-import.json
-python3 attach.py with-trash.json
+python3 attach.py with-trash.json raw/archived.json
 ```
 
 `with-trash.json` holds the active items and the trashed ones with their old
 ids, so the program of step 5 finds the trashed items as well. The
-attachments of the active items are already there and only those of the
-trashed items get uploaded. The trashed items come back as active personal
-items in no folder. Move them to the trash in the web vault if that is where
-they belong.
+attachments of the other items are already there and only those of the
+trashed items get uploaded. The trashed items come back as personal items in
+no folder, active or archived as they were. Move them to the trash in the
+web vault if that is where they belong.
 
 ## 7. Check and clean up
 
@@ -558,21 +565,24 @@ The account must now have as many items and attachments as the backup. The
 block below prints one line for the account and one for the backup, and the
 two must show the same numbers. Each "not uploaded" line of step 5 is one
 missing attachment. If you imported the trash in step 6, `with-trash.json`
-takes the place of `raw/items.json`. Then set `ITEMS=with-trash.json` in
-place of the first line below.
+takes the place of `raw/items.json`. Then set
+`ITEMS="with-trash.json raw/archived.json"` in place of the first line below.
 
 After the count the block logs bw out. It deletes `$D` with every decrypted
 file and the npm CLI of step 3.
 
 ```sh
-ITEMS=raw/items.json
+ITEMS="raw/items.json raw/archived.json"
 bw sync
-bw list items | python3 -c '
+bw list items > account.json
+bw list items --archived > account-archived.json
+python3 -c '
 import json, sys
-def count(items):
+def count(names):
+    items = [i for name in names for i in json.load(open(name)) if not i.get("deletedDate")]
     return len(items), sum(len(item.get("attachments") or []) for item in items)
-print("the account: %d items, %d attachments" % count(json.load(sys.stdin)))
-print("the backup:  %d items, %d attachments" % count(json.load(open(sys.argv[1]))))' "$ITEMS"
+print("the account: %d items, %d attachments" % count(["account.json", "account-archived.json"]))
+print("the backup:  %d items, %d attachments" % count(sys.argv[1:]))' $ITEMS
 bw logout
 cd ~ && rm -rf "$D" ${CLI:+"$CLI"}
 unset BW_SESSION BITWARDENCLI_APPDATA_DIR
@@ -593,7 +603,11 @@ checks this on the dev vault:
 - Organization items land in the organization you import them into, which is
   the one of the same name (step 4). They go into its collections of the same
   names. Its members, groups and policies are not in the backup.
-- The trash comes back only as active items without its deletion dates.
+- The trash comes back without its deletion dates, as items outside the
+  trash.
+- An archived organization item comes back unarchived, as an organization
+  export does not say which items you archived. Archive it again in the web
+  vault.
 
 Everything else comes back as it was:
 
@@ -601,6 +615,7 @@ Everything else comes back as it was:
   duplicate names or trailing spaces
 - passkeys and password history
 - favorites and master password reprompt
+- which personal items are archived, also among the trash of step 6
 - folders and collections by name, the empty ones too
 - which item is in which folder and collections. Step 5 puts back the folders
   and favorites of organization items, which no export holds.

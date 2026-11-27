@@ -2071,11 +2071,17 @@ flowchart TD
     - every item's `id` and `revisionDate`
     - every item's `folderId`, `favorite` and `organizationId`
     - every item's `collectionIds` and attachment ids
+    - the same parts of every archived item that is not in the trash, on
+      their own
     - the folders, collections and organizations as whole JSON
 
   An attachment's `url` carries a token that differs between two listings.
   The rest of an item is fixed by its `revisionDate`. Only the folder, the
   favorite flag and the collections change without a new one (see Writes).
+  The archived items count apart from the others. So archiving an item
+  changes the fingerprint even when its `revisionDate` stays. The cache lists
+  them for that alone. The trash does not count and neither do the archived
+  items in it.
 - The fingerprint is stored in SQLite (the table `backup_fingerprints` with
   `name` and `fingerprint`) and removed with its backup. The `revisionDate`s
   it hashes are spelled as bwtidy first saw each revision. So a backup stays
@@ -2108,6 +2114,7 @@ flowchart TD
   raw/
   ├── items.json                         GET /list/object/items, the exact objects the app PUTs
   ├── trash.json                         bw list items --trash
+  ├── archived.json                      GET /list/object/items?archived=true, then with trash=true
   ├── folders.json
   ├── collections.json
   └── organizations.json
@@ -2116,9 +2123,16 @@ flowchart TD
 
 - `item-attachments` is the source of attachments. It holds every attachment
   of every item in the personal vault and the organizations alike. That
-  covers the active items and those in the trash.
+  covers the active items and those in the trash and the archive.
   They are fetched one by one with one `bw` process each, one after the other
   since they share one CLI state.
+- bw 2026.10.0 leaves an archived item out of every listing unless it is
+  asked for archived items (`--archived` or `archived=true`). The trash
+  listing then holds only the archived items in the trash. So
+  `raw/items.json` and `raw/trash.json` hold no archived item, and
+  `raw/archived.json` holds every archived item with those in the trash.
+  `bw export` leaves out only the trash, so the personal export holds an
+  archived item with its `archivedDate`. An organization export holds none.
 - A second attachment with the same file name on one item is stored as
   `<attachmentId>-<fileName>`. The id is put in front again while that name is
   taken.
@@ -2130,8 +2144,8 @@ flowchart TD
 - `personal-export.zip` stays as `bw export` wrote it. `bw import` has no zip
   format, so a restore imports the `data.json` inside it (format
   `bitwardenjson`). Its `attachments` folders are never trusted or read.
-- The exports hold nothing from the trash. `raw/trash.json` and
-  `item-attachments` do.
+- The exports hold nothing from the trash. `raw/trash.json`,
+  `raw/archived.json` and `item-attachments` do.
 - `RESTORE.md` is `docs/restore.md` as the image has it
   (`/app/docs/restore.md`). The `COMMIT` in its line "Written for bwtidy
   COMMIT." is replaced by the version as `/api/health` shows it. With the
@@ -2140,7 +2154,8 @@ flowchart TD
   says so. A backup never fails for its manual. The documentation site's copy
   fills in the same line with the version the site is built for.
 - A completeness check runs before the zip is built. Every attachment listed
-  on an item in `raw/items.json` and `raw/trash.json` must have its member.
+  on an item in `raw/items.json`, `raw/trash.json` and `raw/archived.json`
+  must have its member.
   The member's length must fit the listed `size`.
 - That size is the encrypted blob's and not the plain byte count. It is `49 +
   (length // 16 + 1) * 16` for one type byte, the IV and the HMAC plus the
@@ -2161,6 +2176,8 @@ flowchart TD
   empty list.
 - The backup refuses to write a backup with no items, because after the first
   login the tool note always exists.
+- An archived item that is not in the trash counts as an item in the next
+  two checks. One in the trash counts like the trash, which they leave out.
 - An item whose `organizationId` is not among the listed organizations makes
   the backup list them again with the same wait. The backup is refused when
   the organization is still missing, as it would get no export.
