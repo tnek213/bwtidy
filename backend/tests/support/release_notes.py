@@ -36,7 +36,13 @@ def metadata(version: str, date: str, previous: str | None) -> str:
     return line
 
 
-## the newest is tagged on 2026-03-04 at 23:30 in New York, which is 2026-03-05 in UTC
+def withdrawn(date: str, gone: str, by: str) -> str:
+    """The metadata line of a version withdrawn on gone in favor of the version by."""
+    slug = by.replace(".", "")
+    return f"{date} · Withdrawn on {gone}, see [{by}](#{slug})"
+
+
+## the newest is tagged on 2026-03-04 at 23:30 in New York, which is 2026-03-05 in Sweden
 TAGS = {SEMVER: "2026-03-04T23:30:00-05:00", "0.0.2": "2026-02-03T12:00:00+00:00"}
 TAGGED = (
     INTRO

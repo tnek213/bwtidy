@@ -178,14 +178,30 @@ The metadata line of a version comes right below its heading:
 YYYY-MM-DD · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/vVERSION) · [All changes](https://github.com/tnek213/bwtidy/compare/vPREVIOUS...vVERSION)
 ```
 
-- PREVIOUS is the next older version heading of the file. The oldest version
-  has no All changes part.
-- The date is the UTC date of the commit that the tag `vVERSION` points at:
-  `TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%d 'vVERSION^{commit}'`.
+- PREVIOUS is the next older version heading of the file that was not
+  withdrawn (below). A version with none has no All changes part.
+- The date is the date in Swedish time (Europe/Stockholm) of the commit that
+  the tag `vVERSION` points at. Swedish time is the project's time zone, the
+  first one it used, also for a release made from elsewhere:
+  `TZ=Europe/Stockholm git log -1 --format=%cd --date=format-local:%Y-%m-%d 'vVERSION^{commit}'`.
 - The line may wrap like any other text (a line break before a `·`), as text
   is wrapped at 80 characters.
 - The newest version may have no metadata line while its tag does not exist
-  yet (prepared, not released). Every version below it has a tag.
+  yet (prepared, not released). Every version below it has a tag, unless it
+  was withdrawn.
+
+A version withdrawn after its release loses its tag and its GitHub release,
+which limits how far it spreads, but keeps its entry, so the file still says
+that it existed. Its metadata line names the date of its release, the date of
+the withdrawal and the version that replaces it, linked by the anchor of that
+version's heading on the docs site (`#100-beta3` for `## 1.0.0-beta.3`):
+
+```markdown
+YYYY-MM-DD · Withdrawn on YYYY-MM-DD, see [VERSION](#ANCHOR)
+```
+
+The replacing version is above it in the file, and its entry says why the
+earlier ones were withdrawn.
 
 The entry of a version:
 
@@ -258,18 +274,18 @@ The workflow "Release" (`.github/workflows/release.yml`) does the rest:
 
 1. On a branch off main, run `scripts/release prepare VERSION`, with the
    version as `frontend/package.json` spells it (`1.0.0-beta.3`). It renames
-   `## Unreleased` to `## VERSION` with its metadata line, dated today (UTC)
-   and linking the version below, and puts a new `## Unreleased` with
-   "Nothing yet." above it. It bumps the version in `backend/pyproject.toml`
+   `## Unreleased` to `## VERSION` with its metadata line, dated today
+   (Swedish time) and linking the version below, and puts a new
+   `## Unreleased` with "Nothing yet." above it. It bumps the version in `backend/pyproject.toml`
    and `frontend/package.json` and refreshes the lock files as
    [The version](#the-version) says. Then it runs the check of the release
    notes and prints the files to commit.
 2. Commit them as "Release bwtidy VERSION" in a pull request and merge it the
-   same day (UTC), as the tag must have the date of the entry.
+   same day (Swedish time), as the tag must have the date of the entry.
 3. Run `scripts/release tag VERSION`. It fetches origin and refuses unless
-   main's version is VERSION, its entry is dated the UTC date of main's last
-   commit and the tag `vVERSION` does not exist. Then it tags that commit with
-   the annotated tag `vVERSION` and pushes the tag.
+   main's version is VERSION, its entry is dated the date (Swedish time) of
+   main's last commit and the tag `vVERSION` does not exist. Then it tags that
+   commit with the annotated tag `vVERSION` and pushes the tag.
 
 When the dates differ, the merge came a day later. Run
 `scripts/release prepare VERSION` again in a new pull request, which writes
@@ -292,8 +308,10 @@ tag as `scripts/release tag` does (`scripts/release check-tag VERSION`). Then
 it creates the GitHub release `vVERSION` titled "bwtidy VERSION" with
 `gh release create --verify-tag`, as a pre-release when the version has a
 pre-release suffix. Its body is what `scripts/release notes VERSION` prints:
-the version's entry without its heading and metadata line, every relative
-link made absolute on the docs site (<https://tnek213.github.io/bwtidy/>,
+the version's entry without its heading and metadata line, each paragraph and
+bullet joined onto one line (GitHub shows every line break of a release body,
+so the wrapping at 80 characters would break its lines in the middle), every
+relative link made absolute on the docs site (<https://tnek213.github.io/bwtidy/>,
 which serves a page `X.md` at `X/`). Run it to see the body before you tag. A
 run again after a failure finds the release and writes its body instead.
 

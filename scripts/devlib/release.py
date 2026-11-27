@@ -273,6 +273,7 @@ def prepare(
         raise fail(f"## {versions.UNRELEASED} holds more than bullets, run scripts/ci first")
     entries = [title for title in titles if versions.VERSION.fullmatch(title)]
     newest = entries[0] if entries else None
+    gone = versions.withdrawn_versions(path.read_text())
     tag = f"v{version}"
     if tag_exists(tag, root):
         raise fail(f"the tag {tag} exists, {version} is released already")
@@ -282,7 +283,8 @@ def prepare(
             raise fail(f"## {version} is not the newest entry of {NOTES}")
         index = titles.index(version)
         old = Entry(found[index][1][1:])
-        previous = entries[1] if len(entries) > 1 else None
+        older = [title for title in entries[1:] if title not in gone]
+        previous = older[0] if older else None
         groups = merged(old, unreleased)
         found[index] = (
             version,
@@ -294,7 +296,7 @@ def prepare(
             raise fail(f"{NOTES} has an entry for {version} already, but the version is {current}")
         if newest is not None and versions.version_key(version) <= versions.version_key(newest):
             raise fail(f"{version} is not newer than {newest}, the newest entry of {NOTES}")
-        if newest is not None and not tag_exists(f"v{newest}", root):
+        if newest is not None and newest not in gone and not tag_exists(f"v{newest}", root):
             raise fail(
                 f"{newest} has no tag yet, release it first with scripts/release tag {newest} "
                 f"or prepare it again with scripts/release prepare {newest}"
@@ -304,8 +306,10 @@ def prepare(
                 f"## {versions.UNRELEASED} says '{versions.NOTHING_YET}', so {version} would have "
                 "no changes to name"
             )
+        released = [title for title in entries if title not in gone]
+        previous = released[0] if released else None
         lines = entry_lines(
-            version, metadata_lines(version, today, newest), [], merged(Entry([]), unreleased)
+            version, metadata_lines(version, today, previous), [], merged(Entry([]), unreleased)
         )
         found.insert(titles.index(versions.UNRELEASED) + 1, (version, lines))
         bump(version, root)
@@ -334,18 +338,19 @@ def show(ref: str, path: str, root: Path) -> str | None:
 
 
 def commit_date(ref: str, root: Path) -> str:
-    """The UTC date (YYYY-MM-DD) of the commit ref points at."""
+    """The date (YYYY-MM-DD, Swedish time) of the commit ref points at."""
     shown = git("log", "-1", "--format=%ct", f"{ref}^{{commit}}", repo=root, check=False)
     if shown.returncode != 0 or not shown.stdout.strip().isdigit():
         raise fail(f"git cannot read the commit of {ref}: {shown.stderr.strip()}")
-    return datetime.datetime.fromtimestamp(int(shown.stdout), datetime.UTC).date().isoformat()
+    return versions.day_of(int(shown.stdout))
 
 
 def release_problems(version: str, ref: str, root: Path = ROOT) -> list[str]:
     """Why the commit ref cannot be released as version, empty when it can.
 
     Its frontend/package.json has version, and the entry of version in its docs/releases.md has
-    a metadata line dated the UTC date of the commit, as the tag vVERSION on it will have.
+    a metadata line dated the date (Swedish time) of the commit, as the tag vVERSION on it will
+    have.
     """
     package = show(ref, "frontend/package.json", root)
     if package is None:
@@ -368,7 +373,7 @@ def release_problems(version: str, ref: str, root: Path = ROOT) -> list[str]:
     if date != committed:
         return [
             f"## {version} in {NOTES} of {ref} is dated {date}, but its commit is from {committed} "
-            f"(UTC) and the tag must have the date of its entry: {again}"
+            f"(Swedish time) and the tag must have the date of its entry: {again}"
         ]
     return []
 
@@ -431,9 +436,39 @@ def absolute(target: str) -> str:
     return f"{SITE_URL}{path}{hash_mark}{anchor}"
 
 
+def unwrap(text: str) -> str:
+    """text with each paragraph and each bullet on one line, code blocks as they are.
+
+    GitHub shows every line break of a release body, so the wrapping at 80 characters of
+    docs/releases.md would break its lines in the middle.
+    """
+    lines: list[str] = []
+    fenced = False
+    for line in text.splitlines():
+        if FENCE.match(line):
+            fenced = not fenced
+            lines.append(line)
+            continue
+        joins = bool(
+            not fenced
+            and line.strip()
+            and lines
+            and lines[-1].strip()
+            and not lines[-1].lstrip().startswith("#")
+            and not FENCE.match(lines[-1])
+            and not line.lstrip().startswith("#")
+            and not BULLET_START.match(line.lstrip())
+        )
+        if joins:
+            lines[-1] = f"{lines[-1].rstrip()} {line.strip()}"
+        else:
+            lines.append(line)
+    return "\n".join(lines)
+
+
 def notes(version: str, root: Path = ROOT) -> str:
     """The body of the GitHub release of version: its entry without its heading and metadata
-    line, every link absolute."""
+    line, every paragraph and bullet on one line and every link absolute."""
     check_version(version)
     for title, lines in split_sections((root / NOTES).read_text().splitlines())[1]:
         if title != version:
@@ -444,7 +479,7 @@ def notes(version: str, root: Path = ROOT) -> str:
             first = paragraphs[0]
             start = body.index(first[0])
             body = body[start + len(first) :]
-        text = "\n".join(body).strip("\n")
+        text = unwrap("\n".join(body).strip("\n"))
         return LINK.sub(lambda m: m.group(1) + absolute(m.group(2)) + m.group(3), text) + "\n"
     raise fail(f"{NOTES} has no ## {version}")
 
@@ -520,18 +555,18 @@ def main(args: list[str], usage: str) -> int:
         return 2
     version = rest[0]
     if command == "prepare":
-        today = datetime.datetime.now(datetime.UTC).date()
+        today = versions.today()
         changed = prepare(version, today)
         problem = versions.version_mismatch()
         if problem:
             print(problem)
             return 1
-        print(f"{NAME}: {version} is prepared, dated {today.isoformat()} (UTC). Commit")
+        print(f"{NAME}: {version} is prepared, dated {today.isoformat()} (Swedish time). Commit")
         for path in changed:
             print(f"  {path}")
         print(
-            f"as 'Release bwtidy {version}' in a pull request and merge it today (UTC), then run "
-            f"scripts/release tag {version}"
+            f"as 'Release bwtidy {version}' in a pull request and merge it today (Swedish time), "
+            f"then run scripts/release tag {version}"
         )
         return 0
     if command == "tag":

@@ -48,7 +48,7 @@ wheels = [
 
 [[package]]
 name = "bwtidy"
-version = "1.0.0b2"
+version = "1.0.0b3"
 source = { directory = "../backend" }
 dependencies = [
     { name = "cryptography" },
