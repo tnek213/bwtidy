@@ -25,6 +25,7 @@ from bwtidy.backups.collect import (
     check_attachments,
     create_backup,
     encrypted_size,
+    exported_ids,
     run_bw,
 )
 from bwtidy.backups.crypto import decrypt_backup
@@ -271,6 +272,85 @@ def test_a_vault_without_archived_items_gets_an_empty_listing(env: BackupRun):
     with open_backup(env, info.name) as archive:
         assert json.loads(archive.read("raw/archived.json")) == []
         assert not [m for m in archive.namelist() if m.startswith("item-attachments/item-arch")]
+
+
+def without_premium(env: BackupRun, personal: list[dict], orgs: dict | None = None) -> None:
+    """bw lists no archived item: archived=true answers what is not archived, as the real bw
+    does for an account without premium. The exports hold the given items."""
+    env.bw.premium = False
+    env.monkeypatch.setenv("FAKE_BW_EXPORT", json.dumps(personal))
+    env.monkeypatch.setenv("FAKE_BW_ORG_EXPORT", json.dumps(orgs or {}))
+
+
+def test_an_archived_item_of_an_account_without_premium_is_backed_up(env: BackupRun):
+    """The personal export holds the archived item while no listing has it, so the backup
+    gets it by id and downloads its attachment like any other."""
+    env.bw.archived = [ARCHIVED_ITEM]
+    without_premium(env, [PERSONAL_ITEM, TWIN_ITEM, ARCHIVED_ITEM])
+    info = env.backup()
+    assert env.bw.calls("GET", "/object/item/item-archived") == 1
+    assert env.bw.calls("GET", "/object/item/item-personal") == 0
+    with open_backup(env, info.name) as archive:
+        assert json.loads(archive.read("raw/archived.json")) == [ARCHIVED_ITEM]
+        assert archive.read("item-attachments/item-archived/laptop.txt") == fake_bytes(
+            "att6", "item-archived"
+        )
+        assert json.loads(archive.read("raw/items.json")) == ITEMS
+        assert json.loads(archive.read("raw/trash.json")) == [TRASHED_ITEM]
+    ## the cache lists no archived item either, so a backup stays reusable
+    assert info.fingerprint == fingerprint(ITEMS, env.bw.folders, [], [ORG], archived=[])
+
+
+def test_an_archived_org_item_of_an_account_without_premium_is_backed_up(env: BackupRun):
+    archived = {**ARCHIVED_ITEM, "id": "item-org-archived", "organizationId": "org1"}
+    archived["attachments"] = [attachment("att8", "item-org-archived", "router.txt")]
+    env.bw.archived = [archived]
+    without_premium(env, [PERSONAL_ITEM, TWIN_ITEM], {"org1": [ORG_ITEM, archived]})
+    info = env.backup()
+    with open_backup(env, info.name) as archive:
+        assert json.loads(archive.read("raw/archived.json")) == [archived]
+        assert archive.read("item-attachments/item-org-archived/router.txt") == fake_bytes(
+            "att8", "item-org-archived"
+        )
+        assert json.loads(archive.read("raw/items.json")) == ITEMS
+
+
+def test_an_exported_item_that_is_neither_listed_nor_archived_fails_the_backup(env: BackupRun):
+    """It would be backed up without its attachments, so no backup is written."""
+    lost = {**PERSONAL_ITEM, "id": "item-lost"}
+    env.bw.archived = [lost]
+    without_premium(env, [PERSONAL_ITEM, lost])
+    with pytest.raises(BackupError) as error:
+        env.backup()
+    assert error.value.step == "archived items"
+    assert "item item-lost is in an export but in no listing" in str(error.value)
+    assert env.files() == []
+
+
+def test_an_archived_item_bw_serve_does_not_find_fails_the_backup(env: BackupRun):
+    env.bw.archived = []
+    without_premium(env, [PERSONAL_ITEM, ARCHIVED_ITEM])
+    with pytest.raises(BackupError) as error:
+        env.backup()
+    assert error.value.step == "archived items"
+    assert "item item-archived" in str(error.value)
+    assert env.files() == []
+
+
+def test_a_personal_export_without_data_json_fails_the_backup():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("attachments/x/y.txt", b"y")
+    with pytest.raises(BackupError) as error:
+        exported_ids(buffer.getvalue(), [])
+    assert error.value.step == "personal export"
+
+
+def test_exported_ids_come_from_the_personal_and_the_org_exports():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("data.json", json.dumps({"items": [{"id": "a"}, {"name": "no id"}]}))
+    assert exported_ids(buffer.getvalue(), [{"items": [{"id": "b"}]}, {}]) == {"a", "b"}
 
 
 def test_an_archived_attachment_with_the_wrong_number_of_bytes_fails_the_backup(env: BackupRun):

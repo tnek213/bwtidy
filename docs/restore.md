@@ -108,6 +108,10 @@ they lose the files of items with the same name. Take attachments from
 `item-attachments` only. When an item has two attachments with the same file
 name, the second one is stored as `<attachmentId>-<fileName>`.
 
+`raw/archived.json` also holds the archived items of an account without
+premium, such as one whose premium ended. Its archived items in the trash are
+missing, as bw lists them nowhere without premium.
+
 ## 1. Decrypt the backup on a tmpfs
 
 The decrypted files hold every secret in plain text. They therefore stay in

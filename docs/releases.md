@@ -11,6 +11,9 @@ Changes on main that are not yet in a versioned Docker image.
 - Say in the docs and in the description of the MCP tool list_items that
   bwtidy shows only the items that are not archived
   ([#225](https://github.com/tnek213/bwtidy/pull/225))
+- Find the archived items of an account without premium, with their
+  attachments, in every backup
+  ([#224](https://github.com/tnek213/bwtidy/pull/224))
 - Restore a change of an item you archived since, which then stays archived,
   and keep a folder that still holds archived items from being deleted
   ([#220](https://github.com/tnek213/bwtidy/pull/220))
