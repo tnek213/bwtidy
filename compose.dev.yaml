@@ -7,7 +7,7 @@
 services:
   vaultwarden:
     ## scripts/dev-vault up sets BWTIDY_VW_IMAGE to the seeded snapshot image when it has one
-    image: ${BWTIDY_VW_IMAGE:-vaultwarden/server:1.37.4}
+    image: ${BWTIDY_VW_IMAGE:-vaultwarden/server:1.37.5}
     environment:
       SIGNUPS_ALLOWED: "true"
       ## the name the app container uses: Vaultwarden puts it in attachment links and token issuers
