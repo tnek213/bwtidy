@@ -188,6 +188,41 @@ def not_trashed(items: Objects) -> Objects:
     return [i for i in items if not i.get("deletedDate")]
 
 
+def exported_ids(personal: bytes, orgs: list[Any]) -> set[str]:
+    """The ids of the items the personal export's data.json and the organization exports hold."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(personal)) as archive:
+            data = json.loads(archive.read("data.json"))
+    except (KeyError, ValueError):
+        raise BackupError("personal export", "the zip holds no readable data.json") from None
+    found: set[str] = set()
+    for export in [data, *orgs]:
+        items = export.get("items") if isinstance(export, dict) else None
+        found |= {i["id"] for i in items or [] if isinstance(i, dict) and i.get("id")}
+    return found
+
+
+async def get_unlisted(client: BwClient, unlisted: set[str]) -> Objects:
+    """Every item an export holds and no listing has, from GET /object/item/<id>.
+
+    bw lists archived items only for an account with premium, while the exports and a get
+    by id hold them all. So these are the archived items of an account without premium.
+    Anything else is a BackupError: the backup would miss its attachments.
+    """
+    found = []
+    for item_id in sorted(unlisted):
+        try:
+            item = await client.get_item(item_id)
+        except BwError as error:
+            raise BackupError("archived items", f"item {item_id}: {error}") from None
+        if item.get("id") != item_id or not item.get("archivedDate"):
+            raise BackupError(
+                "archived items", f"item {item_id} is in an export but in no listing of bw serve"
+            )
+        found.append(item)
+    return found
+
+
 @dataclass(frozen=True)
 class VaultListing:
     """What bw serve lists of the vault for a backup.
@@ -288,11 +323,12 @@ async def collect(
     members["personal-export.zip"] = personal
     timings.lap("personal export")
 
+    org_exports = []
     for org in vault.organizations:
         org_id = org["id"]
         step = "org export"
         data = await bw(step, "--raw", "export", "--format", "json", "--organizationid", org_id)
-        check_json(data, step)
+        org_exports.append(check_json(data, step))
         members[f"org-{org_id}-export.json"] = data
     timings.lap("org exports")
 
@@ -303,8 +339,15 @@ async def collect(
     members["raw/trash.json"] = trash
     timings.lap("trash listing")
 
+    listed = ids([*vault.items, *trashed, *vault.archived])
+    unlisted = exported_ids(personal, org_exports) - listed
+    if unlisted:
+        check("archived items")
+    archived = [*vault.archived, *await get_unlisted(client, unlisted)]
+    timings.lap("archived items")
+
     ## one download at a time: several bw processes at once share one CLI state
-    every = [*vault.items, *trashed, *vault.archived]
+    every = [*vault.items, *trashed, *archived]
     for item in every:
         for attachment, path in attachment_members(item):
             try:
@@ -326,10 +369,13 @@ async def collect(
     timings.lap("attachments")
 
     members["raw/items.json"] = dump(vault.items)
-    members["raw/archived.json"] = dump(vault.archived)
+    members["raw/archived.json"] = dump(archived)
     members["raw/folders.json"] = dump(vault.folders)
     members["raw/collections.json"] = dump(vault.collections)
     members["raw/organizations.json"] = dump(vault.organizations)
+    ## over the listings alone, as the cache sees the vault: with the items get_unlisted found
+    ## no backup would ever match the cache. Without premium a client unarchives an item it
+    ## edits, so these change only by leaving the archive, which the listings see.
     print_ = fingerprint(
         vault.items,
         vault.folders,
