@@ -14,9 +14,11 @@ Nothing yet.
 
 2026-11-28 · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/v1.0.0-beta.3)
 
-No stored format changed since 1.0.0-beta.1. 1.0.0-beta.2 was never
-published, and its changes are in this release. Act on the breaking changes
-below, then pull the new image and start it.
+1.0.0-beta.3 is the first release whose image builds Bitwarden's open source
+CLI from source, and it replaces every earlier image. It also holds the
+changes of 1.0.0-beta.2, which was never published. Your stored data needs no
+migration from 1.0.0-beta.1: act on the breaking changes below, then pull the
+new image and start it.
 
 ### Breaking changes
 
