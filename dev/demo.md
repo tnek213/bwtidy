@@ -18,13 +18,13 @@ visitor's account when its worker exits.
 
 `compose.demo.yaml` runs five containers:
 
-| Container     | Image                       | What it does                                                            |
-| ------------- | --------------------------- | ----------------------------------------------------------------------- |
-| `init`        | the demo image              | writes the stack's secrets into the `secrets` volume, then exits        |
-| `vaultwarden` | `vaultwarden/server:1.37.4` | the demo's own server, HTTPS with the self-signed certificate of `init` |
-| `demo`        | the demo image              | bwtidy's gateway wrapped by `bwtidy_demo`, and the workers it starts    |
-| `controller`  | the demo image              | the pool of ready vaults, and the deletion of Vaultwarden users         |
-| `edge`        | nginx                       | the only published port, rate limits, proxies to `demo`                 |
+| Container     | Image                       | What it does                                                                                                    |
+| ------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `init`        | the demo image              | writes the stack's secrets into the `secrets` volume, sets the owners of the secrets and the ledger, then exits |
+| `vaultwarden` | `vaultwarden/server:1.37.4` | the demo's own server, HTTPS with the self-signed certificate of `init`                                         |
+| `demo`        | the demo image              | bwtidy's gateway wrapped by `bwtidy_demo`, and the workers it starts                                            |
+| `controller`  | the demo image              | the pool of ready vaults, and the deletion of Vaultwarden users                                                 |
+| `edge`        | nginx                       | the only published port, rate limits, proxies to `demo`                                                         |
 
 The version of Vaultwarden is the dev stack's (`compose.dev.yaml`), so the
 demo runs against the server the tests run against. The demo image has bw
@@ -52,8 +52,13 @@ the stack, and only the edge can be reached from outside. Who reaches what:
 
 Every container has a read-only file system, drops all capabilities (the
 `demo` container keeps the six that `compose.yaml` gives bwtidy, the edge the
-four nginx needs to bind port 80 and start its workers) and sets
+four nginx needs to bind port 80 and start its workers, `init` keeps `CHOWN`
+to give the secrets and the ledger their owners) and sets
 `no-new-privileges`. What must be written is a tmpfs or a volume.
+
+The controller runs as a user of its own (see Controller). `init`, `demo`
+and Vaultwarden run as root: `init` sets the owners, the gateway starts each
+worker as its account's uid and Vaultwarden's image runs as root.
 
 `depends_on` orders the start and, with `restart: true`, what compose
 restarts when it makes a container anew: a new `vaultwarden` container is
@@ -330,18 +335,48 @@ Its settings: `DEMO_POOL_READY`, `DEMO_MAX`, `DEMO_FIXTURE` (required),
 `DEMO_LEDGER`, `DEMO_SECRETS` (by default `/secrets`) and `DEMO_SERVER` (by
 default `https://vaultwarden`).
 
+The controller handles vault data (every vault it builds goes through its
+bw), and nothing it does needs root. It runs as the system user
+`controller` of the demo image, uid and gid 10100 (`user: "10100:10100"` in
+`compose.demo.yaml`). The number is fixed, so `init` can set the owners
+before the controller starts. It lies below bwtidy's accounts
+(`BWTIDY_UID_BASE`, 70000 and up) and is none of the ids the nginx and
+Vaultwarden images use. The user's home is `/tmp`, a tmpfs, and every bw
+call gets a `HOME` and a `BITWARDENCLI_APPDATA_DIR` of its own in there.
+
+The controller reads the secrets through its group (see Secrets) and owns
+the ledger. The image's `/ledger` is owned by the controller with mode 0700,
+so a new `ledger` volume gets that owner when Docker fills it from the image.
+A volume an older demo made is owned by root. `init` mounts it too and at
+every start gives the controller what root owns in it, so an existing host
+needs no manual step: each file and directory there owned by root gets the
+mode 0600 (a directory 0700) and then the controller's uid and gid. A
+symlink is never followed. A volume the controller owns already is left as
+it is, since what it holds is the controller's own.
+
 ## Secrets
 
 `init` (`bwtidy_demo.init`, `bwtidy-demo-init`) writes into the `secrets`
-volume (`DEMO_SECRETS`, by default `/secrets`), each file in one rename:
+volume (`DEMO_SECRETS`, by default `/secrets`), each file in one rename. Every
+file is owned by root, and its group and mode let exactly its readers in:
 
-| File                      | Mode | What                                                                                                         |
-| ------------------------- | ---- | ------------------------------------------------------------------------------------------------------------ |
-| `vaultwarden-admin-token` | 0600 | Vaultwarden reads it with `ADMIN_TOKEN_FILE`, the controller too                                             |
-| `controller-token`        | 0600 | the controller's API token, the controller and the wrapper read it                                           |
-| `vaultwarden.key`         | 0600 | the server's TLS key, Vaultwarden reads it                                                                   |
-| `vaultwarden.crt`         | 0644 | the server certificate for the name `vaultwarden`, then the CA                                               |
-| `ca.crt`                  | 0644 | the self-signed CA, trusted by the workers and the controller (`NODE_EXTRA_CA_CERTS`, bw refuses plain http) |
+| File                      | Group      | Mode | Read by                              | What                                                                   |
+| ------------------------- | ---------- | ---- | ------------------------------------ | ---------------------------------------------------------------------- |
+| `vaultwarden-admin-token` | controller | 0640 | Vaultwarden, the controller          | Vaultwarden's `ADMIN_TOKEN_FILE`, the controller deletes users with it |
+| `controller-token`        | controller | 0640 | the controller, the wrapper          | the controller's API token                                             |
+| `vaultwarden.key`         | root       | 0600 | Vaultwarden                          | the server's TLS key                                                   |
+| `vaultwarden.crt`         | root       | 0644 | Vaultwarden (public)                 | the server certificate for the name `vaultwarden`, then the CA         |
+| `ca.crt`                  | root       | 0644 | the controller, the workers (public) | the self-signed CA (`NODE_EXTRA_CA_CERTS`, bw refuses plain http)      |
+
+Vaultwarden runs as root without capabilities, so it has no `DAC_OVERRIDE`
+and reads the admin token and the key as their owner. The controller reads
+the two tokens as a member of the group `controller` (gid 10100). The
+wrapper runs as root and reads its token as the owner. The workers run as
+their accounts' uids, outside the group, so they read neither token and
+only the certificates. A file is written with mode 0600 and gets its group
+and its mode once it is in place. `init` sets the owner, the group and the
+mode of every file at every start, also on a volume it keeps, so a volume an
+older demo wrote gets them too.
 
 The CA's key is never written: it signs the server certificate and is gone,
 so nothing can sign another certificate the stack trusts. Both certificates
@@ -361,8 +396,8 @@ removes the ledger and the usage stats too.
 
 No secret ever leaves the stack, and none comes from outside: nothing is
 configured by hand and nothing is shown. The tokens are readable by root
-only. The certificate is readable by everyone, as the workers run as the
-accounts' uids. The edge mounts no secret.
+and the controller only. The certificates are readable by everyone, as the
+workers run as the accounts' uids. The edge mounts no secret.
 
 Vaultwarden's data is temporary (a tmpfs of `DEMO_VAULTWARDEN_DATA_SIZE`,
 256 MB by default): a restart starts it empty. The account directories are a
@@ -581,7 +616,10 @@ The demo's tests are in `demo/tests`, `scripts/ci` runs them:
 cd demo && uv run --locked pytest -q
 ```
 
-`test_init.py` checks the files of `init`, their modes, that a second run
+`test_init.py` checks the files of `init`, their owners, groups and modes
+(with `os.chown` recorded, as the tests do not run as root), that a rerun
+over files of root or of an older mode fixes them, the owners in the ledger
+(symlinks untouched), that a second run
 keeps a full set and writes a set that lacks a file anew, and that a strict
 TLS client trusting the CA accepts the
 server certificate for `vaultwarden` only. `test_controller.py` runs the
@@ -680,6 +718,13 @@ checks:
 - `DEMO_MAX=1`: the test starts the stack again with one vault, a second
   start while the first runs gets the "free" note, and the end of the first
   makes room.
+- The controller's user: `docker inspect` names `10100:10100` and every
+  process in the container runs as uid and gid 10100 (from `/proc`). The
+  secrets have the owners, groups and modes of Secrets.
+- An older volume: with the ledger and the secrets given to root (the
+  secrets at 0600) by a container of their own, the stack made anew fixes
+  their owners, the controller writes new ids to the ledger and the pool
+  fills again.
 
 A failure of a refused route, of a connection that must fail or of the
 cleanup is a reason to stop and find out, never to weaken the test.

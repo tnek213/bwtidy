@@ -8,6 +8,8 @@ puts demo code into the normal image fails scripts/ci at once.
 import re
 from pathlib import Path
 
+from bwtidy.gateway.settings import DEFAULT_UID_BASE
+
 ROOT = Path(__file__).resolve().parents[3]
 COMPOSE = (ROOT / "compose.demo.yaml").read_text()
 DEMO_DOCKERFILE = (ROOT / "demo" / "Dockerfile").read_text()
@@ -93,8 +95,33 @@ def test_every_container_is_read_only_without_capabilities_it_does_not_need():
         assert "privileged" not in block, name
     bwtidy = blocks((ROOT / "compose.yaml").read_text(), "services")["bwtidy"]
     assert listed(services["demo"], "cap_add") == listed(bwtidy, "cap_add")
-    for name in ("init", "vaultwarden", "controller"):
+    ## init gives the secrets and the ledger their owners, and needs nothing else
+    assert listed(services["init"], "cap_add") == ["CHOWN"]
+    for name in ("vaultwarden", "controller"):
         assert listed(services[name], "cap_add") == [], name
+
+
+def test_the_controller_runs_as_its_own_user_of_the_demo_image():
+    services = blocks(COMPOSE, "services")
+    user = re.search(r'^    user: "(\d+):(\d+)"$', services["controller"], re.MULTILINE)
+    assert user and user.groups() == ("10100", "10100")
+    ## below bwtidy's accounts, so no worker ever runs as the controller
+    assert int(user[1]) < DEFAULT_UID_BASE
+    ## the others keep root: init sets owners, the gateway starts the workers as their uids
+    for name in ("init", "vaultwarden", "demo"):
+        assert "    user:" not in services[name], name
+    assert "groupadd --system --gid 10100 controller" in DEMO_DOCKERFILE
+    assert "useradd --system --uid 10100 --gid 10100" in DEMO_DOCKERFILE
+    assert "chown 10100:10100 /ledger" in DEMO_DOCKERFILE
+    init = (ROOT / "demo" / "src" / "bwtidy_demo" / "init.py").read_text()
+    assert "\nCONTROLLER_UID = 10100\n" in init
+    assert "\nCONTROLLER_GID = 10100\n" in init
+
+
+def test_init_fixes_the_ledger_volume_the_controller_writes():
+    services = blocks(COMPOSE, "services")
+    assert "- ledger:/ledger\n" in services["init"]
+    assert "- ledger:/ledger\n" in services["controller"]
 
 
 def test_the_edge_mounts_no_secret_and_only_init_writes_them():

@@ -7,7 +7,8 @@ the stack. Then that the end of a demo deletes the account directory and the Vau
 that the pool refills, and that the edge and DEMO_MAX limit the starts.
 
 The tests run in the order of the file and share the stack: the two visitors are module
-fixtures, the last test starts the stack again with DEMO_MAX=1 and puts the defaults back.
+fixtures, a late test starts the stack again with DEMO_MAX=1 and puts the defaults back, and
+the last one makes the stack anew over volumes of root, as an older version left them.
 A failure here is never a reason to weaken a test (dev/demo.md, Two guarantees).
 """
 
@@ -43,6 +44,10 @@ DEMO_STACK = ROOT / "scripts" / "demo-stack"
 URL = os.environ.get("DEMO_STACK_URL", "")
 PROJECT = os.environ.get("DEMO_STACK_PROJECT", "")
 ACCOUNTS = "/data/accounts"
+## the controller's own user and group (dev/demo.md, Controller)
+CONTROLLER = "10100"
+## a uid of bwtidy's accounts, as a worker runs
+WORKER = "70000"
 ## a start logs bw in, a new vault registers and imports: both take seconds, never minutes
 REQUEST_TIMEOUT = 120.0
 POOL_TIMEOUT = 240.0
@@ -111,6 +116,28 @@ async def main():
     print(json.dumps(found))
 
 asyncio.run(main())
+"""
+
+
+## runs in the controller: the command, uids and gids of every process of the container
+PROCESSES = """
+import json, pathlib
+found = []
+for entry in pathlib.Path("/proc").iterdir():
+    if not entry.name.isdigit():
+        continue
+    try:
+        status = (entry / "status").read_text()
+        command = (entry / "cmdline").read_bytes().replace(b"\\0", b" ").decode()
+    except OSError:
+        continue
+    fields = dict(line.split(":", 1) for line in status.splitlines() if ":" in line)
+    found.append({
+        "command": command.strip(),
+        "uid": fields["Uid"].split(),
+        "gid": fields["Gid"].split(),
+    })
+print(json.dumps(found))
 """
 
 
@@ -345,6 +372,63 @@ def test_the_edge_reaches_the_demo_but_neither_vaultwarden_nor_the_controller():
     ## nor by address, without the name
     assert not reaches(address("vaultwarden"), 443)
     assert not reaches(address("controller"), 8100)
+
+
+## --- the controller's user
+
+
+def test_the_controller_runs_as_its_own_user():
+    user = docker("inspect", container("controller"), "--format", "{{.Config.User}}")
+    assert user == f"{CONTROLLER}:{CONTROLLER}"
+    processes = json.loads(python_in("controller", PROCESSES))
+    assert [p for p in processes if "bwtidy-demo-controller" in p["command"]], processes
+    for process in processes:
+        ## real, effective, saved and file system ids
+        assert process["uid"] == [CONTROLLER] * 4, process
+        assert process["gid"] == [CONTROLLER] * 4, process
+
+
+SECRETS = {
+    "vaultwarden-admin-token": f"0 {CONTROLLER} 640",
+    "controller-token": f"0 {CONTROLLER} 640",
+    "vaultwarden.key": "0 0 600",
+    "vaultwarden.crt": "0 0 644",
+    "ca.crt": "0 0 644",
+}
+
+
+def owners(service: str, *paths: str) -> dict[str, str]:
+    """Owner, group and mode of each path, as stat sees them in service."""
+    listing = in_container(service, "stat", "-c", "%n %u %g %a", *paths).stdout
+    return {name: rest for name, _, rest in (line.partition(" ") for line in listing.splitlines())}
+
+
+def test_the_secrets_have_their_owners_groups_and_modes():
+    paths = [f"/secrets/{name}" for name in SECRETS]
+    assert owners("controller", "/secrets", *paths) == {
+        "/secrets": "0 0 755",
+        **{f"/secrets/{name}": found for name, found in SECRETS.items()},
+    }
+    ## the directory keeps the ledger to the controller, whatever mode its file has
+    ledger = owners("controller", "/ledger", "/ledger/ids")
+    assert ledger["/ledger"] == f"{CONTROLLER} {CONTROLLER} 700"
+    assert ledger["/ledger/ids"].startswith(f"{CONTROLLER} {CONTROLLER} ")
+
+
+def test_the_controller_reads_its_secrets_and_not_the_servers_key():
+    for name in ("vaultwarden-admin-token", "controller-token", "ca.crt"):
+        assert in_container("controller", "cat", f"/secrets/{name}").stdout, name
+    assert in_container("controller", "cat", "/secrets/vaultwarden.key", check=False).returncode
+    assert in_container("controller", "touch", "/secrets/x", check=False).returncode
+
+
+def test_a_worker_uid_reads_the_certificates_and_no_token():
+    as_worker = ["setpriv", f"--reuid={WORKER}", f"--regid={WORKER}", "--clear-groups", "cat"]
+    for name in ("vaultwarden-admin-token", "controller-token", "vaultwarden.key"):
+        read = in_container("demo", *as_worker, f"/secrets/{name}", check=False)
+        assert read.returncode != 0, name
+        assert read.stdout == "", name
+    assert "BEGIN CERTIFICATE" in in_container("demo", *as_worker, "/secrets/ca.crt").stdout
 
 
 ## --- a visitor's demo
@@ -722,8 +806,41 @@ def test_every_container_has_a_memory_and_a_process_limit(service: str):
     assert int(pids) > 0
 
 
-## last in the file on purpose: it looks back at every visitor of the tests above
+## after every visitor test on purpose: it looks back at every visitor of the tests above
+## (only the test of older volumes comes later, since it recreates every container)
 @pytest.mark.parametrize("service", SERVICES)
 def test_no_container_was_killed_for_memory(service: str):
     state = docker("inspect", container(service), "--format", "{{.State.OOMKilled}}")
     assert state == "false"
+
+
+## --- volumes an older version left
+
+
+def test_a_stack_over_a_ledger_and_secrets_of_root_still_works():
+    image = docker("inspect", container("controller"), "--format", "{{.Config.Image}}")
+    before = set(in_container("controller", "cat", "/ledger/ids").stdout.split())
+    as_older = (
+        "chown -R 0:0 /ledger /secrets && chmod 0755 /ledger && chmod 0644 /ledger/ids"
+        " && chmod 0600 /secrets/vaultwarden-admin-token /secrets/controller-token"
+    )
+    volumes = ["-v", f"{PROJECT}_ledger:/ledger", "-v", f"{PROJECT}_secrets:/secrets"]
+    run = ["run", "--rm", "--network", "none", "--user", "0:0", "--entrypoint", "sh"]
+    docker(*run, *volumes, image, "-c", as_older)
+    root = docker(*run, *volumes, image, "-c", "stat -c '%u %g %a' /ledger /ledger/ids")
+    assert root.split("\n") == ["0 0 755", "0 0 644"]
+    stack("compose", "up", "--detach", "--wait", "--no-build", "--force-recreate")
+    test_the_secrets_have_their_owners_groups_and_modes()
+    test_the_controller_runs_as_its_own_user()
+    wait_status(lambda counts: counts["ready"] == 2 and counts["building"] == 0)
+    after = set(in_container("controller", "cat", "/ledger/ids").stdout.split())
+    ## the pool of the new, empty Vaultwarden has ids the controller wrote to the old ledger
+    assert before < after
+    assert len(after - before) >= 2
+    with browser() as client:
+        visitor = start(client)
+        assert visitor.id in after
+        assert users(visitor.email) == {visitor.email: True}
+        assert visitor.end().status_code == 303
+        assert users(visitor.email) == {visitor.email: False}
+    assert account_dirs() == []
