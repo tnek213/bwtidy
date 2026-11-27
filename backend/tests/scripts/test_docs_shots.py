@@ -2,7 +2,18 @@ from typing import Any
 
 import pytest
 
-from tests.support.docs_shots import IMAGES, ROOT, ShotError, check_name, clip, images_dir, shot
+from tests.support import docs_shots
+from tests.support.docs_shots import (
+    IMAGES,
+    ROOT,
+    SETTLE,
+    UNSCROLL_SWITCHES,
+    ShotError,
+    check_name,
+    clip,
+    images_dir,
+    shot,
+)
 
 VIEW = {"width": 1600, "height": 900}
 BAR = {"x": 0, "y": 0, "width": 1600, "height": 64}
@@ -121,3 +132,33 @@ def test_outside_a_docs_run_a_shot_does_nothing(monkeypatch):
     ## no page at all: it must not touch one
     page: Any = None
     shot(page, "Not a valid name")
+
+
+class RecordingPage:
+    """Stands in for a Playwright page: records the scripts it runs and the screenshot it takes."""
+
+    viewport_size = VIEW
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def evaluate(self, script: str, *args: Any) -> None:
+        self.calls.append(script)
+
+    def screenshot(self, **options: Any) -> None:
+        self.calls.append("screenshot")
+
+
+def test_a_shot_scrolls_every_switch_back_before_it_measures(monkeypatch, tmp_path):
+    monkeypatch.setenv("BWTIDY_DOCS_SHOTS", "1")
+    monkeypatch.setenv("BWTIDY_DOCS_SHOTS_DIR", str(tmp_path))
+    monkeypatch.setattr(docs_shots, "_taken", {})
+    page: Any = RecordingPage()
+    shot(page, "switches")
+    calls = page.calls
+    assert calls.index(UNSCROLL_SWITCHES) < calls.index(SETTLE) < calls.index("screenshot")
+
+
+def test_the_switches_script_scrolls_each_switch_root_to_its_start():
+    assert "document.querySelectorAll('.MuiSwitch-root')" in UNSCROLL_SWITCHES
+    assert "scrollTo(0, 0)" in UNSCROLL_SWITCHES
