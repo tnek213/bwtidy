@@ -34,7 +34,8 @@ spec changes.
   up, the commands, the credentials), `dev/dev-vault.md` (the dev stacks, the
   snapshot, the fixture), `dev/testing.md` (the suites and how to write a
   test), `dev/release.md` (merging pull requests, the version and how to
-  write its release notes, the docs site and the image) and `dev/demo.md`
+  write its release notes, releasing with `scripts/release` and the workflow
+  `release.yml`, the docs site and the image) and `dev/demo.md`
   (the design of the public demo).
 - How it is built: [docs/architecture.md](docs/architecture.md). Read it before
   changing structure.
@@ -232,6 +233,8 @@ the site's strict build in `scripts/ci` fails (`scripts/docs-site`).
 - Commit messages follow the style in CONTRIBUTING.md (Commits). An agent
   writes the subject only, never a body, and keeps it at most 72 characters.
 - A pull request with a user-visible change adds its bullet under Unreleased
-  in `docs/releases.md`, as dev/release.md (The release notes) says.
+  in `docs/releases.md`, as dev/release.md (The release notes) says. The
+  check of `ci.yml` fails without it (`scripts/release check-pr`), unless the
+  pull request has the label `no release note`.
 
 <!-- markdownlint-enable MD038 -->

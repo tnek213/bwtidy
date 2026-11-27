@@ -1,0 +1,123 @@
+# Releases bwtidy from a tag vVERSION that scripts/release tag pushes (dev/release.md, To release):
+# checks the release notes and the tag's date, creates the GitHub release with the version's entry
+# of docs/releases.md as its body and then publishes the image through image.yml. A GitHub release
+# that this workflow's GITHUB_TOKEN creates starts no other workflow, so image.yml would never see
+# it published: that is why this workflow calls image.yml. On a push to main that changes the
+# release notes, and by hand, it writes each entry into the body of its GitHub release again, so a
+# correction reaches GitHub too.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+    branches: [main]
+    paths:
+      - docs/releases.md
+      - .github/workflows/release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    # to create the GitHub release
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        # the whole history with its tags, as the release notes lint compares each date with its tag
+        with:
+          fetch-depth: 0
+      - name: Work out the version
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.(0|[1-9][0-9]*))?$ ]]; then
+            echo "the tag $TAG is not v plus a version as X.Y.Z, optionally -alpha.N, -beta.N or -rc.N" >&2
+            exit 1
+          fi
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+      - name: Check the release notes
+        run: scripts/release lint
+      - name: Check the date of the tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: scripts/release check-tag "$VERSION"
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          scripts/release notes "$VERSION" >"$RUNNER_TEMP/notes.md"
+          # a run again after a failure later on finds the release and keeps its body in step
+          if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+            exit 0
+          fi
+          prerelease=()
+          if [[ "$VERSION" == *-* ]]; then
+            prerelease=(--prerelease)
+          fi
+          gh release create "$TAG" --title "bwtidy $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
+            --verify-tag "${prerelease[@]}"
+
+  image:
+    needs: release
+    # the provenance attestation of image.yml: a token from GitHub's OIDC to sign it, and the right
+    # to store it
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/image.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
+
+  sync:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    # to edit the bodies of the GitHub releases
+    permissions:
+      contents: write
+    steps:
+      # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Write the release notes into the GitHub releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          released="$(gh release list --limit 1000 --json tagName --jq '.[].tagName')"
+          versions="$(sed -n 's/^## \([0-9][0-9A-Za-z.-]*\)$/\1/p' docs/releases.md)"
+          for version in $versions; do
+            tag="v$version"
+            if ! grep -qxF "$tag" <<<"$released"; then
+              echo "$tag has no GitHub release"
+              continue
+            fi
+            scripts/release notes "$version" >"$RUNNER_TEMP/notes.md"
+            # GitHub may keep the body with CRLF line ends, and $(...) drops the trailing newlines
+            body="$(gh release view "$tag" --json body --jq .body | sed 's/\r$//')"
+            if [ "$body" = "$(cat "$RUNNER_TEMP/notes.md")" ]; then
+              echo "$tag is in step"
+            else
+              gh release edit "$tag" --notes-file "$RUNNER_TEMP/notes.md"
+              echo "$tag has the notes of docs/releases.md now"
+            fi
+          done

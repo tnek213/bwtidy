@@ -4,13 +4,17 @@
   scripts/update-deps                         update the lock files, the image digests and the
                                               action SHAs
   scripts/update-deps --dry-run               show what would change and write nothing
-  scripts/update-deps --cli-pin [--root DIR]  only write the pin of the Bitwarden CLI in DIR
+  scripts/update-deps --cli-pin [--root DIR] [--pr N]
+                                              only write the pin of the Bitwarden CLI in DIR
                                               (the repo by default), with --dry-run to show it
 
 --cli-pin writes every place that states the CLI version docker/bitwarden-cli/package.json pins:
-source.json's tag cli-vVERSION and the commit it names, and the docs in CLI_PIN_DOCS. It reads
-only those data files below DIR and runs nothing from it, so a workflow runs main's copy on the
-files of a pull request (.github/workflows/dependabot-cli-pin.yml).
+source.json's tag cli-vVERSION and the commit it names, and the docs in CLI_PIN_DOCS. With --pr N,
+the number of the pull request that bumps the CLI, it also writes the bullet "Run the Bitwarden
+CLI VERSION in the image" with the link to pull request N under Unreleased in docs/releases.md,
+in place of "Nothing yet." and only once. It reads only those data files below DIR and runs
+nothing from it, so a workflow runs main's copy on the files of a pull request
+(.github/workflows/dependabot-cli-pin.yml).
 
 Backend and demo: uv lock --upgrade, within the ranges of backend/pyproject.toml and
 demo/pyproject.toml. Frontend: npm update
@@ -384,7 +388,11 @@ def unsafe_cli_files(root: Path) -> list[str]:
 
     A pull request could make one a symbolic link, and the write would then land elsewhere.
     """
-    names = ["docker/bitwarden-cli/package.json", "docker/bitwarden-cli/source.json"]
+    names = [
+        "docker/bitwarden-cli/package.json",
+        "docker/bitwarden-cli/source.json",
+        versions.RELEASE_NOTES,
+    ]
     unsafe = []
     for name in [*names, *CLI_PIN_DOCS]:
         path = root / name
@@ -395,9 +403,71 @@ def unsafe_cli_files(root: Path) -> list[str]:
     return unsafe
 
 
-def update_cli_pin(root: Path, dry_run: bool, errors: list[str]) -> list[Change]:
+def cli_note(version: str, pr: int) -> list[str]:
+    """The bullet of the release notes for a bump of the CLI to VERSION in pull request PR."""
+    link = f"[#{pr}]({versions.REPO_URL}/pull/{pr})"
+    return [f"- Run the Bitwarden CLI {version} in the image", f"  ({link})"]
+
+
+def with_cli_note(text: str, version: str, pr: int) -> str | None:
+    """TEXT, the release notes, with the bullet of cli_note under Unreleased, None when it has it.
+
+    The bullet takes the place of "Nothing yet." or comes last. A bullet of the same pull request
+    for another version is replaced, so the notes never name the CLI twice for it.
+    """
+    lines = text.splitlines()
+    heading = f"## {versions.UNRELEASED}"
+    if heading not in lines:
+        return None
+    start = lines.index(heading) + 1
+    end = next(
+        (i for i in range(start, len(lines)) if lines[i].startswith("## ")),
+        len(lines),
+    )
+    bullet = cli_note(version, pr)
+    link = bullet[1].strip()
+    index = start
+    while index < end:
+        if lines[index].startswith("- Run the Bitwarden CLI "):
+            stop = index + 1
+            while stop < end and lines[stop].startswith(" "):
+                stop += 1
+            if link in " ".join(lines[index:stop]):
+                if lines[index:stop] == bullet:
+                    return None
+                lines[index:stop] = bullet
+                return "\n".join(lines) + "\n"
+            index = stop
+        else:
+            index += 1
+    section = lines[start:end]
+    if versions.NOTHING_YET in section:
+        at = start + section.index(versions.NOTHING_YET)
+        lines[at : at + 1] = bullet
+    else:
+        last = max(i for i in range(start, end) if lines[i].strip())
+        lines[last + 1 : last + 1] = bullet
+    return "\n".join(lines) + "\n"
+
+
+def update_cli_note(root: Path, version: str, pr: int, dry_run: bool) -> list[Change]:
+    """The bullet of cli_note in the release notes below ROOT."""
+    path = root / versions.RELEASE_NOTES
+    text = with_cli_note(path.read_text(), version, pr)
+    if text is None:
+        return []
+    if not dry_run:
+        path.write_text(text)
+    return [
+        (f"{versions.RELEASE_NOTES} ({versions.UNRELEASED})", None, cli_note(version, pr)[0][2:])
+    ]
+
+
+def update_cli_pin(
+    root: Path, dry_run: bool, errors: list[str], pr: int | None = None
+) -> list[Change]:
     """Every place below ROOT that states the CLI version package.json pins: source.json and the
-    docs of CLI_PIN_DOCS."""
+    docs of CLI_PIN_DOCS, and with PR (its pull request) the bullet of the release notes."""
     unsafe = unsafe_cli_files(root)
     if unsafe:
         errors.append(f"not a regular file in {root}: {', '.join(unsafe)}")
@@ -411,7 +481,10 @@ def update_cli_pin(root: Path, dry_run: bool, errors: list[str]) -> list[Change]
     ## docs that name a version whose source is unknown would be wrong, so they wait for it
     if len(errors) > known:
         return []
-    return source + update_cli_docs(root, version, dry_run, errors)
+    docs = update_cli_docs(root, version, dry_run, errors)
+    if pr is None or len(errors) > known:
+        return source + docs
+    return source + docs + update_cli_note(root, version, pr, dry_run)
 
 
 ## --- the lock files
@@ -613,15 +686,33 @@ def print_changes(label: str, found: list[Change]) -> None:
         print(f"  {name} {old or '(new)'} -> {new or '(removed)'}")
 
 
-def cli_pin_main(root: Path, dry_run: bool) -> int:
+def cli_pin_main(root: Path, dry_run: bool, pr: int | None) -> int:
     """--cli-pin: write the CLI pin below ROOT and print what changed."""
     errors: list[str] = []
-    found = update_cli_pin(root, dry_run, errors)
+    found = update_cli_pin(root, dry_run, errors, pr)
     print("Would change:" if dry_run else "Changed:")
     print_changes("Bitwarden CLI pin", found)
     for error in errors:
         print(f"update-deps: {error}", file=sys.stderr)
     return 1 if errors else 0
+
+
+def cli_pin_args(args: list[str], dry_run: bool) -> int:
+    """--cli-pin with its options --root DIR and --pr N, each at most once."""
+    options: dict[str, str] = {}
+    while args:
+        if len(args) < 2 or args[0] not in ("--root", "--pr") or args[0] in options:
+            print(__doc__, file=sys.stderr)
+            return 2
+        options[args[0]] = args[1]
+        args = args[2:]
+    pr = options.get("--pr")
+    ## the number goes into the release notes, so it is only ever digits
+    if pr is not None and not re.fullmatch(r"[1-9]\d*", pr):
+        print(f"update-deps: --pr takes the number of a pull request, not {pr!r}", file=sys.stderr)
+        return 2
+    root = Path(options["--root"]) if "--root" in options else ROOT
+    return cli_pin_main(root, dry_run, int(pr) if pr is not None else None)
 
 
 def main(args: list[str]) -> int:
@@ -630,10 +721,8 @@ def main(args: list[str]) -> int:
         return 0
     dry_run = "--dry-run" in args
     rest = [arg for arg in args if arg != "--dry-run"]
-    if rest == ["--cli-pin"]:
-        return cli_pin_main(ROOT, dry_run)
-    if len(rest) == 3 and rest[:2] == ["--cli-pin", "--root"]:
-        return cli_pin_main(Path(rest[2]), dry_run)
+    if rest[:1] == ["--cli-pin"]:
+        return cli_pin_args(rest[1:], dry_run)
     if rest:
         print(__doc__, file=sys.stderr)
         return 2

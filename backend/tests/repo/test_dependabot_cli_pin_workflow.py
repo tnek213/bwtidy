@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from devlib import load_script
 
 ROOT = Path(__file__).resolve().parents[3]
 TEXT = (ROOT / ".github" / "workflows" / "dependabot-cli-pin.yml").read_text()
@@ -29,7 +30,7 @@ SHA = "a" * 40
 ## script write it, never run a file of it
 HEAD_USES = [
     r'jq -r \'\.dependencies\["@bitwarden/cli"\]\' head/docker/bitwarden-cli/package\.json',
-    r"python3 main/scripts/update-deps --cli-pin --root head",
+    r'python3 main/scripts/update-deps --cli-pin --root head --pr "\$NUMBER"',
     r"git -C head (status|diff) [^|\n]*",
     r'base64 -w0 "head/\$path"',
 ]
@@ -203,3 +204,101 @@ def test_the_commit_step_refuses_a_new_file(tmp_path, head):
     assert answer.returncode == 1
     assert "new.md" in answer.stderr
     assert not request.exists()
+
+
+## --- the bullet of the release notes (scripts/update-deps --cli-pin --pr N)
+
+NOTES_REPO = "https://github.com/tnek213/bwtidy"
+HEAD_NOTES = (
+    "# Release notes\n\nIntro.\n\n## Unreleased\n\n"
+    "Changes on main that are not yet in a versioned Docker image.\n\n"
+)
+OLDER = f"## 1.0.0-beta.1\n\n- Start ([#1]({NOTES_REPO}/pull/1))\n"
+BULLET = f"- Run the Bitwarden CLI 2026.11.0 in the image\n  ([#108]({NOTES_REPO}/pull/108))\n"
+
+
+@pytest.fixture(scope="module")
+def deps():
+    return load_script("update-deps")
+
+
+def test_the_workflow_passes_the_number_of_the_pull_request():
+    step = NAMED["Write the CLI pin"]
+    assert step["env"]["NUMBER"] == "${{ github.event.pull_request.number || inputs.pull_request }}"
+    assert 'update-deps --cli-pin --root head --pr "$NUMBER"' in step["run"]
+
+
+def test_the_bullet_replaces_nothing_yet(deps):
+    text = HEAD_NOTES + "Nothing yet.\n\n" + OLDER
+    assert deps.with_cli_note(text, "2026.11.0", 108) == HEAD_NOTES + BULLET + "\n" + OLDER
+
+
+def test_the_bullet_comes_after_the_other_bullets(deps):
+    other = f"- Sort the grid\n  ([#90]({NOTES_REPO}/pull/90))\n"
+    text = HEAD_NOTES + other + "\n" + OLDER
+    assert deps.with_cli_note(text, "2026.11.0", 108) == HEAD_NOTES + other + BULLET + "\n" + OLDER
+
+
+def test_the_bullet_is_written_once(deps):
+    text = deps.with_cli_note(HEAD_NOTES + "Nothing yet.\n\n" + OLDER, "2026.11.0", 108)
+    assert deps.with_cli_note(text, "2026.11.0", 108) is None
+    ## another version in the same pull request takes the place of the bullet
+    newer = deps.with_cli_note(text, "2026.11.1", 108)
+    assert newer == text.replace("2026.11.0", "2026.11.1")
+    assert newer.count("Run the Bitwarden CLI") == 1
+
+
+def test_the_bullet_goes_only_into_unreleased(deps):
+    text = HEAD_NOTES + "Nothing yet.\n\n" + OLDER.replace("- Start", "- Start\n\nNothing yet.")
+    written = deps.with_cli_note(text, "2026.11.0", 108)
+    assert written.index("Run the Bitwarden CLI") < written.index("## 1.0.0-beta.1")
+    assert written.count("Nothing yet.") == 1
+
+
+def cli_head(tmp_path: Path) -> Path:
+    """The files --cli-pin reads, already pinned to 2026.11.0, with the release notes."""
+    cli = tmp_path / "docker" / "bitwarden-cli"
+    cli.mkdir(parents=True)
+    (tmp_path / "docs").mkdir()
+    package = {"dependencies": {"@bitwarden/cli": "2026.11.0"}}
+    (cli / "package.json").write_text(json.dumps(package))
+    source = {"repository": "https://github.com/bitwarden/clients", "tag": "cli-v2026.11.0"}
+    (cli / "source.json").write_text(json.dumps({**source, "commit": SHA}))
+    (tmp_path / "README.md").write_text("at the tag `cli-v2026.11.0`\n")
+    (tmp_path / "docker" / "hub-overview.md").write_text("at the tag `cli-v2026.11.0`\n")
+    (tmp_path / "docs" / "restore.md").write_text("npm install -g @bitwarden/cli@2026.11.0\n")
+    (tmp_path / "docs" / "releases.md").write_text(HEAD_NOTES + "Nothing yet.\n\n" + OLDER)
+    return tmp_path
+
+
+def test_the_cli_pin_with_pr_writes_the_bullet_once(deps, tmp_path, monkeypatch):
+    root = cli_head(tmp_path)
+    monkeypatch.setattr(deps, "run", lambda command, cwd: f"{SHA}\trefs/tags/cli-v2026.11.0\n")
+    assert deps.main(["--cli-pin", "--root", str(root), "--pr", "108"]) == 0
+    notes = (root / "docs" / "releases.md").read_text()
+    assert notes == HEAD_NOTES + BULLET + "\n" + OLDER
+    assert deps.main(["--cli-pin", "--root", str(root), "--pr", "108"]) == 0
+    assert (root / "docs" / "releases.md").read_text() == notes
+    ## without --pr it writes no bullet, as it has no pull request to link
+    (root / "docs" / "releases.md").write_text(HEAD_NOTES + "Nothing yet.\n\n" + OLDER)
+    assert deps.main(["--cli-pin", "--root", str(root)]) == 0
+    assert "Nothing yet." in (root / "docs" / "releases.md").read_text()
+
+
+@pytest.mark.parametrize("number", ["", "0", "108; touch x", "-1", "1e3"])
+def test_the_number_of_the_pull_request_is_digits_only(deps, tmp_path, number):
+    root = cli_head(tmp_path)
+    assert deps.main(["--cli-pin", "--root", str(root), "--pr", number]) == 2
+    assert "Nothing yet." in (root / "docs" / "releases.md").read_text()
+
+
+def test_the_cli_pin_writes_no_release_notes_through_a_link(deps, tmp_path, tmp_path_factory):
+    root = cli_head(tmp_path)
+    elsewhere = tmp_path_factory.mktemp("elsewhere") / "releases.md"
+    elsewhere.write_text("x\n")
+    (root / "docs" / "releases.md").unlink()
+    (root / "docs" / "releases.md").symlink_to(elsewhere)
+    errors: list[str] = []
+    assert deps.update_cli_pin(root, False, errors, 108) == []
+    assert "docs/releases.md" in errors[0]
+    assert elsewhere.read_text() == "x\n"
