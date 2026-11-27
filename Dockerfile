@@ -2,7 +2,7 @@
 
 ## every image by tag and digest, so a rebuild starts from the same base (scripts/update-deps
 ## refreshes the digests, Dependabot proposes new ones)
-FROM ghcr.io/astral-sh/uv:0.11@sha256:77280f2f771df71f90786c314fe1bbc1e023feac652969bbf139c280babf2eb7 AS uv
+FROM ghcr.io/astral-sh/uv:0.13@sha256:a3ea1357342c1a4bf9a0c53a3deb1b55379aefa037338d8113d5771efa01774f AS uv
 
 FROM node:24-trixie-slim@sha256:4d00acb4bcc42c454c4eb801526f7ad7f772ea3bd4fd168c5cc2e384abcbb9d4 AS node
 
@@ -99,7 +99,7 @@ COPY --from=bitwarden-cli-source /src/clients/apps/cli/build node_modules/@bitwa
 COPY --from=bitwarden-cli-source /src/SOURCE /src/clients/LICENSE_GPL.txt node_modules/@bitwarden/cli/
 COPY --from=bitwarden-cli-source /src/sdk-internal node_modules/@bitwarden/cli/sdk-internal
 
-FROM python:3.13-slim-trixie@sha256:7249d5587b78209a006dc4a3b5340678f84ea729239193aa559962cd8c1fce50 AS python
+FROM python:3.15-slim-trixie@sha256:63bb298d2b7b88f176f51b5189f54ce6535c997682ea70885d2132f5d473a8a5 AS python
 
 ## the documentation site the gateway serves at /docs/, built strictly with the Zensical that
 ## backend/uv.lock pins (the backend's group docs, without bwtidy and its dependencies)
