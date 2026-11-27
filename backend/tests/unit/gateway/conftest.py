@@ -1,9 +1,7 @@
-"""The fixtures of the gateway's tests: quick health polls, the fake resolver, a short tmp_path
-and the gateway with fake workers."""
+"""The fixtures of the gateway's tests: quick health polls, the fake resolver, a tmp_path whose
+end removes the workers' sockets too and the gateway with fake workers."""
 
-import shutil
 import socket
-import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -12,6 +10,7 @@ import pytest
 from bwtidy.gateway import accounts as accounts_module
 from bwtidy.gateway import workers as workers_module
 from tests.support.gateway_env import ADDRESSES, GatewayEnv, make_env
+from tests.support.sockets import short_tmp_path
 
 
 @pytest.fixture(autouse=True)
@@ -32,12 +31,7 @@ def fake_resolver(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def tmp_path() -> Iterator[Path]:
-    """A short one: a unix socket path has a limit of about 100 bytes."""
-    path = Path(tempfile.mkdtemp(prefix="gw"))
-    try:
-        yield path
-    finally:
-        shutil.rmtree(path, ignore_errors=True)
+    yield from short_tmp_path("gw")
 
 
 @pytest.fixture

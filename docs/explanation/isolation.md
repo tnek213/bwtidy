@@ -52,8 +52,13 @@ The worker gets a umask of 077 and an environment built from scratch. Its own
 The account's directory is `/data/accounts/HOST/EMAIL`. Its uid owns it and
 mode 0700 shuts out the other accounts' uids. It holds the SQLite file and
 the hash of the MCP token. The Bitwarden CLI's login state is there too, as
-well as the sockets of the worker and of `bw serve` and the worker's log.
-The account's backups in `/backups/HOST/EMAIL` are kept the same way.
+well as the worker's log. The account's backups in `/backups/HOST/EMAIL` are
+kept the same way.
+
+The sockets of the worker and of `bw serve` lie in a socket directory of the
+account under `/data/accounts/.run`. Its name is short and the same length for
+every account, as a Unix socket path holds at most 107 bytes. The account's
+uid owns it with mode 0700 as well.
 
 The directories above them up to `/data/accounts` and `/backups` have mode
 0711. A worker can pass through them to its own directory but cannot list
@@ -66,7 +71,8 @@ in [Configuration](../reference/configuration.md#files-and-volumes).
   CLI login as well as its backups and log.
 - A worker cannot reach another account's unlocked vault. `bw serve` has no
   authentication of its own, so it listens only on a socket inside the
-  account's directory. The other accounts' uids cannot open that directory.
+  account's socket directory. The other accounts' uids cannot open that
+  directory.
 - The browser's cookie leads to one account, and a worker cannot change it.
 - An MCP token leads only to the account whose directory holds its hash.
 

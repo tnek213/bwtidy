@@ -88,7 +88,7 @@ defaults. Leave them all as they are.
 | --- | --- | --- |
 | `BWTIDY_HOST` | `127.0.0.1` | The address the gateway listens on. The image sets `0.0.0.0`. |
 | `BWTIDY_PORT` | `8000` | The port the gateway listens on in the container. |
-| `BWTIDY_ACCOUNTS_DIR` | `/data/accounts` | Where the account directories are. |
+| `BWTIDY_ACCOUNTS_DIR` | `/data/accounts` | Where the account directories are. It is at most 76 bytes long, or the gateway stops at its start. The workers' sockets lie in it, and a Unix socket path holds at most 107 bytes. |
 | `BWTIDY_BACKUPS_ROOT` | | Where the backups are. `compose.yaml` sets `/backups`. When it is unset each account keeps its backups in its own `app/backups`. |
 | `BWTIDY_STATIC_DIR` | | The built web page, `/app/static` in the image. When it is unset no web page is served. |
 | `BWTIDY_DOCS_DIR` | | The built documentation site served at `/docs/`, `/app/site` in the image. When it is unset there is none. |
@@ -210,6 +210,10 @@ These are the paths in the container.
 
 ```text
 /data/accounts/                   the volume bwtidy-accounts
+├── .run/                         emptied at the gateway's start
+│   └── NAME/                     a running worker's sockets, owned by its uid (mode 0700)
+│       ├── app.sock              the worker's socket
+│       └── bw.sock               the socket of its bw serve
 └── HOST/
     └── EMAIL/                    one account's data, owned by its uid (mode 0700)
         ├── app/
@@ -217,7 +221,6 @@ These are the paths in the container.
         │   └── mcp-token.sha256  the hash of the MCP token
         ├── bw/                   the Bitwarden CLI's login and state
         ├── home/                 the worker's home directory
-        ├── run/                  the sockets of the worker and of its bw serve
         └── worker.log            the account worker's log
 /backups/                         the volume bwtidy-backups, or the directory BWTIDY_BACKUPS names
 └── HOST/

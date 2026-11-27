@@ -20,6 +20,9 @@ from bwtidy.gateway.accounts import normalize_server
 from bwtidy.protocol import ACCOUNTS_DIR, STATS_FILE
 
 DEFAULT_ACCOUNTS_DIR = Path(ACCOUNTS_DIR)
+## the workers' socket directories, inside the accounts directory: its dot keeps it from ever
+## being a host directory (docs/spec.md, Socket directories)
+RUN_DIR = ".run"
 ## service uids below this are left to the host's own services, so no worker shares a uid with one
 DEFAULT_UID_BASE = 70000
 ## how long the gateway waits for a started worker's /api/health before it kills it
@@ -84,10 +87,17 @@ class GatewaySettings:
     ## means stats.db in the parent of accounts_dir, see stats_path
     stats: bool = False
     stats_db: Path | None = None
+    ## the root of the workers' socket directories, None means RUN_DIR in accounts_dir (see
+    ## run_path). Only the tests set it, so their sockets stay short however deep TMPDIR is.
+    run_dir: Path | None = None
 
     @property
     def stats_path(self) -> Path:
         return self.stats_db or self.accounts_dir.parent / STATS_FILE
+
+    @property
+    def run_path(self) -> Path:
+        return self.run_dir or self.accounts_dir / RUN_DIR
 
     @classmethod
     def from_env(cls) -> "GatewaySettings":

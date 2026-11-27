@@ -326,9 +326,6 @@ ACCOUNTS_DIR/HOST/EMAIL/
 │   ├── bw-login-state
 │   └── delete-requested once Delete my account ran
 ├── bw/                  BITWARDENCLI_APPDATA_DIR
-├── run/
-│   ├── app.sock
-│   └── bw.sock
 ├── home/                HOME
 ├── worker.log           the worker's stdout and stderr, appended
 └── .pending             until the first unlock
@@ -354,6 +351,37 @@ ACCOUNTS_DIR/HOST/EMAIL/
   The reason goes in its log. At its start it logs every such directory.
   Whatever the base, no worker starts as uid 0 or below (503 `The worker's
   uid is not usable.`).
+
+### Socket directories
+
+The sockets of a worker and of its `bw serve` lie outside the account
+directory, in a socket directory of their own.
+
+```text
+ACCOUNTS_DIR/.run/
+└── NAME/                one per worker
+    ├── app.sock         BWTIDY_SOCKET
+    └── bw.sock          BWTIDY_BW_SOCKET
+```
+
+- NAME is the first 16 hex digits of the SHA-256 of `HOST/EMAIL`. The
+  reason is that Linux allows at most 107 bytes in a Unix socket path. A
+  host of 253 characters and an email of 254 would not fit under
+  `ACCOUNTS_DIR/HOST/EMAIL`. NAME has the same length for every account.
+- `.run` starts with a dot, which no host name does. So it is never a host
+  directory, and nothing in it counts as an account.
+- The gateway empties `.run` at its start, as no socket left in it belongs to
+  a running worker. `.run` has mode 0711 and root owns it. So a worker can
+  enter it but cannot list the other accounts' socket directories.
+- Before each worker start the gateway makes NAME anew as root. Whatever was
+  there goes first, a symlink as the link alone. The account's uid and gid
+  own NAME with mode 0700, so the other accounts' uids cannot open its
+  sockets.
+- When a worker exited the gateway deletes its NAME, unless a new worker of
+  the account starts or runs by then.
+- The gateway stops at its start when `ACCOUNTS_DIR` is longer than 76
+  bytes. Its error says so, since every socket path would then be longer
+  than 107 bytes and no worker could start.
 
 ### Backups root
 
@@ -455,7 +483,7 @@ account directory. So `ROOT` can be any mount apart from the account data.
 - The gateway opens `worker.log` without following a link and without
   blocking. It refuses to start the worker (503) when that is not a regular
   file owned by the account's uid. A missing one is made with mode 0600.
-- The gateway waits up to 60 seconds for `/api/health` on `run/app.sock`.
+- The gateway waits up to 60 seconds for `/api/health` on its `app.sock`.
   Otherwise it kills the worker (its whole process group) and answers 503.
   One worker per account runs at a time.
 - Proxied requests have no timeout, and only the gateway's shutdown cuts them
