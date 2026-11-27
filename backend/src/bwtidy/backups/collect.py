@@ -184,41 +184,65 @@ async def list_covering(listing: Listing, needed: set[str]) -> tuple[Objects, se
     return objects, needed - ids(objects)
 
 
-async def list_vault(client: BwClient) -> tuple[Objects, Objects, Objects, Objects]:
-    """Items, folders, collections and organizations from bw serve, once they are settled.
+def not_trashed(items: Objects) -> Objects:
+    return [i for i in items if not i.get("deletedDate")]
+
+
+@dataclass(frozen=True)
+class VaultListing:
+    """What bw serve lists of the vault for a backup.
+
+    archived holds the archived items, those in the trash too, as every other listing
+    leaves them out.
+    """
+
+    items: Objects
+    archived: Objects
+    folders: Objects
+    collections: Objects
+    organizations: Objects
+
+
+async def list_vault(client: BwClient) -> VaultListing:
+    """Items, archived items, folders, collections and organizations from bw serve, once they
+    are settled.
 
     No items at all, or an item in an organization the listing lacks, is a BackupError: the
     backup would silently miss an export. A folder or collection the listing lacks is only
-    a warning, the raw items still carry the ids.
+    a warning, the raw items still carry the ids. The archived items count like the active
+    ones here, those in the trash like the trash: not at all.
     """
     items = await list_items_settled(client)
     if not items:
         raise BackupError("vault listing", "bw serve listed no items")
-    org_ids = {i["organizationId"] for i in items if i.get("organizationId")}
+    ## asked after the item list has settled, so bw serve has decrypted the items again
+    archived = [*await client.list_archived(), *await client.list_archived(trash=True)]
+    placed = [*items, *not_trashed(archived)]
+    org_ids = {i["organizationId"] for i in placed if i.get("organizationId")}
     organizations, missing = await list_covering(client.list_organizations, org_ids)
     if missing:
         raise BackupError(
             "vault listing", "an item belongs to an organization that bw serve did not list"
         )
-    folder_ids = {i["folderId"] for i in items if i.get("folderId")}
+    folder_ids = {i["folderId"] for i in placed if i.get("folderId")}
     folders, missing = await list_covering(client.list_folders, folder_ids)
     if missing:
-        affected = sum(1 for i in items if i.get("folderId") in missing)
+        affected = sum(1 for i in placed if i.get("folderId") in missing)
         log.warning(
             "Folders missing from bw serve's list: %d, items in them: %d. The backup goes on.",
             len(missing),
             affected,
         )
-    collection_ids = {c for i in items for c in i.get("collectionIds") or []}
+    collection_ids = {c for i in placed for c in i.get("collectionIds") or []}
     collections, missing = await list_covering(client.list_collections, collection_ids)
     if missing:
-        affected = sum(1 for i in items if missing & set(i.get("collectionIds") or []))
+        affected = sum(1 for i in placed if missing & set(i.get("collectionIds") or []))
         log.warning(
             "Collections missing from bw serve's list: %d, items in them: %d. The backup goes on.",
             len(missing),
             affected,
         )
-    return items, folders, collections, organizations
+    return VaultListing(items, archived, folders, collections, organizations)
 
 
 async def collect(
@@ -253,7 +277,7 @@ async def collect(
     timings.lap("sync")
     check("vault listing")
     try:
-        items, folders, collections, organizations = await list_vault(client)
+        vault = await list_vault(client)
     except BwError as error:
         raise BackupError("vault listing", str(error)) from None
     timings.lap("listing")
@@ -264,7 +288,7 @@ async def collect(
     members["personal-export.zip"] = personal
     timings.lap("personal export")
 
-    for org in organizations:
+    for org in vault.organizations:
         org_id = org["id"]
         step = "org export"
         data = await bw(step, "--raw", "export", "--format", "json", "--organizationid", org_id)
@@ -280,7 +304,8 @@ async def collect(
     timings.lap("trash listing")
 
     ## one download at a time: several bw processes at once share one CLI state
-    for item in [*items, *trashed]:
+    every = [*vault.items, *trashed, *vault.archived]
+    for item in every:
         for attachment, path in attachment_members(item):
             try:
                 members[path] = await bw(
@@ -297,14 +322,22 @@ async def collect(
                     "attachments",
                     f"attachment {attachment['id']} of item {item['id']}: {error.detail}",
                 ) from None
-    check_attachments([*items, *trashed], members)
+    check_attachments(every, members)
     timings.lap("attachments")
 
-    members["raw/items.json"] = dump(items)
-    members["raw/folders.json"] = dump(folders)
-    members["raw/collections.json"] = dump(collections)
-    members["raw/organizations.json"] = dump(organizations)
-    return Collected(members, fingerprint(items, folders, collections, organizations))
+    members["raw/items.json"] = dump(vault.items)
+    members["raw/archived.json"] = dump(vault.archived)
+    members["raw/folders.json"] = dump(vault.folders)
+    members["raw/collections.json"] = dump(vault.collections)
+    members["raw/organizations.json"] = dump(vault.organizations)
+    print_ = fingerprint(
+        vault.items,
+        vault.folders,
+        vault.collections,
+        vault.organizations,
+        archived=not_trashed(vault.archived),
+    )
+    return Collected(members, print_)
 
 
 def restore_manual(path: Path, version: str) -> bytes | None:

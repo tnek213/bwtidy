@@ -122,6 +122,10 @@ class Elsewhere:
     def trash(self, item_id: str) -> None:
         self.bw_cli.run("delete", "item", item_id, session=self.key)
 
+    def archive(self, item_id: str) -> None:
+        """Archive the item: every listing but `bw list items --archived` leaves it out."""
+        self.bw_cli.run("archive", "item", item_id, session=self.key)
+
     def backup(self) -> str:
         """A backup by hand, its file name."""
         self.beat()

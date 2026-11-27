@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from bwtidy.backups import reader as reader_module
-from bwtidy.backups.reader import BackupReader
+from bwtidy.backups.reader import BackupContents, BackupReader
 
 NAME = "20261026T120000Z.zip.age"
 OTHER = "20261027T120000Z.zip.age"
@@ -20,6 +20,7 @@ def _zip() -> bytes:
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("raw/items.json", json.dumps([{"id": "i1", "name": "One"}]))
         archive.writestr("raw/trash.json", "[]")
+        archive.writestr("raw/archived.json", json.dumps([{"id": "i2", "name": "Two"}]))
     return buffer.getvalue()
 
 
@@ -75,3 +76,19 @@ def test_a_read_after_a_clear_is_kept(reader: BackupReader, monkeypatch):
     reader.clear()
     contents = reader.read(NAME)
     assert reader._last is contents
+
+
+def test_the_contents_hold_the_archived_items_apart():
+    contents = BackupContents(NAME, _zip())
+    assert list(contents.items) == ["i1"]
+    assert list(contents.archived) == ["i2"]
+
+
+def test_a_backup_without_its_archived_listing_is_damaged():
+    """The backup layout has one current format (docs/spec.md, Backups)."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("raw/items.json", "[]")
+        archive.writestr("raw/trash.json", "[]")
+    with pytest.raises(ValueError, match="is damaged"):
+        BackupContents(NAME, buffer.getvalue())

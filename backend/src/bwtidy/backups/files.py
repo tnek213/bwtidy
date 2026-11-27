@@ -42,19 +42,37 @@ class FingerprintStore(Protocol):
 
 
 def fingerprint(
-    items: Objects, folders: Objects, collections: Objects, organizations: Objects
+    items: Objects,
+    folders: Objects,
+    collections: Objects,
+    organizations: Objects,
+    *,
+    archived: Objects,
 ) -> str:
     """A sha256 hex over what a backup covers, the same for the same vault whatever the order.
 
-    Of every item only its id, revisionDate, folder, favorite, organization, collections and
-    attachment ids count: the rest of an item is fixed by its revisionDate, and an attachment's
-    url carries a token that differs between two listings. The folder and the favorite count on
-    their own because the clients' partial update changes them without a new revisionDate. The
+    The archived items that are not in the trash count like the active items, on their own, so
+    archiving an item changes the fingerprint even when its revisionDate stays. Of every item
+    only its id, revisionDate, folder, favorite, organization, collections and attachment ids
+    count: the rest of an item is fixed by its revisionDate, and an attachment's url carries a
+    token that differs between two listings. The folder and the favorite count on their own
+    because the clients' partial update changes them without a new revisionDate. The
     collections count on their own because Vaultwarden changes an item's collections without a
     new revisionDate. Folders, collections and organizations count whole, they have no
     revisionDate of their own.
     """
-    item_keys = sorted(
+    covered = {
+        "items": _item_keys(items),
+        "archived": _item_keys(archived),
+        "folders": sorted(json.dumps(f, sort_keys=True) for f in folders),
+        "collections": sorted(json.dumps(c, sort_keys=True) for c in collections),
+        "organizations": sorted(json.dumps(o, sort_keys=True) for o in organizations),
+    }
+    return hashlib.sha256(json.dumps(covered, sort_keys=True).encode()).hexdigest()
+
+
+def _item_keys(items: Objects) -> list[str]:
+    return sorted(
         json.dumps(
             [
                 item.get("id"),
@@ -68,13 +86,6 @@ def fingerprint(
         )
         for item in items
     )
-    covered = {
-        "items": item_keys,
-        "folders": sorted(json.dumps(f, sort_keys=True) for f in folders),
-        "collections": sorted(json.dumps(c, sort_keys=True) for c in collections),
-        "organizations": sorted(json.dumps(o, sort_keys=True) for o in organizations),
-    }
-    return hashlib.sha256(json.dumps(covered, sort_keys=True).encode()).hexdigest()
 
 
 def list_backups(directory: Path) -> list[BackupInfo]:

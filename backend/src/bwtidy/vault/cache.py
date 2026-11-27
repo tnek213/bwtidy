@@ -63,6 +63,9 @@ class VaultCache:
         ## and a folder that still holds one is not deleted
         self.trashed: list[dict[str, Any]] = []
         self.trash_ids: set[str] = set()
+        ## the archived items that are not in the trash, which every other listing leaves out.
+        ## Only the backups' fingerprint reads them (docs/spec.md, Backups)
+        self.archived: list[dict[str, Any]] = []
         self.loaded = False
         self.own = OwnWrites()
         ## how many loads replaced the items, so what is computed from them (formats.py) knows
@@ -92,6 +95,7 @@ class VaultCache:
         self.organizations = await self._client.list_organizations()
         self.trashed = await self._client.list_trash()
         self.trash_ids = {i["id"] for i in self.trashed if i.get("id")}
+        self.archived = await self._client.list_archived()
         self.loaded = True
         try:
             self._on_load()
@@ -106,5 +110,6 @@ class VaultCache:
         self.organizations = []
         self.trashed = []
         self.trash_ids = set()
+        self.archived = []
         self.loaded = False
         self.own.clear()

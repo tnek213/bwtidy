@@ -17,7 +17,8 @@ attachment are made in the dev vault for the backup and deleted for good right a
 are values the seeded vault lacks: an empty folder, a folder Work/Clients, an empty collection,
 a login with reprompt, a boolean and a linked field and a URI match, a Family note in a folder,
 one marked favorite (both per user, so no organization export holds them) and one in two
-collections.
+collections. So are three archived notes with an attachment each: a personal one, a Family
+one and one in the trash.
 
 Nothing here prints an item or a value: a mismatch names items and keys only.
 """
@@ -54,10 +55,17 @@ ORG_TWINS = {"Family": b"family\n", "Club": b"club\n"}
 TWINS = {"first twin": b"one\n", "second twin": b"two\n"}
 SEEDED_ITEMS = 79
 SEEDED_ATTACHMENTS = 4
-## the twins, the org twins and the four below, the trashed note is not in raw/items.json
-MADE_ITEMS = 8
-## one each for the twins and the org twins
-MADE_ATTACHMENTS = 4
+## the twins, the org twins, the four below and the two archived notes that are not in the
+## trash (in raw/archived.json): the trashed notes are in neither file
+MADE_ITEMS = 10
+## one each for the twins, the org twins and those two archived notes
+MADE_ATTACHMENTS = 6
+## archived notes made for the backup, by their notes: name, file name and bytes
+ARCHIVED = {
+    "shelved": ("Shelved", "shelved.txt", b"archived\n"),
+    "org shelved": ("Org shelved", "org-shelved.txt", b"archived in Family\n"),
+    "shelved and binned": ("Shelved and binned", "binned.txt", b"archived in the trash\n"),
+}
 EMPTY = "Empty"
 CLIENTS = "Work/Clients"
 ## in the folder CLIENTS
@@ -97,6 +105,7 @@ NOT_COMPARED = {
     "revisionDate",
     "creationDate",
     "deletedDate",
+    "archivedDate",
     "organizationId",
     "collectionIds",
     "folderId",
@@ -233,6 +242,10 @@ class Restore:
     def json(self, *args: str) -> Any:
         return self.cli.json(*args, session=self.key)
 
+    def items(self) -> list[Item]:
+        """The items that are not in the trash, the archived ones too."""
+        return self.json("list", "items") + self.json("list", "items", "--archived")
+
     def org_ids(self) -> dict[str, str]:
         """Every organization's id by its name (dev/README.md: Restore, Family and Club)."""
         orgs = self.json("list", "organizations")
@@ -261,7 +274,10 @@ class Restore:
     def empty(self) -> None:
         """Delete every item, folder and collection of every organization for good."""
         self.run("sync")
-        for item in self.json("list", "items") + self.json("list", "items", "--trash"):
+        trash = self.json("list", "items", "--trash") + self.json(
+            "list", "items", "--trash", "--archived"
+        )
+        for item in self.items() + trash:
             self.run("delete", "item", item["id"], "--permanent")
         for folder in self.json("list", "folders"):
             if folder["id"]:
@@ -331,6 +347,13 @@ def backup(app: App, bw_cli: BwCli) -> Iterator[Backup]:
                 "Binned", "codes.txt", b"from the trash\n", "binned"
             )
             elsewhere.trash(made["binned"])
+            for notes, (item_name, file_name, content) in ARCHIVED.items():
+                place = places("Family", "Shared") if notes == "org shelved" else {}
+                made[notes] = elsewhere.note_with_attachment(
+                    item_name, file_name, content, notes, **place
+                )
+                elsewhere.archive(made[notes])
+            elsewhere.trash(made["shelved and binned"])
             name = elsewhere.backup()
         finally:
             elsewhere.clean_up()
@@ -360,11 +383,11 @@ def restore(bw_cli: BwCli) -> Iterator[Restore]:
 
 def match_backup(backup: Backup, restore: Restore, trash: bool = False) -> Matching:
     """Every backup item (and trashed item with trash, as imported) to the item it became."""
-    old = backup.json("raw/items.json")
+    old = backup.json("raw/items.json") + not_trashed(backup.json("raw/archived.json"))
     if trash:
         old += [
             {**{k: v for k, v in i.items() if k not in TRASH_DROPPED}, "id": i["id"]}
-            for i in backup.json("raw/trash.json")
+            for i in trashed(backup)
         ]
     old_names = Names(
         backup.json("raw/folders.json"),
@@ -377,11 +400,25 @@ def match_backup(backup: Backup, restore: Restore, trash: bool = False) -> Match
         restore.json("list", "collections"),
         restore.json("list", "organizations"),
     )
-    return match(old, restore.json("list", "items"), old_names, new_names)
+    return match(old, restore.items(), old_names, new_names)
 
 
-def attach(backup: Backup, restore: Restore, items: str) -> list[str]:
-    """Run docs/restore.md's attach.py on the backup items of the file items, as the document
+def not_trashed(items: list[Item]) -> list[Item]:
+    return [i for i in items if not i.get("deletedDate")]
+
+
+def trashed(backup: Backup) -> list[Item]:
+    """The items in the trash as docs/restore.md, step 6, takes them: the archived ones too."""
+    archived = backup.json("raw/archived.json")
+    return backup.json("raw/trash.json") + [i for i in archived if i.get("deletedDate")]
+
+
+## the files of docs/restore.md, step 5
+BACKUP_ITEMS = ("raw/items.json", "raw/archived.json")
+
+
+def attach(backup: Backup, restore: Restore, *items: str) -> list[str]:
+    """Run docs/restore.md's attach.py on the backup items of the files items, as the document
     does it in the unpacked backup. Returns the lines it printed, which name only ids."""
     program = backup.root / "attach.py"
     program.write_text(attach_program(RESTORE_DOC.read_text()))
@@ -392,7 +429,7 @@ def attach(backup: Backup, restore: Restore, items: str) -> list[str]:
         "BITWARDENCLI_APPDATA_DIR": restore.cli.appdata,
     }
     result = subprocess.run(
-        ["python3", "attach.py", items],
+        ["python3", "attach.py", *items],
         cwd=backup.root,
         env=env,
         stdin=subprocess.DEVNULL,
@@ -418,7 +455,7 @@ def first_run(backup: Backup, restore: Restore) -> list[str]:
         restore.run(
             "import", "bitwardenjson", str(export), "--organizationid", org_ids[org["name"]]
         )
-    lines = attach(backup, restore, "raw/items.json")
+    lines = attach(backup, restore, *BACKUP_ITEMS)
     assert not [line for line in lines if NOT_UPLOADED in line or NO_FOLDER in line], lines
     return lines
 
@@ -431,7 +468,9 @@ def uploaded(first_run: list[str]) -> int:
 
 @pytest.fixture(scope="module")
 def raw(backup: Backup) -> dict[str, dict[str, Any]]:
-    return {i["id"]: i for i in backup.json("raw/items.json")}
+    """The backup items that step 5 brings back: the active ones, archived or not."""
+    items = backup.json("raw/items.json") + not_trashed(backup.json("raw/archived.json"))
+    return {i["id"]: i for i in items}
 
 
 @pytest.fixture(scope="module")
@@ -482,6 +521,38 @@ def test_the_backup_holds_the_org_items_folder_and_favorite(backup: Backup, raw:
     assert not exported["Org favorite"]["favorite"]
 
 
+def test_the_backup_holds_the_archived_notes_apart(backup: Backup):
+    archived = {i["notes"]: i for i in backup.json("raw/archived.json")}
+    assert archived.keys() == ARCHIVED.keys()
+    for notes, (_, file_name, content) in ARCHIVED.items():
+        assert archived[notes]["id"] == backup.made[notes]
+        assert archived[notes]["archivedDate"]
+        assert backup.attachments(archived[notes]) == [(file_name, content)]
+    assert archived["shelved and binned"]["deletedDate"]
+    listed = backup.json("raw/items.json") + backup.json("raw/trash.json")
+    assert not {i["id"] for i in listed} & {backup.made[n] for n in ARCHIVED}
+
+
+def test_an_archived_personal_item_comes_back_archived_with_its_attachment(
+    backup: Backup, restore: Restore, imported: dict
+):
+    """The personal export holds its archivedDate, an organization export holds none, so
+    the archived Family note comes back active (docs/restore.md, What does not come back)."""
+    archived_ids = {i["id"] for i in restore.json("list", "items", "--archived")}
+    shelved = imported[backup.made["shelved"]]
+    assert shelved["id"] in archived_ids
+    assert shelved["archivedDate"]
+    org_shelved = imported[backup.made["org shelved"]]
+    assert org_shelved["id"] not in archived_ids
+    assert not org_shelved.get("archivedDate")
+    out = backup.root.parent / "archived"
+    out.mkdir()
+    for notes in ("shelved", "org shelved"):
+        _, file_name, content = ARCHIVED[notes]
+        same = restore.attachments(imported[backup.made[notes]], out) == [(file_name, content)]
+        assert same, f"{notes}: not its own file"
+
+
 def test_every_attachment_is_uploaded(raw: dict, uploaded: int):
     assert uploaded == sum(len(i.get("attachments") or []) for i in raw.values())
     assert uploaded == SEEDED_ATTACHMENTS + MADE_ATTACHMENTS
@@ -498,7 +569,7 @@ def test_attach_sets_the_folder_and_favorite_of_the_org_items_that_lack_them(
 def test_every_item_is_back_once(restore: Restore, raw: dict, imported: dict):
     assert imported.keys() == raw.keys()
     assert len({i["id"] for i in imported.values()}) == len(raw)
-    assert len(restore.json("list", "items")) == len(raw)
+    assert len(restore.items()) == len(raw)
 
 
 def test_every_item_has_the_same_leaves(raw: dict, imported: dict):
@@ -575,7 +646,8 @@ def test_org_items_are_in_the_org_of_the_same_name_and_the_same_collections(
     assert not wrong, f"wrong place: {wrong}"
     ## Family's 10 items and Club's 1, plus one org twin in each
     by_org = sorted(o for i in imported.values() if (o := org_name(new_orgs, i)))
-    assert by_org == ["Club"] * 2 + ["Family"] * (11 + len(FAMILY_MADE))
+    ## and the archived Family note
+    assert by_org == ["Club"] * 2 + ["Family"] * (12 + len(FAMILY_MADE))
 
 
 def test_the_made_items_are_back_with_their_folder_favorite_and_collections(
@@ -671,13 +743,13 @@ def test_each_org_twin_gets_its_own_organizations_file(
 
 def revisions(restore: Restore) -> dict[str, str]:
     restore.run("sync")
-    return {i["id"]: i["revisionDate"] for i in restore.json("list", "items")}
+    return {i["id"]: i["revisionDate"] for i in restore.items()}
 
 
 def test_a_second_run_of_attach_changes_nothing(backup: Backup, restore: Restore, imported):
     """docs/restore.md: run it again after a failure, it only adds what is missing."""
     before = revisions(restore)
-    assert attach(backup, restore, "raw/items.json") == []
+    assert attach(backup, restore, *BACKUP_ITEMS) == []
     assert revisions(restore) == before
 
 
@@ -693,7 +765,7 @@ def test_a_folder_name_the_account_lacks_leaves_the_item_in_its_folder(
     before = revisions(restore)
     rename(f"{CLIENTS} renamed")
     try:
-        lines = attach(backup, restore, "raw/items.json")
+        lines = attach(backup, restore, *BACKUP_ITEMS)
     finally:
         rename(CLIENTS)
     in_folder = imported[backup.made["Org in folder"]]["id"]
@@ -707,8 +779,13 @@ def test_a_folder_name_the_account_lacks_leaves_the_item_in_its_folder(
 
 def test_the_trash_imports_as_docs_restore_says(backup: Backup, restore: Restore, imported):
     """Runs last: it adds the trash items to the restore account, then their attachments."""
-    trash = backup.json("raw/trash.json")
-    assert {i["name"] for i in trash} == {"Old forum account", "Expired license key", "Binned"}
+    trash = trashed(backup)
+    assert {i["name"] for i in trash} == {
+        "Old forum account",
+        "Expired license key",
+        "Binned",
+        "Shelved and binned",
+    }
     items = [{k: v for k, v in i.items() if k not in TRASH_DROPPED} for i in trash]
     path = backup.root / "trash-import.json"
     path.write_text(json.dumps({"encrypted": False, "items": items}))
@@ -716,9 +793,9 @@ def test_the_trash_imports_as_docs_restore_says(backup: Backup, restore: Restore
     ## with-trash.json of step 6: the trashed items keep their ids, so attach.py finds their files
     moved = [{k: v for k, v in i.items() if k == "id" or k not in TRASH_DROPPED} for i in trash]
     (backup.root / "with-trash.json").write_text(json.dumps(backup.json("raw/items.json") + moved))
-    lines = attach(backup, restore, "with-trash.json")
-    assert sum(UPLOADED in line for line in lines) == 1
-    assert len(lines) == 1, lines
+    lines = attach(backup, restore, "with-trash.json", "raw/archived.json")
+    assert sum(UPLOADED in line for line in lines) == 2
+    assert len(lines) == 2, lines
     matching = match_backup(backup, restore, trash=True)
     assert not matching.unmatched
     out = backup.root.parent / "trash"
@@ -730,3 +807,4 @@ def test_the_trash_imports_as_docs_restore_says(backup: Backup, restore: Restore
         assert not diffs, f"{item['name']}: {diffs}"
         same = restore.attachments(new, out) == backup.attachments(item)
         assert same, f"{item['name']}: attachments differ"
+        assert bool(new.get("archivedDate")) == bool(item.get("archivedDate")), item["name"]

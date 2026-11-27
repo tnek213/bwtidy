@@ -92,6 +92,9 @@ class FakeBwServe:
         ## items moved to the trash by DELETE, in order, and the ids taken out of it again
         self.trashed: list[dict[str, Any]] = []
         self.restored: list[str] = []
+        ## the archived items, those in the trash with a deletedDate: only archived=true lists
+        ## them, with trash=true those in the trash
+        self.archived: list[dict[str, Any]] = []
         ## attachment bytes by (item id, attachment id), and the uploads as (item id, file name).
         ## Like Vaultwarden, an upload or a delete of an attachment leaves the revisionDate as
         ## it is, unless attachment_revisions asks for a new one each, as a server could
@@ -191,7 +194,10 @@ class FakeBwServe:
         if not self.unlocked:
             return fail("Vault is locked.")
         if (method, path) == ("GET", "/list/object/items"):
-            if request.url.params.get("trash") == "true":
+            trash = request.url.params.get("trash") == "true"
+            if request.url.params.get("archived") == "true":
+                return listing([i for i in self.archived if bool(i.get("deletedDate")) == trash])
+            if trash:
                 return listing(self.trashed)
             if self._empty_lists_left > 0:
                 self._empty_lists_left -= 1

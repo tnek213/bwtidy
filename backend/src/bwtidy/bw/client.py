@@ -94,6 +94,13 @@ class BwClient:
         data = await self._request("GET", "/list/object/items", params={"trash": "true"})
         return self._settled(data.get("data", []) if isinstance(data, dict) else [])
 
+    ## the archived items, which every other listing leaves out: what `bw list items --archived`
+    ## lists, and with trash those archived items that are in the trash
+    async def list_archived(self, trash: bool = False) -> list[dict[str, Any]]:
+        params = {"archived": "true", **({"trash": "true"} if trash else {})}
+        data = await self._request("GET", "/list/object/items", params=params)
+        return self._settled(data.get("data", []) if isinstance(data, dict) else [])
+
     async def list_collections(self) -> list[dict[str, Any]]:
         return await self._list("collections")
 

@@ -108,6 +108,7 @@ def test_every_member_is_there(backup: Backup, served_items: list[dict]):
             *attachments,
             "raw/items.json",
             "raw/trash.json",
+            "raw/archived.json",
             "raw/folders.json",
             "raw/collections.json",
             "raw/organizations.json",
@@ -193,6 +194,40 @@ def test_an_attachment_of_an_item_in_the_trash_is_backed_up(
         assert backup.archive.read(f"item-attachments/{item_id}/codes.txt") == b"from the trash\n"
     finally:
         elsewhere.clean_up()
+
+
+def test_an_archived_item_and_its_attachment_are_backed_up(
+    app: App, bw_cli: BwCli, tmp_path: Path, created: dict
+):
+    """bw leaves an archived item out of bw list items and bw list items --trash, and the
+    personal export holds no attachment by item id."""
+    elsewhere = Elsewhere(app, bw_cli, tmp_path)
+    try:
+        shelved = elsewhere.note_with_attachment("Shelved", "shelved.txt", b"archived\n")
+        elsewhere.archive(shelved)
+        binned = elsewhere.note_with_attachment("Shelved and binned", "binned.txt", b"both\n")
+        elsewhere.archive(binned)
+        elsewhere.trash(binned)
+        backup = Backup(app, elsewhere.backup())
+        assert backup.archive.read(f"item-attachments/{shelved}/shelved.txt") == b"archived\n"
+        assert backup.archive.read(f"item-attachments/{binned}/binned.txt") == b"both\n"
+        archived = {i["id"]: i for i in backup.json("raw/archived.json")}
+        assert archived.keys() == {shelved, binned}
+        assert archived[shelved]["archivedDate"] and not archived[shelved].get("deletedDate")
+        assert archived[binned]["archivedDate"] and archived[binned]["deletedDate"]
+        assert [a["fileName"] for a in archived[shelved]["attachments"]] == ["shelved.txt"]
+        listed = {i["id"] for i in backup.json("raw/items.json") + backup.json("raw/trash.json")}
+        assert not listed & {shelved, binned}
+        with zipfile.ZipFile(io.BytesIO(backup.archive.read("personal-export.zip"))) as export:
+            exported = {i["id"] for i in json.loads(export.read("data.json"))["items"]}
+        ## bw export leaves out the trash only, so the import brings the archived item back
+        assert shelved in exported and binned not in exported
+    finally:
+        elsewhere.clean_up()
+
+
+def test_a_vault_without_archived_items_has_an_empty_archived_listing(backup: Backup):
+    assert backup.json("raw/archived.json") == []
 
 
 def test_raw_items_equal_bw_serves_list(backup: Backup, served_items: list[dict]):
