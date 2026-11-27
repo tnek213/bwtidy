@@ -29,7 +29,8 @@ flowchart TD
 
 ## What it can see
 
-The agent sees every item with its plain values, such as these:
+The agent sees every item that is not archived, with its plain values, such
+as these:
 
 - the name, the type and the notes
 - the folder, the organization and the collections

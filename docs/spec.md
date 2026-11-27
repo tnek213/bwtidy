@@ -2441,6 +2441,11 @@ of the Columns button. [Rename an attachment](how-to/rename-attachment.md)
 covers Rename attachments, and [Change log](reference/ui.md#change-log) covers
 the Change log page. These are the rules behind them:
 
+- The vault in RAM loads only the items that are not archived (`GET
+  /list/object/items` without `archived=true`), so the grid, the search and the
+  MCP tools never show an archived item. `bw serve` lists archived items only
+  when asked. The backups hold them in `raw/archived.json`. Showing them is
+  planned after 1.0.
 - The grid is AG Grid Community. Column groups, a pinned `name` column and
   hiding columns are all in its free tier.
 - A column exists for every coordinate that some item has a value in.

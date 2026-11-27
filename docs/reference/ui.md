@@ -16,12 +16,13 @@ and the write.
 
 ## Vault
 
-The Vault page is a grid with one row per item. Each column is a coordinate,
-which is a place a value can be such as `login.username` or `fields.PIN`.
-The columns sit under the groups Item and Custom fields and under a group for
-each item type that has fields of its own. `name` and `template` stay pinned
-on the left. A header's tooltip gives the full coordinate and how many items
-have a value in it.
+The Vault page is a grid with one row per item. The grid shows the items that
+are not archived, and the trash is left out as before. Archived items stay in
+the backups. Each column is a coordinate, which is a place a value can be such
+as `login.username` or `fields.PIN`. The columns sit under the groups Item and
+Custom fields and under a group for each item type that has fields of its own.
+`name` and `template` stay pinned on the left. A header's tooltip gives the full
+coordinate and how many items have a value in it.
 
 ### Toolbar
 
