@@ -8,6 +8,9 @@ The versions of bwtidy follow [Semantic Versioning](https://semver.org) with
 
 Changes on main that are not yet in a versioned Docker image.
 
+- Restore a vault from a backup on Windows with PowerShell
+  ([#230](https://github.com/tnek213/bwtidy/pull/230))
+
 - Refuse an email or a server too long for an account's directory name with
   a clear message, where the first login failed with an error before
   ([#227](https://github.com/tnek213/bwtidy/pull/227))
