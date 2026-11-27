@@ -180,10 +180,11 @@ key and Shift+F10 on the header. This is the menu of a field column.
 - Set N in the Rare fields column sets N from 0 to 99 (see Rare fields in
   [Cells](#cells)).
 - Manage folders… in the Folder column lists every folder with its number of
-  items. Rename gives a folder a new name in place. Delete deletes an empty
-  folder, and a folder that holds items cannot be deleted even when they are
-  in the trash. A folder with a rename or delete in the queue takes no other
-  until it is written.
+  items. Rename gives a folder a new name in place. Save stays off for the
+  name of another folder, also when only its case differs (Straße and STRASSE
+  count as one name). Delete deletes an empty folder, and a folder that holds
+  items cannot be deleted even when they are in the trash. A folder with a
+  rename or delete in the queue takes no other until it is written.
 
 A merge that finds items with a value in more than one of the columns asks
 which value each of them keeps (Choose the values to keep).
