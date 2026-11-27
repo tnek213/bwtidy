@@ -120,9 +120,9 @@ bwtidy is in beta: feature complete for 1.0, with a stored format (the
 database, the bwtidy note, the backups, the settings) changing only with a
 migration. A new beta (`1.0.0-beta.N`) comes whenever something is fixed or
 the Bitwarden CLI has a new release. The beta becomes a release candidate
-(`1.0.0-rc.N`) when the gates of Road to 1.0
-(`docs/explanation/road-to-1.0.md`) hold, and the release candidate becomes
-1.0.0 after 8 weeks with no serious bug.
+(`1.0.0-rc.N`) when the gates of
+[Road to 1.0](../docs/explanation/road-to-1.0.md) hold, and the release
+candidate becomes 1.0.0 after 8 weeks with no serious bug.
 
 ## The release notes
 

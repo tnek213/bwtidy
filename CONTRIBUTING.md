@@ -4,9 +4,9 @@ bwtidy is beta software: its features are complete for 1.0, and a stored
 format (the database, the bwtidy note, the backups, the settings) changes only
 with a migration. Behavior may still change where a bug or feedback calls for
 it. What the beta needs before 1.0 is in
-[Road to 1.0](docs/releases.md#road-to-10). It has one maintainer for now and
-is meant to grow in the open, so issues, ideas and changes are welcome. There
-is no promise of a review time or of a change going in.
+[Road to 1.0](docs/explanation/road-to-1.0.md). It has one maintainer for now
+and is meant to grow in the open, so issues, ideas and changes are welcome.
+There is no promise of a review time or of a change going in.
 
 Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). Report
 behavior that breaks it to <tnek213.recollect098@slmail.me>.

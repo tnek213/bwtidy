@@ -492,7 +492,7 @@ you post there is shared. bwtidy itself sends nothing.
 
 The version follows [Semantic Versioning 2.0.0](https://semver.org) as
 MAJOR.MINOR.PATCH with pre-releases as `-alpha.N`, `-beta.N` and `-rc.N`.
-[Road to 1.0](../releases.md#road-to-10) says what the beta promises on the
+[Road to 1.0](../explanation/road-to-1.0.md) says what the beta promises on the
 way to 1.0.0.
 
 The About page shows the version and then the commit the running image was

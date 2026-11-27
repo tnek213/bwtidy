@@ -2632,7 +2632,7 @@ describe the About page and the More actions menu.
 - bwtidy follows Semantic Versioning 2.0.0 with MAJOR.MINOR.PATCH. Its
   pre-releases are `-alpha.N`, `-beta.N` and `-rc.N`. The version is
   `1.0.0-beta.1`, and everything a person sees uses that spelling. [Road to
-  1.0](releases.md#road-to-10) has the stages and what each one promises.
+  1.0](explanation/road-to-1.0.md) has the stages and what each one promises.
 - `backend/pyproject.toml` holds the version in Python's spelling
   (`1.0.0b1`), which Python packaging requires. It is the only place where
   the version is written by hand. The backend reads it from the installed
