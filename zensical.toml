@@ -61,6 +61,10 @@ custom_dir = "overrides"
 font = false
 features = [
   "content.code.copy",
+  # a click on a tab picks the same tab in every tab group of the page, and the choice is kept.
+  # The tabs exist only in the build copy that scripts/docs-site makes, from the pairs of shell
+  # commands of a page.
+  "content.tabs.link",
   "navigation.footer",
   "navigation.sections",
   "navigation.top",
@@ -108,6 +112,9 @@ pymdownx.inlinehilite = {}
 # GitHub's alerts (> [!NOTE], > [!TIP], > [!WARNING]) as boxes, so a box also shows on GitHub
 # and reads as a quote in a backup's RESTORE.md
 pymdownx.quotes.callouts = true
+# the content tabs, which exist only in the build copy that scripts/docs-site makes: it turns each
+# pair of shell commands of a page (a Bash and a PowerShell code block) into two tabs
+pymdownx.tabbed.alternate_style = true
 # a code block even when its info string holds an option it does not know, such as a diagram's
 # alt="..." (scripts/docs-site serve shows a diagram as its code block, build makes it a picture
 # first). Without it the fence stays text and its closing fence opens a block of what follows.

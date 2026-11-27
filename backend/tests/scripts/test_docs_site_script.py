@@ -920,3 +920,109 @@ def test_without_bwtidy_kroki_url_the_public_kroki_is_used(monkeypatch, docs_sit
 def test_the_types_are_kroki_s_thirty(docs_site):
     assert len(set(docs_site.KROKI_TYPES)) == 30
     assert {"mermaid", "plantuml", "d2", "graphviz", "vegalite"} <= set(docs_site.KROKI_TYPES)
+
+
+BASH = "Linux, macOS, WSL (Bash):"
+POWERSHELL = "Windows (PowerShell):"
+PAIR = (
+    f"{BASH}\n\n```sh\nls -l\n\necho done\n```\n\n"
+    f"{POWERSHELL}\n\n```powershell\nGet-ChildItem\n```\n"
+)
+TABS = (
+    '=== "Linux, macOS, WSL (Bash)"\n\n    ```sh\n    ls -l\n\n    echo done\n    ```\n\n'
+    '=== "Windows (PowerShell)"\n\n    ```powershell\n    Get-ChildItem\n    ```\n'
+)
+
+
+def test_a_pair_of_shell_commands_becomes_two_tabs(docs_site):
+    text = f"# Run\n\nRun this:\n\n{PAIR}\nThen go on.\n"
+    assert docs_site.shell_tabs(text) == f"# Run\n\nRun this:\n\n{TABS}\nThen go on.\n"
+
+
+def test_two_pairs_on_one_page_both_become_tabs(docs_site):
+    text = f"# Run\n\n{PAIR}\nAnd then:\n\n{PAIR}"
+    assert docs_site.shell_tabs(text) == f"# Run\n\n{TABS}\nAnd then:\n\n{TABS}"
+
+
+def test_a_pair_in_a_list_step_keeps_its_indent(docs_site):
+    def indented(text: str) -> str:
+        return "".join(f"    {line}" if line.strip() else line for line in text.splitlines(True))
+
+    text = f"1. Run:\n\n{indented(PAIR)}\n2. Done.\n"
+    tabs = indented(TABS)
+    assert docs_site.shell_tabs(text) == f"1. Run:\n\n{tabs}\n2. Done.\n"
+
+
+def test_a_page_without_a_pair_stays_as_it_is(docs_site):
+    text = (
+        f"# Run\n\n```sh\nls\n```\n\n````markdown\n{PAIR}````\n\n"
+        f"Text that names {BASH} inline.\n\n```powershell\ndir\n```"
+    )
+    assert docs_site.shell_tabs(text) == text
+
+
+@pytest.mark.parametrize(
+    ("page", "line", "why"),
+    [
+        (
+            f"# Run\n\n{BASH}\n\n```sh\nls\n```\n\nThen go on.\n",
+            3,
+            "without 'Windows (PowerShell):'",
+        ),
+        (f"# Run\n\n{POWERSHELL}\n\n```powershell\ndir\n```\n", 3, "without 'Linux, macOS"),
+        (f"# Run\n\n{BASH}\n\nls\n", 3, "is not directly followed by a ```sh block"),
+        (f"# Run\n\n{BASH}\n\n```bash\nls\n```\n", 3, "is not directly followed by a ```sh block"),
+        (
+            f"# Run\n\n{BASH}\n\n```sh\nls\n```\n\n{POWERSHELL}\n\nThen go on.\n",
+            9,
+            "'Windows (PowerShell):' is not directly followed by a ```powershell block",
+        ),
+    ],
+    ids=["bash-alone", "powershell-alone", "bash-without-block", "bash-wrong-language", "ps-bare"],
+)
+def test_build_fails_naming_the_page_and_line_of_a_broken_pair(
+    repo, monkeypatch, capsys, docs_site, page, line, why
+):
+    write(repo, "docs/how-to/run.md", page)
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 1
+    err = capsys.readouterr().err
+    assert f"docs-site: docs/how-to/run.md:{line}: " in err
+    assert why in err
+
+
+def test_build_hands_zensical_the_tabs_and_keeps_the_page_in_the_checkout(
+    repo, monkeypatch, tmp_path, docs_site
+):
+    page = f"# Run\n\n{PAIR}"
+    write(repo, "docs/how-to/run.md", page)
+    kept = tmp_path / "kept"
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site, keep=kept)
+    assert docs_site.build(None) == 0
+    assert (kept / "how-to" / "run.md").read_text() == f"# Run\n\n{TABS}"
+    assert (kept / "index.md").read_text() == "# Home\n"
+    assert (repo / "docs" / "how-to" / "run.md").read_text() == page
+
+
+def test_the_restore_page_gets_its_version_and_its_tabs(repo, monkeypatch, docs_site):
+    restore = f"# Restore\n\n{RESTORE_DOC_COMMIT} The project: there\n\n{PAIR}"
+    write(repo, "docs/restore.md", restore)
+    seen = fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 0
+    assert seen["restore.md"] == (
+        f"# Restore\n\nWritten for bwtidy 0.1.0-alpha.1 ({COMMIT}). The project: there\n\n{TABS}"
+    )
+
+
+def test_the_site_links_the_tabs_of_the_alternate_style():
+    with (REAL_ROOT / "zensical.toml").open("rb") as file:
+        config = tomllib.load(file)["project"]
+    assert config["markdown_extensions"]["pymdownx"]["tabbed"] == {"alternate_style": True}
+    assert "content.tabs.link" in config["theme"]["features"]
+
+
+def test_the_labels_are_the_tab_titles_of_the_docs(docs_site):
+    assert docs_site.SHELL_TABS == (
+        ("Linux, macOS, WSL (Bash):", "sh"),
+        ("Windows (PowerShell):", "powershell"),
+    )

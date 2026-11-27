@@ -348,6 +348,19 @@ line `Written for bwtidy COMMIT.`, as every backup does in its `RESTORE.md`:
 `BWTIDY_COMMIT` (the Dockerfile's docs stage takes it as a build arg) or else
 the checkout's last commit. The page in the checkout keeps `COMMIT`.
 
+A page offers a shell command for Bash and for Windows PowerShell as a pair in
+plain Markdown (AGENTS.md, Writing docs): the paragraph
+`Linux, macOS, WSL (Bash):` and a `sh` code block, then the paragraph
+`Windows (PowerShell):` and a `powershell` code block. After the version is
+in, the build turns each pair of its copy into two content tabs titled
+"Linux, macOS, WSL (Bash)" and "Windows (PowerShell)", each code block indented
+below its title. `zensical.toml` links the tabs (`content.tabs.link`), so a
+click on one tab shows that shell in every tab group of the page and the site
+keeps the choice. A label not directly followed by its code block, or one half
+of a pair without the other, fails the build with the page and the line. The
+page in the checkout keeps the plain pairs, which GitHub, a backup's
+`RESTORE.md` and `serve` show as they are.
+
 ### Diagrams
 
 A page holds a diagram as a fenced code block whose language is a Kroki

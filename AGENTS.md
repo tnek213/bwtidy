@@ -167,7 +167,16 @@ A prerequisite, a tip or a warning that matters may go in a box, written as
 GitHub's alert (`> [!NOTE]`, `> [!TIP]` or `> [!WARNING]`), and a directory
 layout is drawn as a tree in a `text` code block. No content tabs and no `!!!`
 admonitions: GitHub shows these pages too, and every backup holds
-`docs/restore.md` as plain text, where that syntax turns into code blocks. Cards
+`docs/restore.md` as plain text, where that syntax turns into code blocks.
+The one exception is a shell command for both Bash and Windows PowerShell,
+written as a pair in plain Markdown. It is a paragraph that is exactly
+`Linux, macOS, WSL (Bash):` directly followed by a ```` ```sh ```` block, then
+a paragraph that is exactly `Windows (PowerShell):` directly followed by a
+```` ```powershell ```` block, with only a blank line between each label and
+its block. The labels are plain paragraphs, not bold, as markdownlint's MD036
+takes a bold line for a heading. `scripts/docs-site build` turns each pair into
+two linked tabs in its copy of the docs only, and fails on a label without its
+block or on half a pair (dev/release.md, "The documentation site"). Cards
 (`<div class="grid cards" markdown>`) are for a landing page. A diagram is a
 fenced code block whose language is a Kroki diagram type (`mermaid`, `plantuml`,
 `d2`, `graphviz` or any other type <https://kroki.io/> lists) with

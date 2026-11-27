@@ -38,6 +38,16 @@ backend/pyproject.toml spelled the semver way, then the commit, from BWTIDY_COMM
 Dockerfile passes it) or else the checkout's last commit, as `0.1.0-alpha.1 (261111 7db8830)`.
 It fails when the page lacks the line. `serve` shows the page as it is.
 
+A page offers a shell command for Bash and for Windows PowerShell as a pair (AGENTS.md, Writing
+docs): the paragraph "Linux, macOS, WSL (Bash):" and a ```sh block, then the paragraph
+"Windows (PowerShell):" and a ```powershell block. After the version is in, `build` turns each
+pair of its copy of docs/ into two content tabs (SHELL_TABS), titled by the labels without their
+colon and with each code block indented by 4 spaces below its title, so the lines stay where they
+were. zensical.toml links the tabs, so a click on one shows the same shell in every tab group of
+the page and the choice is kept. A label not directly followed by its code block, or one half of
+a pair without the other, fails the build, naming the page and the line. The checkout keeps plain
+Markdown, which GitHub and a backup's RESTORE.md show as it is, and so does `serve`.
+
 Both `build` and `serve` hand the pages that version as extra.bwtidy_version (the link to the
 docs issue form), its semver alone as extra.bwtidy_release and the repo's star count from
 BWTIDY_STARS as extra.bwtidy_stars, left out when the variable is unset or not digits only (the
@@ -102,6 +112,9 @@ BANNER_MARKER = "data-disclaimer"
 ## backend/src/bwtidy/backups/collect.py (a test checks they agree)
 RESTORE_PAGE = "restore.md"
 RESTORE_DOC_COMMIT = "Written for bwtidy COMMIT."
+## the label paragraphs of a pair of shell commands (AGENTS.md, Writing docs) and the language of
+## the fence each one comes with, in their order. The build makes the pair linked content tabs.
+SHELL_TABS = (("Linux, macOS, WSL (Bash):", "sh"), ("Windows (PowerShell):", "powershell"))
 ## what Zensical writes at the top of every site, so a directory that holds both is a build
 BUILD_MARKERS = ("index.html", "sitemap.xml")
 ## a command in the backend's group docs (Zensical and resvg-py), without bwtidy itself
@@ -678,6 +691,109 @@ def fill_in_version(docs: Path, version: str) -> bool:
     return True
 
 
+class ShellTabsError(Exception):
+    """A label of a pair of shell commands that is not where the pair needs it, at line."""
+
+    def __init__(self, line: int, message: str) -> None:
+        super().__init__(message)
+        self.line = line
+
+
+def block_end(lines: list[str], start: int, fence: str) -> int:
+    """The index of the line that closes the code block opened at start, else the last line."""
+    end = start + 1
+    while end < len(lines) and not closes(lines[end], fence):
+        end += 1
+    return min(end, len(lines) - 1)
+
+
+def next_block(lines: list[str], index: int) -> int | None:
+    """The index of the first line after index that is not blank, None when there is none."""
+    return next((i for i in range(index + 1, len(lines)) if lines[i].strip()), None)
+
+
+def shell_fence(lines: list[str], label: int, indent: str, language: str) -> tuple[int, int]:
+    """The first and last line of the code block in language right after the label at label."""
+    start = next_block(lines, label)
+    match = OPENING_FENCE.match(lines[start]) if start is not None else None
+    if start is None or not match or match[1] != indent or match[3].split()[:1] != [language]:
+        name = lines[label].strip()
+        raise ShellTabsError(
+            label + 1, f"{name!r} is not directly followed by a ```{language} block"
+        )
+    return start, block_end(lines, start, match[2])
+
+
+def tab_line(line: str, indent: str) -> str:
+    """A line of a code block as the content of a tab at indent: 4 spaces further in."""
+    return f"{indent}    {line.removeprefix(indent)}" if line.strip() else line
+
+
+def shell_tabs(text: str) -> str:
+    """The markdown text with each pair of shell commands as two linked content tabs.
+
+    A pair is the paragraph of each label of SHELL_TABS directly followed by its code block, the
+    Bash one first. Each label becomes the title of a tab without its colon, and its code block
+    is indented by 4 spaces below it, so the text keeps its lines. A label without its code block
+    and one half of a pair without the other raise a ShellTabsError. A code block is copied whole,
+    so a label inside one stays as it is."""
+    (bash, bash_language), (powershell, powershell_language) = SHELL_TABS
+    lines = text.split("\n")
+    out: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        fence = OPENING_FENCE.match(line)
+        if fence:
+            end = block_end(lines, index, fence[2])
+            out += lines[index : end + 1]
+            index = end + 1
+            continue
+        indent = line[: len(line) - len(line.lstrip())]
+        if line.strip() == powershell:
+            raise ShellTabsError(
+                index + 1,
+                f"{powershell!r} without {bash!r} and its ```{bash_language} block before it",
+            )
+        if line.strip() != bash:
+            out.append(line)
+            index += 1
+            continue
+        first = shell_fence(lines, index, indent, bash_language)
+        second_label = next_block(lines, first[1])
+        if second_label is None or lines[second_label].rstrip() != f"{indent}{powershell}":
+            raise ShellTabsError(
+                index + 1,
+                f"{bash!r} and its ```{bash_language} block without {powershell!r} and its "
+                f"```{powershell_language} block right after them",
+            )
+        second = shell_fence(lines, second_label, indent, powershell_language)
+        for label, (start, end) in ((index, first), (second_label, second)):
+            title = lines[label].strip().removesuffix(":")
+            out.append(f'{indent}=== "{title}"')
+            out += lines[label + 1 : start]
+            out += [tab_line(fenced, indent) for fenced in lines[start : end + 1]]
+            if label == index:
+                out += lines[end + 1 : second_label]
+        index = second[1] + 1
+    return "\n".join(out)
+
+
+def make_shell_tabs(docs: Path) -> list[str]:
+    """Turn the pairs of shell commands of every page under docs into tabs, the problems found."""
+    problems = []
+    for page in sorted(docs.rglob("*.md")):
+        text = page.read_text(encoding="utf-8")
+        try:
+            tabbed = shell_tabs(text)
+        except ShellTabsError as error:
+            problems.append(f"{page.relative_to(docs.parent).as_posix()}:{error.line}: {error}")
+            continue
+        if tabbed != text:
+            page.write_text(tabbed, encoding="utf-8")
+    return problems
+
+
 def without_banner(site: Path) -> list[str]:
     """The HTML pages of a built site that lack the disclaimer banner's marker."""
     pages = sorted(site.rglob("*.html"))
@@ -960,7 +1076,9 @@ def build(target: Path | None) -> int:
                 file=sys.stderr,
             )
             return 1
-        problems = render_diagrams(project / DOCS)
+        problems = make_shell_tabs(project / DOCS)
+        if not problems:
+            problems = render_diagrams(project / DOCS)
         for problem in problems:
             print(f"docs-site: {problem}", file=sys.stderr)
         if problems:
