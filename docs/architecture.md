@@ -142,9 +142,10 @@ belongs in. When the rule itself is what changes, the config file and this
 section change in the same commit.
 
 The backend's rules are the contracts of `[tool.importlinter]` in
-`backend/pyproject.toml`. import-linter checks them (`uv run --locked lint-imports` in
-`backend/`). A contract holds for indirect imports too, so a chain through
-other modules breaks it just like a direct import. The contracts are these:
+`backend/pyproject.toml`. import-linter checks them
+(`uv run --locked lint-imports` in `backend/`). A contract holds for indirect
+imports too, so a chain through other modules breaks it just like a direct
+import. The contracts are these:
 
 - "Layers of the worker" holds the fifteen layers above from `main.py` down to
   the basics. The modules of a package may import each other but the flat
@@ -221,11 +222,11 @@ them.
   `GridDialog` or `NormalizeDialog` switch of `grid/dialogs/index.tsx`.
 - A setting of the deployment is an environment variable read in `config.py`
   or `gateway/settings.py` and named in `example.env`. Where a setting of the
-  user lives depends on what it belongs to. One that travels with the vault lives in the tool
-  note as a section (like the generator's). One that belongs to the account
-  on this machine lives in the SQLite settings table (like the auto-commit
-  numbers and the date format). One that belongs to the browser lives in a
-  cookie or localStorage (like the color mode).
+  user lives depends on what it belongs to. One that travels with the vault
+  lives in the tool note as a section (like the generator's). One that belongs
+  to the account on this machine lives in the SQLite settings table (like the
+  auto-commit numbers and the date format). One that belongs to the browser
+  lives in a cookie or localStorage (like the color mode).
 - A test goes where [Tests](#tests) says. A helper that two test files share
   goes into a support module and never into a test.
 
@@ -309,8 +310,10 @@ check on `/api/health`. Its port 8000 is published on the host's `127.0.0.1`
 (8765 by default). It mounts the volume `bwtidy-accounts` at `/data/accounts`
 and the backups at `/backups`. The backups are the volume `bwtidy-backups` or
 the host directory that `BWTIDY_BACKUPS` names, with
-`BWTIDY_BACKUPS_ROOT=/backups`. A stop gets 150 seconds. `STOP_TIMEOUT` in
-`gateway/workers.py` plus the gateway's request drain must stay below that.
+`BWTIDY_BACKUPS_ROOT=/backups`. It mounts the volume `bwtidy-stats` at
+`/stats` too, with `BWTIDY_STATS_DB=/stats/stats.db`. A stop gets 150
+seconds. `STOP_TIMEOUT` in `gateway/workers.py` plus the gateway's request
+drain must stay below that.
 
 The gateway runs as root and starts each worker as the account's uid. Without
 the worker settings `main.py` runs as a single-user backend on a TCP port,
@@ -327,7 +330,7 @@ The `docs` stage builds that site with `scripts/docs-site build` from
 beta disclaimer as a banner on every page. It uses the Zensical of the
 backend's dependency group `docs`, which stays out of the app's venv. The
 workflow `.github/workflows/docs.yml` builds the same site and publishes it on
-GitHub Pages. The user docs follow Diátaxis (https://diataxis.fr) with one
+GitHub Pages. The user docs follow Diátaxis (<https://diataxis.fr>) with one
 folder per kind of page under `docs/`. AGENTS.md (Writing docs) holds the
 rules for writing them.
 
@@ -358,51 +361,72 @@ No module imports a name that starts with an underscore from another module.
 
 The basics, with the two above the others first:
 
-- `config.py` the worker's settings from the environment (`Settings`), with the session timeouts (`Policy`) and the backup retention (`Retention`).
-- `login_state.py` the file `bw-login-state` that tells the gateway whether the CLI is logged in.
-- `logs.py` the log format, with a time on every line and other libraries from WARNING up.
+- `config.py` the worker's settings from the environment (`Settings`), with the
+  session timeouts (`Policy`) and the backup retention (`Retention`).
+- `login_state.py` the file `bw-login-state` that tells the gateway whether the
+  CLI is logged in.
+- `logs.py` the log format, with a time on every line and other libraries from
+  WARNING up.
 - `timing.py` the step durations of a slow operation, for one INFO line.
-- `version.py` `semver`, the version as semver.org spells it. It uses the stdlib only so that `scripts/devlib/versions.py` can load it by path.
-- `validation.py` the answer to a refused request body (never the body), and the one text of a validation error.
-- `passphrase.py` age passphrase encryption with the master password and the password hash, the only caller of scrypt.
-- `mcp_token.py` the MCP token's record and its checks, which the gateway and the worker share.
+- `version.py` `semver`, the version as semver.org spells it. It uses the stdlib
+  only so that `scripts/devlib/versions.py` can load it by path.
+- `validation.py` the answer to a refused request body (never the body), and the
+  one text of a validation error.
+- `passphrase.py` age passphrase encryption with the master password and the
+  password hash, the only caller of scrypt.
+- `mcp_token.py` the MCP token's record and its checks, which the gateway and
+  the worker share.
 - `protocol.py` the strings the gateway, the worker and the frontend agree on.
-- `db.py` `Database`, the SQLite file at its one schema. It holds the change log and the queue as well as the settings and the backup fingerprints.
+- `db.py` `Database`, the SQLite file at its one schema. It holds the change log
+  and the queue as well as the settings and the backup fingerprints.
 
 The usage stats in `stats/`, beside `config.py` and kept only with
 `BWTIDY_STATS=1`:
 
-- `stats/db.py` the gateway's stats file with `MIGRATIONS` as well as the writes and the retention.
-- `stats/parse.py` what the gateway reads of a request and checks against the worker's names. That is the route templates and the JSON-RPC methods and tool names as well as the outcomes and the error report.
-- `stats/recorder.py` `Recorder`, which holds what was seen in RAM and writes it in batches off the request path. It also takes the capacity samples.
-- `stats/report.py` the worker's side with its names at `/stats/names` and the error header of its 500.
-- `stats/summary.py` `summary` (the one dict that a page or `bwtidy stats` shows) and the top errors.
+- `stats/db.py` the gateway's stats file with `MIGRATIONS` as well as the writes
+  and the retention.
+- `stats/parse.py` what the gateway reads of a request and checks against the
+  worker's names. That is the route templates and the JSON-RPC methods and tool
+  names as well as the outcomes and the error report.
+- `stats/recorder.py` `Recorder`, which holds what was seen in RAM and writes it
+  in batches off the request path. It also takes the capacity samples.
+- `stats/report.py` the worker's side with its names at `/stats/names` and the
+  error header of its 500.
+- `stats/summary.py` `summary` (the one dict that a page or `bwtidy stats`
+  shows) and the top errors.
 
 Talking to bw in `bw/`:
 
 - `bw/client.py` `BwClient`, the async client of bw serve's API.
 - `bw/serve.py` `BwServeProcess` starts bw serve and restarts it when it exits.
 - `bw/process.py` `run_cli` (the one way to run a bw CLI command) and `stop_bw`.
-- `bw/login.py` `BwLogin`, the CLI login in a pseudo-terminal for the web UI and the CLI's logout.
+- `bw/login.py` `BwLogin`, the CLI login in a pseudo-terminal for the web UI and
+  the CLI's logout.
 - `bw/revision.py` `same_revision`, the one comparison of two revisionDates.
 
 The vocabulary in `items/`:
 
 - `items/coordinates.py` where a value lives in an item (its grid column), and `is_secret`.
-- `items/normalize.py` renaming fields and merging columns and items, with the near-duplicate hints.
+- `items/normalize.py` renaming fields and merging columns and items, with the
+  near-duplicate hints.
 - `items/patterns.py` the datatype pattern engine, bounded for untrusted patterns.
 - `items/ssh_keys.py` an SSH key's public key and fingerprint from its private key.
 
 The tool note's sections in `sections/`:
 
 - `sections/__init__.py` `SECTIONS` (each section's rules by name) and `SectionChange`.
-- `sections/notes.py` the notes JSON and `SectionRules`, what every section module builds on.
-- `sections/templates.py` the templates section with its model, its parser and its changes.
-- `sections/datatypes.py` the datatypes section and the check that no datatype a template uses is deleted.
-- `sections/generator.py` the generator section and the query of bw's generator for a set of options.
+- `sections/notes.py` the notes JSON and `SectionRules`, what every section
+  module builds on.
+- `sections/templates.py` the templates section with its model, its parser and
+  its changes.
+- `sections/datatypes.py` the datatypes section and the check that no datatype a
+  template uses is deleted.
+- `sections/generator.py` the generator section and the query of bw's generator
+  for a set of options.
 - `sections/to_fill.py` the toFill section as the note stores it, and its changes.
 - `sections/note.py` the note section, the name the tool note is expected to have.
-- `sections/matching.py` the scoring and matching of an item against the templates and datatypes.
+- `sections/matching.py` the scoring and matching of an item against the
+  templates and datatypes.
 
 The operations:
 
@@ -412,36 +436,53 @@ The account's state in RAM in `vault/`:
 
 - `vault/cache.py` `VaultCache`, the vault in RAM.
 - `vault/own_writes.py` `OwnWrites`, the chain of bwtidy's own writes this session.
-- `vault/tool_note.py` finds and creates the tool note, keeps its id (`ToolNoteId`) and its backup password fields.
-- `vault/hidden.py` `HiddenValues`, the age identity that encrypts queued secret values.
-- `vault/formats.py` the cached note's templates and datatypes and `Formats`, how the cached values match them.
-- `vault/statistics.py` the counters of how hard the pattern checks work, kept by `Formats`.
+- `vault/tool_note.py` finds and creates the tool note, keeps its id
+  (`ToolNoteId`) and its backup password fields.
+- `vault/hidden.py` `HiddenValues`, the age identity that encrypts queued secret
+  values.
+- `vault/formats.py` the cached note's templates and datatypes and `Formats`,
+  how the cached values match them.
+- `vault/statistics.py` the counters of how hard the pattern checks work, kept
+  by `Formats`.
 
 Backups in `backups/`:
 
-- `backups/files.py` the backup files with their listing and names, the retention rule and the fingerprint.
-- `backups/crypto.py` the age encryption of a backup file and the re-encryption after a new master password.
-- `backups/collect.py` `create_backup`, which checks the exports and listings through bw and puts them into one zip with its RESTORE.md.
+- `backups/files.py` the backup files with their listing and names, the
+  retention rule and the fingerprint.
+- `backups/crypto.py` the age encryption of a backup file and the re-encryption
+  after a new master password.
+- `backups/collect.py` `create_backup`, which checks the exports and listings
+  through bw and puts them into one zip with its RESTORE.md.
 - `backups/reader.py` `BackupReader`, a decrypted backup in RAM.
-- `backups/keeper.py` `BackupKeeper` with the backup of a write, the background backup and the retention.
+- `backups/keeper.py` `BackupKeeper` with the backup of a write, the background
+  backup and the retention.
 
 The session:
 
-- `session.py` `SessionManager` with the unlock and the session token as well as the timeouts and the end.
+- `session.py` `SessionManager` with the unlock and the session token as well as
+  the timeouts and the end.
 - `worker.py` `WorkerLifetime` with the exit after the session and the pending marker.
 
 The write path in `writes/`:
 
-- `writes/path.py` `WritePath.apply` (the batch driver) and `WriteContext`, what the modules of the kinds call on it. That covers the vault in RAM and bw serve as well as the backups and the shared steps of a write. It also holds `APPLY` with the function of each kind of operation typed to its class.
+- `writes/path.py` `WritePath.apply` (the batch driver) and `WriteContext`, what
+  the modules of the kinds call on it. That covers the vault in RAM and bw serve
+  as well as the backups and the shared steps of a write. It also holds `APPLY`
+  with the function of each kind of operation typed to its class.
 - `writes/check.py` `validate`, the check of a batch before anything is written.
 - `writes/rules.py` the secret rules every write checks.
 - `writes/planners.py` what an operation makes of an item, without writing.
-- `writes/saves.py` a section save with its check and the notes as its write leaves them.
+- `writes/saves.py` a section save with its check and the notes as its write
+  leaves them.
 - `writes/restore_plan.py` what a restoreItems does per item of a change log row.
-- `writes/items.py` the writes of one item or a few. They change a leaf or the URIs and set the collections. They move, rename and merge items and handle the trash.
-- `writes/create.py` createItem and the conversions that create a new item and trash the old one.
+- `writes/items.py` the writes of one item or a few. They change a leaf or the
+  URIs and set the collections. They move, rename and merge items and handle the
+  trash.
+- `writes/create.py` createItem and the conversions that create a new item and
+  trash the old one.
 - `writes/folders.py` the folder of a move or a new item, and the folder kinds.
-- `writes/attachments.py` renameAttachment, an upload and a delete that leave one copy.
+- `writes/attachments.py` renameAttachment, an upload and a delete that leave
+  one copy.
 - `writes/note.py` `_write_note`, the one write of the tool note's notes.
 - `writes/restore.py` restoreItems, step by step as the plan says.
 
@@ -450,38 +491,57 @@ The review queue in `queue/`:
 - `queue/review.py` `ReviewQueue`, the facade the doors and `main.py` call.
 - `queue/state.py` `QueueState` (what the modules share) and an entry's stored form.
 - `queue/intake.py` what comes in, with the checks on arrival and the stores.
-- `queue/commit.py` `approve` and `retry`, which send a batch through the write path and apply or blame each entry.
-- `queue/entries.py` the rows with the one status write, the listing and the decisions without a write.
+- `queue/commit.py` `approve` and `retry`, which send a batch through the write
+  path and apply or blame each entry.
+- `queue/entries.py` the rows with the one status write, the listing and the
+  decisions without a write.
 - `queue/agent.py` what the agent reads of its own entries.
 - `queue/sections.py` a section as the saves under way leave it.
 - `queue/wipe.py` the account data deletion and the backups the queue still needs.
 - `queue/view.py` an entry's summary and its masked diff.
-- `queue/autocommit.py` `AutoCommit`, the commit of the UI's entries on time or count.
+- `queue/autocommit.py` `AutoCommit`, the commit of the UI's entries on time or
+  count.
 - `queue/to_fill.py` `ToFill`, the list of secret fields still to fill in.
 
 The agent's door in `mcp/`:
 
-- `mcp/server.py` `BwtidyMcp`, which gates every tool. Its `create_mcp_server` registers `TOOLS` and hands each tool its interface, which is `AgentVault` for the read and propose tools and `SessionActions` for the session tools.
-- `mcp/vault.py` `AgentVault`, the vault as the agent sees it. It says what each tool may read and puts its proposals into the queue.
-- `mcp/texts.py` what the agent reads, which is the instructions and each tool's description.
+- `mcp/server.py` `BwtidyMcp`, which gates every tool. Its `create_mcp_server`
+  registers `TOOLS` and hands each tool its interface, which is `AgentVault` for
+  the read and propose tools and `SessionActions` for the session tools.
+- `mcp/vault.py` `AgentVault`, the vault as the agent sees it. It says what each
+  tool may read and puts its proposals into the queue.
+- `mcp/texts.py` what the agent reads, which is the instructions and each tool's
+  description.
 - `mcp/read_tools.py` the read tools.
 - `mcp/propose_tools.py` the propose tools, one operation each.
-- `mcp/session_tools.py` the two tools that end the session after the answer and `SessionActions` (all they may do).
-- `mcp/auth.py` `McpToken` (the worker's token file) and `RequireMcpToken` in front of `/mcp`.
+- `mcp/session_tools.py` the two tools that end the session after the answer and
+  `SessionActions` (all they may do).
+- `mcp/auth.py` `McpToken` (the worker's token file) and `RequireMcpToken` in
+  front of `/mcp`.
 
 The browser's door in `api/`:
 
-- `api/app_state.py` `AppState`, the parts that every route reaches through `app_state(request)`. Among them are the settings and the database with the vault in RAM. The session and the write path are there too along with the keeper and the queue.
-- `api/deps.py` what the route modules share, such as the session dependency and the request header check. It also gives the session's state as the login routes answer it and the tool note.
+- `api/app_state.py` `AppState`, the parts that every route reaches through
+  `app_state(request)`. Among them are the settings and the database with the
+  vault in RAM. The session and the write path are there too along with the
+  keeper and the queue.
+- `api/deps.py` what the route modules share, such as the session dependency and
+  the request header check. It also gives the session's state as the login
+  routes answer it and the tool note.
 - `api/errors.py` the HTTP answer of each domain error.
-- `api/sections.py` what the section routes share, which is the queued changes and the current view.
+- `api/sections.py` what the section routes share, which is the queued changes
+  and the current view.
 - `api/session.py` unlock, heartbeat and log out.
 - `api/bwlogin.py` the Bitwarden CLI login from the web UI.
 - `api/grid.py` the vault as a grid, and the one route that answers a secret.
 - `api/queue.py` the queue with the UI edits, the decisions and the auto-commit.
-- `api/operations.py` `POST /api/operations` straight to the write path for scripts and test setup. It also answers the change log and restore plans, each from the parts that `AppState` holds.
-- `api/backups.py` listing and taking backups as well as downloading and deleting them.
-- `api/templates.py` the templates section and the matches, and the tool note's rename back and keep name straight to the write path.
+- `api/operations.py` `POST /api/operations` straight to the write path for
+  scripts and test setup. It also answers the change log and restore plans, each
+  from the parts that `AppState` holds.
+- `api/backups.py` listing and taking backups as well as downloading and
+  deleting them.
+- `api/templates.py` the templates section and the matches, and the tool note's
+  rename back and keep name straight to the write path.
 - `api/datatypes.py` the datatypes section and the live pattern checks.
 - `api/generator.py` the generator settings and an example value.
 - `api/statistics.py` the numbers of the Statistics page.
@@ -495,13 +555,17 @@ The composition root:
 
 The gateway in `gateway/`:
 
-- `gateway/app.py` the gateway's routes, the account state machine and the static files.
-- `gateway/proxy.py` the proxy to the workers, with the routing by cookie and token and the headers that pass.
+- `gateway/app.py` the gateway's routes, the account state machine and the
+  static files.
+- `gateway/proxy.py` the proxy to the workers, with the routing by cookie and
+  token and the headers that pass.
 - `gateway/settings.py` the gateway's settings from the environment.
 - `gateway/accounts.py` account keys, directories and uids.
-- `gateway/backups.py` `BackupsRoot`, each account's directory under the backups root.
+- `gateway/backups.py` `BackupsRoot`, each account's directory under the backups
+  root.
 - `gateway/workers.py` start, watch and stop one worker per account.
-- `gateway/stats.py` `StatsMiddleware` around the proxy, which notes each request that reaches a worker for the recorder and learns the workers' names.
+- `gateway/stats.py` `StatsMiddleware` around the proxy, which notes each
+  request that reaches a worker for the recorder and learns the workers' names.
 
 ## Frontend
 
@@ -510,10 +574,14 @@ date picker for date fields. `main.tsx` mounts `App.tsx`. Four directories
 hold what the pages share and the others are the pages and the app bar. What
 each may import is in [Layers and their rules](#layers-and-their-rules).
 
-- `api/` the backend's resources, one file each with its fetchers and React Query keys and JSON types. It also holds `apiFetch` in `api/api.ts` and the operation builders in `api/operations.ts`. The rules of a page live in the page.
+- `api/` the backend's resources, one file each with its fetchers and React
+  Query keys and JSON types. It also holds `apiFetch` in `api/api.ts` and the
+  operation builders in `api/operations.ts`. The rules of a page live in the
+  page.
 - `shared/` the helpers and small components that belong to no page:
     - the coordinates (a mirror of `items/coordinates.py`)
-    - the account's lifecycle (reopening, switching and the other tabs) and the lock
+    - the account's lifecycle (reopening, switching and the other tabs) and the
+      lock
     - how a cell value shows
     - the queue's failure text
     - the generator's limits and checks
@@ -521,16 +589,24 @@ each may import is in [Layers and their rules](#layers-and-their-rules).
     - the date and time format and the date field
     - the form dialog and the generator form
     - the password managers' opt-out
-- `commit/` the commit tracker, which is `AutoCommitProvider` with its context and the unread marks.
-- `theme/` the color mode and the layout (Normal or Compact) as well as `Prose`, the paragraph with balanced lines.
-- `about/` the About page with the version and the license as well as the credits and the third-party packages.
-- `appbar/` the app bar. It holds the page links and Commit now as well as the MCP switch and the color mode. Log out and the more menu sit there too.
+- `commit/` the commit tracker, which is `AutoCommitProvider` with its context
+  and the unread marks.
+- `theme/` the color mode and the layout (Normal or Compact) as well as `Prose`,
+  the paragraph with balanced lines.
+- `about/` the About page with the version and the license as well as the
+  credits and the third-party packages.
+- `appbar/` the app bar. It holds the page links and Commit now as well as the
+  MCP switch and the color mode. Log out and the more menu sit there too.
 - `backups/` the alert about backups to re-encrypt after a new master password.
-- `changelog/` the Change log page with its filters and restore as well as delete backup and the diff report.
-- `grid/` the Vault grid page with its cells, toolbar and dialogs. Each dialog is one file in `grid/dialogs/`.
+- `changelog/` the Change log page with its filters and restore as well as
+  delete backup and the diff report.
+- `grid/` the Vault grid page with its cells, toolbar and dialogs. Each dialog
+  is one file in `grid/dialogs/`.
 - `queue/` the Queue page.
-- `session/` the account form and the Bitwarden login as well as the unlock and the heartbeat.
-- `settings/` the Settings page with the display settings and the default generator as well as deleting the data.
+- `session/` the account form and the Bitwarden login as well as the unlock and
+  the heartbeat.
+- `settings/` the Settings page with the display settings and the default
+  generator as well as deleting the data.
 - `statistics/` the Statistics page.
 - `templates/` the Types page with the templates and the datatypes.
 
@@ -659,11 +735,11 @@ The other ways in:
 - The tool note travels with the vault. Its notes JSON holds the sections
   `templates` and `datatypes` as well as `generator` and `toFill` (one module
   each in `sections/`). Its hidden fields hold the backups' passwords.
-- The account directory `/data/accounts/HOST/EMAIL/` ([spec.md, Account directory](spec.md#account-directory)) is made
-  at the account's first Bitwarden login. It holds `app/` with the SQLite
-  file and `mcp-token.sha256` as well as `bw-login-state` and the delete marker. Next to it
-  lie the CLI state `bw/` and the sockets in `run/` as well as `home/` and
-  `worker.log`.
+- The account directory `/data/accounts/HOST/EMAIL/` ([spec.md, Account
+  directory](spec.md#account-directory)) is made at the account's first
+  Bitwarden login. It holds `app/` with the SQLite file and `mcp-token.sha256`
+  as well as `bw-login-state` and the delete marker. Next to it lie the CLI
+  state `bw/` and the sockets in `run/` as well as `home/` and `worker.log`.
 - The backups `*.zip.age` live under the backups root in
   `/backups/HOST/EMAIL/` with `compose.yaml`. Otherwise they live in
   `app/backups/` of the account directory, or where `BWTIDY_BACKUPS_DIR`

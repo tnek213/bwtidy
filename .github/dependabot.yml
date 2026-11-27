@@ -40,6 +40,17 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
 
+  # markdownlint-cli2, which scripts/ci lints the Markdown files with, pinned to one version in its
+  # package.json
+  - package-ecosystem: npm
+    directory: /tools/markdownlint
+    schedule:
+      interval: weekly
+    groups:
+      markdownlint-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
   - package-ecosystem: docker
     directory: /
     schedule:

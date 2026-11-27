@@ -6,7 +6,7 @@ how.
 
 <div class="grid cards" markdown>
 
--   :lucide-bug:{ .lg .middle } __Bug report__
+- :lucide-bug:{ .lg .middle } **Bug report**
 
     ---
 
@@ -15,7 +15,7 @@ how.
 
     [:lucide-arrow-right: Report a bug](https://github.com/tnek213/bwtidy/issues/new?template=bug_report.yml)
 
--   :lucide-lightbulb:{ .lg .middle } __Change request__
+- :lucide-lightbulb:{ .lg .middle } **Change request**
 
     ---
 
@@ -25,7 +25,7 @@ how.
 
     [:lucide-arrow-right: Request a change](https://github.com/tnek213/bwtidy/issues/new?template=feature_request.yml)
 
--   :lucide-book-open:{ .lg .middle } __Documentation__
+- :lucide-book-open:{ .lg .middle } **Documentation**
 
     ---
 
@@ -35,7 +35,7 @@ how.
 
     [:lucide-arrow-right: Suggest a docs improvement](https://github.com/tnek213/bwtidy/issues/new?template=docs_improvement.yml)
 
--   :lucide-git-pull-request:{ .lg .middle } __Pull request__
+- :lucide-git-pull-request:{ .lg .middle } **Pull request**
 
     ---
 
@@ -44,7 +44,7 @@ how.
 
     [:lucide-arrow-right: Read CONTRIBUTING.md](https://github.com/tnek213/bwtidy/blob/main/CONTRIBUTING.md)
 
--   :lucide-shield-alert:{ .lg .middle } __Security issue__
+- :lucide-shield-alert:{ .lg .middle } **Security issue**
 
     ---
 
@@ -53,7 +53,7 @@ how.
 
     [:lucide-arrow-right: Read SECURITY.md](https://github.com/tnek213/bwtidy/blob/main/SECURITY.md#reporting-a-vulnerability)
 
--   :lucide-heart-handshake:{ .lg .middle } __Code of conduct__
+- :lucide-heart-handshake:{ .lg .middle } **Code of conduct**
 
     ---
 

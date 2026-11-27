@@ -37,8 +37,20 @@ RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
 ## the vault every visitor gets, imported by the controller
 COPY dev/fixture-personal.json /app/demo/fixture-personal.json
 
+## the controller's own user (dev/demo.md, Controller): fixed ids that init gives the secrets'
+## group and the ledger to (bwtidy_demo.init), below bwtidy's accounts (BWTIDY_UID_BASE, 70000)
+## and none that the nginx or Vaultwarden image uses. Its home is the controller's tmpfs. The
+## image's /ledger is its own, so a new ledger volume starts with that owner.
+RUN groupadd --system --gid 10100 controller \
+    && useradd --system --uid 10100 --gid 10100 --no-create-home --home-dir /tmp \
+        --shell /usr/sbin/nologin controller \
+    && mkdir /ledger \
+    && chown 10100:10100 /ledger \
+    && chmod 0700 /ledger
+
 ENV PATH=/app/backend/.venv/bin:$PATH \
     DEMO_FIXTURE=/app/demo/fixture-personal.json
 
-## the base's user (root, for the worker uids), its WORKDIR and its read-only file system stay
+## the base's user (root, for the worker uids), its WORKDIR and its read-only file system stay.
+## compose.demo.yaml runs the controller as its own user.
 CMD ["bwtidy-demo-gateway"]

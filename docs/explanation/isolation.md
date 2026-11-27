@@ -75,8 +75,8 @@ in [Configuration](../reference/configuration.md#files-and-volumes).
 - The gateway runs as root and can read every account's directory. It reads
   only three small files there. They are the MCP token's hash, whether the
   CLI is logged in and the marker of an account that asked to be deleted.
-  The gateway reads each one only when it is a regular file that the
-  account's uid owns, and never through a symlink.
+  The gateway trusts a file only when the file itself is a regular file and
+  not a symlink, and the account's uid owns it.
 - Anyone who is root on the host or can run Docker there can read every file
   and every worker's memory, the unlocked vault included. bwtidy does not
   protect against that. The web port is published only on the host's

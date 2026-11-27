@@ -7,6 +7,16 @@ services:
     networks:
       - front
       - public
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
 
   edge:
     network_mode: service:sidecar

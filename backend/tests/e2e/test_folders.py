@@ -3,6 +3,9 @@
 
 The folder Infra is renamed and renamed back by the Restore, the folder Spare is made empty as
 another device and deleted. The fixture vault_put_back puts both back when a step fails.
+
+The rename refuses another folder's name as the backend does, by case folding: with Infra renamed
+to Straße, Work cannot become STRASSE.
 """
 
 from typing import Any
@@ -11,7 +14,7 @@ import pytest
 from playwright.sync_api import Locator, Page, expect
 from support.api import Api, commit_new_entries, last_entry_id
 from support.elsewhere import elsewhere
-from support.pages import item_cell, search
+from support.pages import grid, item_cell, search
 
 pytestmark = pytest.mark.usefixtures("vault_put_back")
 
@@ -89,3 +92,31 @@ def test_manage_folders_renames_a_folder_and_deletes_an_empty_one(unlocked_page:
     expect(restore).to_be_hidden()
     commit_new_entries(api, after)
     assert folders(api)["Infra"]["id"] == infra["id"]
+
+
+def test_the_rename_refuses_another_folders_name_by_case_folding(unlocked_page: Page, api: Api):
+    page = unlocked_page
+    infra = folders(api)["Infra"]
+    after = last_entry_id(api)
+    operation = {
+        "kind": "renameFolder",
+        "folderId": infra["id"],
+        "shownName": "Infra",
+        "newName": "Straße",
+    }
+    api.post("/api/queue", {"operations": [operation]})
+    commit_new_entries(api, after)
+    page.reload()
+    grid(page)
+
+    dialog = manage_folders(page)
+    dialog.get_by_role("listitem", name="Work", exact=True).get_by_role(
+        "button", name="Rename"
+    ).click()
+    field = dialog.get_by_label("New name for Work")
+    ## str.casefold turns ß into ss, which lowercasing alone does not
+    field.fill("STRASSE")
+    expect(dialog.get_by_text("Another folder is named Straße")).to_be_visible()
+    expect(dialog.get_by_role("button", name="Save")).to_be_disabled()
+    field.fill("STRASSE 2")
+    expect(dialog.get_by_role("button", name="Save")).to_be_enabled()

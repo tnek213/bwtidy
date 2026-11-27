@@ -1,6 +1,7 @@
-import { CssBaseline, createTheme, ThemeProvider, useMediaQuery } from '@mui/material'
+import { CssBaseline, createTheme, type Theme, ThemeProvider, useMediaQuery } from '@mui/material'
+import { red } from '@mui/material/colors'
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react'
-import { useLayout } from './layout.tsx'
+import { type Layout, useLayout } from './layout.tsx'
 import { PROSE_WIDTH } from './Prose.tsx'
 
 // MUI's default is 8. The compact layout shrinks the margins so more fits in a small window.
@@ -13,6 +14,11 @@ type ColorMode = 'light' | 'dark'
 export type ColorModeSetting = ColorMode | 'system'
 
 const ONE_YEAR = 31536000
+
+// The text color has at least 3:1 against the page, the paper and the app bar in both modes.
+function focusRing(theme: Theme, offset: number) {
+  return { outline: `2px solid ${theme.palette.text.primary}`, outlineOffset: offset }
+}
 
 function isColorMode(value: string | undefined): value is ColorMode {
   return value === 'light' || value === 'dark'
@@ -46,6 +52,29 @@ interface ColorModeValue {
 
 const ColorModeContext = createContext<ColorModeValue>({ mode: 'light', setting: 'system', setSetting: () => {} })
 
+// The theme of the app in a color mode and a layout.
+export function appTheme(mode: ColorMode, layout: Layout): Theme {
+  return createTheme({
+    palette: {
+      mode,
+      // MUI picks the text color of a contained button by this ratio, 3 by default: AA asks 4.5 for its text.
+      contrastThreshold: 4.5,
+      // MUI's red of the dark mode has too little contrast as text on the dark paper (4.2:1).
+      ...(mode === 'dark' ? { error: { main: red[300] } } : {}),
+    },
+    spacing: layout === 'compact' ? COMPACT_SPACING : 8,
+    components: {
+      MuiDialogContentText: { styleOverrides: { root: { maxWidth: PROSE_WIDTH } } },
+      // MUI marks keyboard focus with a faint tint only, too weak to see (WCAG 2.4.7 and 1.4.11).
+      MuiButtonBase: { styleOverrides: { root: ({ theme }) => ({ '&.Mui-focusVisible': focusRing(theme, 2) }) } },
+      // Inside their menu, list or tab bar, whose edge would clip a ring outside.
+      MuiMenuItem: { styleOverrides: { root: ({ theme }) => ({ '&.Mui-focusVisible': focusRing(theme, -2) }) } },
+      MuiListItemButton: { styleOverrides: { root: ({ theme }) => ({ '&.Mui-focusVisible': focusRing(theme, -2) }) } },
+      MuiTab: { styleOverrides: { root: ({ theme }) => ({ '&.Mui-focusVisible': focusRing(theme, -2) }) } },
+    },
+  })
+}
+
 export function ColorModeProvider({ children }: { children: ReactNode }) {
   const [setting, setSettingState] = useState<ColorModeSetting>(readSetting)
   const osDark = useMediaQuery('(prefers-color-scheme: dark)', { noSsr: true })
@@ -58,15 +87,7 @@ export function ColorModeProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(() => ({ mode, setting, setSetting }), [mode, setting, setSetting])
-  const theme = useMemo(
-    () =>
-      createTheme({
-        palette: { mode },
-        spacing: layout === 'compact' ? COMPACT_SPACING : 8,
-        components: { MuiDialogContentText: { styleOverrides: { root: { maxWidth: PROSE_WIDTH } } } },
-      }),
-    [mode, layout],
-  )
+  const theme = useMemo(() => appTheme(mode, layout), [mode, layout])
 
   return (
     <ColorModeContext value={value}>

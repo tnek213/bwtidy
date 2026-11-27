@@ -3,6 +3,7 @@
 This page describes every page, menu and button of bwtidy. It follows the
 app bar from Vault through Types and Queue to the Change log. The pages that
 open from elsewhere come next and the app bar itself comes last.
+[Keyboard](#keyboard) at the end lists the keys.
 
 The pictures show bwtidy's test vault as the app looks now. The docs tests
 take them (see the developer guide `dev/testing.md` in the repository). A
@@ -135,6 +136,9 @@ bwtidy note every entry is disabled.
 
 ![The cell menu of a login's password cell, with Cell and Row parts](../images/reference-cell-menu.png)
 
+- Reveal value and Hide value do what the eye of a secret cell does. On a
+  Rare fields cell they name the secret they show. They are the way to reveal
+  a value without a mouse.
 - Edit value edits the cell like a double click.
 - Remove value removes the value from the item.
 - Mark to fill in puts an empty secret cell on your To fill in list. Unmark
@@ -147,8 +151,8 @@ bwtidy note every entry is disabled.
 - Rename attachments shows on an attachments cell (see
   [Rename an attachment](../how-to/rename-attachment.md)).
 - Add field adds a custom field with a name and a value to the item. You
-  pick Text or Hidden as its field type. When the item already has an empty field of that name,
-  that field keeps its type.
+  pick Text or Hidden as its field type. When the item already has an empty
+  field of that name, that field keeps its type.
 - Convert to template… maps the item's values onto the coordinates of a
   template you pick. For another item type bwtidy creates a new item and moves
   the old one to the trash.
@@ -159,8 +163,8 @@ bwtidy note every entry is disabled.
 
 ### Header menu
 
-The three dots in a column header open its menu. This is the menu of a field
-column.
+The three dots in a column header open its menu, and so do the context menu
+key and Shift+F10 on the header. This is the menu of a field column.
 
 ![The header menu of the custom field column Password](../images/reference-header-menu.png)
 
@@ -176,10 +180,11 @@ column.
 - Set N in the Rare fields column sets N from 0 to 99 (see Rare fields in
   [Cells](#cells)).
 - Manage folders… in the Folder column lists every folder with its number of
-  items. Rename gives a folder a new name in place. Delete deletes an empty
-  folder, and a folder that holds items cannot be deleted even when they are
-  in the trash. A folder with a rename or delete in the queue takes no other
-  until it is written.
+  items. Rename gives a folder a new name in place. Save stays off for the
+  name of another folder, also when only its case differs (Straße and STRASSE
+  count as one name). Delete deletes an empty folder, and a folder that holds
+  items cannot be deleted even when they are in the trash. A folder with a
+  rename or delete in the queue takes no other until it is written.
 
 A merge that finds items with a value in more than one of the columns asks
 which value each of them keeps (Choose the values to keep).
@@ -210,8 +215,8 @@ Organization when you belong to one.
 - Generate a password shows for a login and is on by default. The password
   is generated and nobody sees it until you reveal it in the grid.
 - From a template every required field needs a value that fits its
-  datatype's format, or Create stays disabled. A field marked optional may stay blank. For a
-  field name pattern (like `user_*`) you name the field too.
+  datatype's format, or Create stays disabled. A field marked optional may stay
+  blank. For a field name pattern (like `user_*`) you name the field too.
 - An SSH key needs only its private key in OpenSSH or PEM format without a
   passphrase. bwtidy fills in its public key and fingerprint.
 - Create queues the new item. It shows in the grid once it is written.
@@ -392,9 +397,9 @@ its backup. That backup is the vault as it was right before the write.
   as text. It never holds a value.
 - The table shows Time and Source first. Operation follows (hover it for what
   it did) and then Items, Result and Backup.
-- The name on a backup's own row downloads the encrypted file. Decrypt it with `age -d` and
-  the master password (see
-  [step 1 of the restore](../restore.md#1-decrypt-the-backup-on-a-tmpfs)).
+- The name on a backup's own row downloads the encrypted file. Decrypt it with
+  `age -d` and the master password (see [step 1 of the
+  restore](../restore.md#1-decrypt-the-backup-on-a-tmpfs)).
 - Restore on a row puts its items back as that backup holds them. A dialog
   first says what happens to each item. On a folder's row Restore gives the
   folder its old name back or creates a deleted folder again. On an attachment
@@ -403,7 +408,8 @@ its backup. That backup is the vault as it was right before the write.
   backup NAME and links to the change it undid while that change is on the
   page.
 - A change whose backup is gone (deleted or past the retention) shows the
-  backup's name struck through and has no Restore.
+  backup's name struck through and has no Restore. A screen reader reads the
+  name with "(deleted)" after it.
 - Changes next to each other that share one backup show it in full on the
   topmost row and fainter on the rows under it. Restore works on each.
 - A small restore icon marks a change that a later restore undid. Its tooltip
@@ -476,7 +482,8 @@ their packages with their licenses.
 
 If bwtidy works for you, a thumbs up in Works for me helps others decide. A
 comment helps even more. Name your bwtidy version and whether you use
-Bitwarden or Vaultwarden. Say roughly how many items your vault has. Only what you post there is shared. bwtidy itself sends nothing.
+Bitwarden or Vaultwarden. Say roughly how many items your vault has. Only what
+you post there is shared. bwtidy itself sends nothing.
 
 ![The About page](../images/about-page.png)
 
@@ -566,3 +573,28 @@ tries to write the edits that wait, ends the session and takes you back to the
 account form. About bwtidy opens the [About](#about) page.
 
 ![The open More actions menu with About bwtidy outlined and numbered 2](../images/more-menu-open.png)
+
+## Keyboard
+
+Everything works without a mouse. Tab and Shift+Tab move between the
+controls and every control shows a ring while it has the focus. Escape closes
+a menu or a dialog and the focus goes back to what opened it.
+
+The grid is one stop for Tab. Inside it the arrow keys move from cell to cell
+and from the headers down into the rows. Tab leaves the grid.
+
+| Key | In the grid |
+| --- | --- |
+| Arrow keys | Move to the next cell or header |
+| Enter or typing | Edit the cell (see [Cells](#cells)) |
+| Enter on a header | Sort by the column |
+| Space | Tick the row for the [selection bar](#selection-bar) |
+| Context menu key or Shift+F10 on a cell | Open the [cell menu](#cell-menu) |
+| Context menu key or Shift+F10 on a header | Open the [header menu](#header-menu) |
+| Escape | Stop editing and keep the old value |
+
+A screen reader hears the marks a cell shows in color once the cell has the
+focus, such as a change waiting in the queue or a field on your To fill in
+list. It hears a revealed value and Hidden in place of the dots of a masked
+one. A write that starts or ends is said aloud, and so are new proposals from
+an agent.

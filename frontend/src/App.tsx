@@ -6,6 +6,7 @@ import FirstRunNotice from './about/FirstRunNotice.tsx'
 import { onLocked } from './api/api.ts'
 import AppBar, { type Page } from './appbar/AppBar.tsx'
 import CommitFailureSnackbar from './appbar/CommitFailureSnackbar.tsx'
+import WriteAnnouncer from './appbar/WriteAnnouncer.tsx'
 import BackupReencryptionAlert from './backups/BackupReencryptionAlert.tsx'
 import ChangeLogPage from './changelog/ChangeLogPage.tsx'
 import GridPage from './grid/GridPage.tsx'
@@ -52,8 +53,8 @@ function Shell({ account }: { account: Account | null }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <AppBar account={account} page={page} onPageChange={setPage} />
-      <BackupReencryptionAlert result={session.data?.backupReencryption} />
       <Box component="main" sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 }}>
+        <BackupReencryptionAlert result={session.data?.backupReencryption} />
         {page === 'grid' && <GridPage />}
         {page === 'types' && <TypesPage onStatistics={() => setPage('statistics')} />}
         {page === 'queue' && <QueuePage />}
@@ -61,6 +62,7 @@ function Shell({ account }: { account: Account | null }) {
         {page === 'settings' && <SettingsPage />}
         {page === 'statistics' && <StatisticsPage />}
         {page === 'about' && <AboutPage />}
+        <WriteAnnouncer />
       </Box>
       <CommitFailureSnackbar />
     </Box>
@@ -69,7 +71,7 @@ function Shell({ account }: { account: Account | null }) {
 
 function Loading() {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 12 }}>
+    <Box component="main" sx={{ display: 'flex', justifyContent: 'center', mt: 12 }}>
       <CircularProgress aria-label="Loading" />
     </Box>
   )
@@ -116,10 +118,10 @@ function SessionApp({ account }: { account: Account | null }) {
       <LoginPage notice={<FirstRunNotice />} />
     )
   return (
-    <>
+    <Box component="main">
       {page}
       {account !== null && <AccountLine account={account} />}
-    </>
+    </Box>
   )
 }
 
@@ -132,11 +134,19 @@ export default function App() {
     return <Loading />
   }
   if (account.isError) {
-    return <AccountPage error="Could not reach bwtidy, try again" notice={<FirstRunNotice />} />
+    return (
+      <Box component="main">
+        <AccountPage error="Could not reach bwtidy, try again" notice={<FirstRunNotice />} />
+      </Box>
+    )
   }
   switch (account.data.kind) {
     case 'none':
-      return <AccountPage error={account.data.error} notice={<FirstRunNotice />} />
+      return (
+        <Box component="main">
+          <AccountPage error={account.data.error} notice={<FirstRunNotice />} />
+        </Box>
+      )
     case 'ready':
       return <SessionApp account={account.data.account} />
     default:

@@ -1,0 +1,264 @@
+#!/usr/bin/env python3
+"""demo-egress: limit what the demo's public network (compose.demo.yaml) can reach.
+
+  demo-egress apply --bridge NAME --mode none|vpn [--allow-dns ADDRESS]...
+  demo-egress remove --bridge NAME
+  demo-egress print --bridge NAME --mode none|vpn [--allow-dns ADDRESS]...
+  demo-egress -h | --help
+
+Run it as root on the host, after Docker has started (dev/demo.md, Limit the way out). It needs
+Python 3 and iptables, nothing else of the repo, so the file can be copied to the host alone.
+NAME is the bridge of the network public, DEMO_PUBLIC_BRIDGE of compose.demo.yaml
+(br-bwtidy-demo by default).
+
+apply writes two chains of its own: BWTIDY-FWD-NAME for what the network sends through the host,
+jumped to from DOCKER-USER, and BWTIDY-IN-NAME for what it sends to the host itself, jumped to
+from INPUT. Each jump is the first rule of its chain and matches -i NAME. Both chains let the
+answers of established connections through. Then:
+
+- mode none (the edge alone, which only answers on its published port): nothing else,
+- mode vpn (a VPN sidecar on the network): in the forwarded chain, every range that is not the
+  public internet is dropped, then UDP and TCP 80, 443 and 53 pass. The host chain drops all.
+
+Each --allow-dns ADDRESS (IPv4) gets UDP and TCP 53 before the drops, in the forwarded chain,
+and in the host chain when the address is one of the host's own. What passes goes on through
+the host's other rules (RETURN), so the script never opens what the host's firewall closes.
+
+apply is idempotent: it flushes its chains, fills them again and keeps exactly one jump each.
+While it does, a DROP rule for the bridge sits first in DOCKER-USER and INPUT, so the network
+is never open in between. remove deletes the jumps, those DROP rules and the chains. print shows
+the iptables commands apply runs on a host without the chains, and runs none of them.
+IPv4 only: a network with IPv6 needs the same in ip6tables.
+"""
+
+import argparse
+import ipaddress
+import os
+import re
+import shlex
+import shutil
+import socket
+import subprocess
+import sys
+from collections.abc import Callable
+
+PROG = "demo-egress"
+FORWARD_HOOK = "DOCKER-USER"
+HOST_HOOK = "INPUT"
+## the kernel's limit for an interface name (IFNAMSIZ less the closing NUL)
+MAX_BRIDGE = 15
+## iptables' limit for a chain name
+MAX_CHAIN = 28
+BRIDGE = re.compile(r"[A-Za-z0-9._-]+")
+MODES = ("none", "vpn")
+VPN_TCP_PORTS = ("80", "443", "53")
+## every IPv4 range that is not the public internet, dropped in mode vpn
+NON_PUBLIC = [
+    ## "this network", RFC 1122 (section 3.2.1.3)
+    "0.0.0.0/8",
+    ## private, RFC 1918
+    "10.0.0.0/8",
+    ## shared address space (carrier-grade NAT and tailnets), RFC 6598
+    "100.64.0.0/10",
+    ## loopback, RFC 1122 (section 3.2.1.3)
+    "127.0.0.0/8",
+    ## link-local, RFC 3927
+    "169.254.0.0/16",
+    ## private, RFC 1918
+    "172.16.0.0/12",
+    ## private, RFC 1918
+    "192.168.0.0/16",
+    ## multicast, RFC 5771
+    "224.0.0.0/4",
+    ## reserved (and the limited broadcast address), RFC 1112 (section 4)
+    "240.0.0.0/4",
+]
+ESTABLISHED = ["-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "RETURN"]
+
+## iptables ARGS: its exit code and what it wrote to stderr
+Run = Callable[[list[str]], tuple[int, str]]
+
+
+class EgressError(Exception):
+    """Why demo-egress stops."""
+
+
+def run_iptables(args: list[str]) -> tuple[int, str]:
+    result = subprocess.run(["iptables", "-w", *args], capture_output=True, text=True, check=False)
+    return result.returncode, result.stderr.strip()
+
+
+def check_bridge(name: str) -> str:
+    if len(name) > MAX_BRIDGE:
+        raise EgressError(f"the bridge name {name!r} is longer than {MAX_BRIDGE} characters")
+    if not BRIDGE.fullmatch(name):
+        raise EgressError(
+            f"the bridge name {name!r} may hold only letters, digits, dot, dash and underscore"
+        )
+    return name
+
+
+def chains(bridge: str) -> tuple[str, str]:
+    """The forwarded chain and the host chain of the bridge."""
+    return f"BWTIDY-FWD-{bridge}", f"BWTIDY-IN-{bridge}"
+
+
+def dns_addresses(values: list[str]) -> list[str]:
+    found: list[str] = []
+    for value in values:
+        try:
+            address = str(ipaddress.IPv4Address(value))
+        except ValueError:
+            raise EgressError(f"--allow-dns {value!r} is not an IPv4 address") from None
+        if address not in found:
+            found.append(address)
+    return found
+
+
+def is_host_address(address: str) -> bool:
+    """Whether the address is one of the host's own: only those can be bound."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        try:
+            probe.bind((address, 0))
+        except OSError:
+            return False
+    return True
+
+
+def dns_rules(addresses: list[str]) -> list[list[str]]:
+    return [
+        ["-d", address, "-p", protocol, "--dport", "53", "-j", "RETURN"]
+        for address in addresses
+        for protocol in ("udp", "tcp")
+    ]
+
+
+def forward_rules(mode: str, dns: list[str]) -> list[list[str]]:
+    rules = [ESTABLISHED, *dns_rules(dns)]
+    if mode == "vpn":
+        rules += [["-d", cidr, "-j", "DROP"] for cidr in NON_PUBLIC]
+        rules.append(["-p", "udp", "-j", "RETURN"])
+        rules += [["-p", "tcp", "--dport", port, "-j", "RETURN"] for port in VPN_TCP_PORTS]
+    rules.append(["-j", "DROP"])
+    return rules
+
+
+def host_rules(dns_on_host: list[str]) -> list[list[str]]:
+    return [ESTABLISHED, *dns_rules(dns_on_host), ["-j", "DROP"]]
+
+
+def must(run: Run, args: list[str]) -> None:
+    code, error = run(args)
+    if code != 0:
+        raise EgressError(f"iptables {shlex.join(args)} failed: {error or f'exit code {code}'}")
+
+
+def exists(run: Run, chain: str) -> bool:
+    return run(["-S", chain])[0] == 0
+
+
+def delete_every(run: Run, hook: str, rule: list[str]) -> None:
+    while run(["-C", hook, *rule])[0] == 0:
+        must(run, ["-D", hook, *rule])
+
+
+def hooks(bridge: str) -> list[tuple[str, str]]:
+    forward, host = chains(bridge)
+    return [(FORWARD_HOOK, forward), (HOST_HOOK, host)]
+
+
+def apply(bridge: str, mode: str, dns: list[str], run: Run) -> None:
+    forward, host = chains(bridge)
+    guard = ["-i", bridge, "-j", "DROP"]
+    for hook, _ in hooks(bridge):
+        must(run, ["-I", hook, "1", *guard])
+    dns_on_host = [address for address in dns if is_host_address(address)]
+    for chain, rules in ((forward, forward_rules(mode, dns)), (host, host_rules(dns_on_host))):
+        must(run, ["-F" if exists(run, chain) else "-N", chain])
+        for rule in rules:
+            must(run, ["-A", chain, *rule])
+    for hook, chain in hooks(bridge):
+        jump = ["-i", bridge, "-j", chain]
+        delete_every(run, hook, jump)
+        must(run, ["-I", hook, "1", *jump])
+    for hook, _ in hooks(bridge):
+        delete_every(run, hook, guard)
+
+
+def remove(bridge: str, run: Run) -> None:
+    for hook, chain in hooks(bridge):
+        if exists(run, hook):
+            delete_every(run, hook, ["-i", bridge, "-j", chain])
+            delete_every(run, hook, ["-i", bridge, "-j", "DROP"])
+    for _, chain in hooks(bridge):
+        if exists(run, chain):
+            must(run, ["-F", chain])
+            must(run, ["-X", chain])
+
+
+def planned(bridge: str, mode: str, dns: list[str]) -> list[str]:
+    """The commands apply runs on a host without the chains, as shell lines."""
+    commands: list[str] = []
+    inserted: list[list[str]] = []
+
+    def dry(args: list[str]) -> tuple[int, str]:
+        ## a host without the chains: only a rule this run inserted exists
+        if args[0] == "-S":
+            return 1, ""
+        if args[0] == "-C":
+            return (0 if args[1:] in inserted else 1), ""
+        commands.append(shlex.join(["iptables", "-w", *args]))
+        if args[0] == "-I":
+            inserted.append([args[1], *args[3:]])
+        elif args[0] == "-D":
+            inserted.remove(args[1:])
+        return 0, ""
+
+    apply(bridge, mode, dns, dry)
+    return commands
+
+
+def preflight(run: Run, needs_docker: bool) -> None:
+    if shutil.which("iptables") is None:
+        raise EgressError("iptables is not installed (no iptables on PATH)")
+    if os.geteuid() != 0:
+        raise EgressError("run it as root: it changes the host's firewall")
+    if needs_docker and not exists(run, FORWARD_HOOK):
+        raise EgressError(f"the chain {FORWARD_HOOK} does not exist yet: start Docker first")
+
+
+def parser() -> argparse.ArgumentParser:
+    top = argparse.ArgumentParser(
+        prog=PROG, description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    commands = top.add_subparsers(dest="command", required=True)
+    for name in ("apply", "remove", "print"):
+        command = commands.add_parser(name)
+        command.add_argument("--bridge", required=True)
+        if name != "remove":
+            command.add_argument("--mode", required=True, choices=MODES)
+            command.add_argument("--allow-dns", action="append", default=[], metavar="ADDRESS")
+    return top
+
+
+def main(args: list[str]) -> int:
+    options = parser().parse_args(args)
+    try:
+        bridge = check_bridge(options.bridge)
+        dns = dns_addresses(getattr(options, "allow_dns", []))
+        if options.command == "print":
+            print("\n".join(planned(bridge, options.mode, dns)))
+            return 0
+        preflight(run_iptables, needs_docker=options.command == "apply")
+        if options.command == "apply":
+            apply(bridge, options.mode, dns, run_iptables)
+        else:
+            remove(bridge, run_iptables)
+    except EgressError as error:
+        print(f"{PROG}: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -16,6 +16,7 @@ import type { QueueEntry } from '../api/queue.ts'
 import type { GridAttachment, GridRow } from '../api/grid.ts'
 import { type Operation, renameAttachment } from '../api/operations.ts'
 import { rowName } from './labels.ts'
+import { caseFold } from '../shared/caseFold.ts'
 
 // The rename of the attachment a pending queue entry is about to write, null when none is queued.
 function queuedRename(attachment: GridAttachment, pending: readonly QueueEntry[]): string | null {
@@ -29,7 +30,7 @@ function queuedRename(attachment: GridAttachment, pending: readonly QueueEntry[]
 }
 
 // Why a new file name cannot be saved, null when it can. The rules the backend applies
-// (check_attachment_rename), another attachment's name counted ignoring case.
+// (check_attachment_rename), another attachment's name counted ignoring case (str.casefold).
 function fileNameProblem(attachment: GridAttachment, name: string, attachments: readonly GridAttachment[]): string | null {
   if (name.trim() === '') {
     return 'The name is empty'
@@ -40,8 +41,8 @@ function fileNameProblem(attachment: GridAttachment, name: string, attachments: 
   if (name === attachment.fileName) {
     return 'The attachment has this name already'
   }
-  const wanted = name.toLowerCase()
-  const other = attachments.find((candidate) => candidate.id !== attachment.id && candidate.fileName.toLowerCase() === wanted)
+  const wanted = caseFold(name)
+  const other = attachments.find((candidate) => candidate.id !== attachment.id && caseFold(candidate.fileName) === wanted)
   return other ? `Another attachment is named ${other.fileName}` : null
 }
 

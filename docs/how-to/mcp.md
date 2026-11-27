@@ -8,7 +8,7 @@ explains what an agent sees and may propose. [MCP tools](../reference/mcp-tools.
 lists the tools it can call.
 
 The commands below use two placeholders. URL is the address you open bwtidy
-at without a path, such as https://bwtidy.example or http://127.0.0.1:8765
+at without a path, such as <https://bwtidy.example> or <http://127.0.0.1:8765>
 on the same host. TOKEN is your MCP token. The commands write the MCP address
 as `URL/mcp`, which is also how the token dialog's MCP URL field shows it.
 You can paste that field in place of `URL/mcp`.

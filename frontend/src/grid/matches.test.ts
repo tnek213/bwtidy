@@ -178,6 +178,8 @@ test('a pattern fits a whole name, * any characters, ignoring case and surroundi
   expect(fitsPattern('user_*', 'user_dev')).toBe(true)
   expect(fitsPattern('user_*', 'user_')).toBe(true)
   expect(fitsPattern(' User_* ', '  USER_dev ')).toBe(true)
+  // Case folded like the backend's str.casefold, which turns ß into ss.
+  expect(fitsPattern('STRASSE_*', 'Straße_1')).toBe(true)
   expect(fitsPattern('user_*', 'a user_dev')).toBe(false)
   expect(fitsPattern('a*b*c', 'axbyc')).toBe(true)
   expect(fitsPattern('a*b*c', 'acb')).toBe(false)

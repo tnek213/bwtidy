@@ -153,8 +153,8 @@ mark.
 
 Click Change log. The conversion of the two notes goes into one write ①
 and the two addresses into the next ②. Each write names the backup of
-the vault as it was right before it. The conversion rows name the notes by their id
-because the notes are in the trash. Further down the saves of the datatype
+the vault as it was right before it. The conversion rows name the notes by their
+id because the notes are in the trash. Further down the saves of the datatype
 and the template have rows of their own as writes to the bwtidy note.
 
 ![The Change log with the two address rows and the two Apply template rows, the Backup of each write outlined and numbered 1 and 2](../images/tutorial-template-change-log.png)

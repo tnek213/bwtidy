@@ -12,10 +12,10 @@ one you want and type the new name. Then click Save.
 
 Save stays off for an empty name or a name with a slash or a backslash. It
 also stays off for the name the attachment has now. The name of another
-attachment of the item is taken too, even in other letter case. You can
-still change the case of the attachment's own name. Once you type, the
-reason Save is off shows under the field. Cancel keeps the old name and
-Close leaves the dialog without a change.
+attachment of the item is taken too, even in other letter case (Straße.txt
+and STRASSE.txt count as one name). You can still change the case of the
+attachment's own name. Once you type, the reason Save is off shows under the
+field. Cancel keeps the old name and Close leaves the dialog without a change.
 
 Save closes the dialog and puts the rename in the queue like any other edit
 (see [How edits are saved](../explanation/edits.md)). Until it is written the

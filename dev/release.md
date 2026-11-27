@@ -1,7 +1,49 @@
 # Releasing
 
-The version and its release notes, the documentation site and its publishing
-on GitHub Pages, and publishing the image.
+How a pull request is merged into main, the version and its release notes,
+the documentation site and its publishing on GitHub Pages, and publishing the
+image.
+
+## Merging pull requests
+
+The ruleset "Protect main" (Settings, Rules, Rulesets) guards main. Its bypass
+list is empty, so its rules hold for the maintainer too:
+
+- Restrict deletions and Block force pushes: the history of main is never
+  lost or rewritten.
+- Require a pull request before merging, with no approvals since there is
+  one maintainer: every change goes through a pull request and its CI.
+- Require status checks to pass, with the check `ci`: the job of
+  `.github/workflows/ci.yml` that runs `scripts/ci`.
+- Require signed commits: every commit on main shows as Verified. GitHub
+  signs the merge commits and squash commits it makes itself.
+
+The repository allows merge commits and squash merging, both with the pull
+request's title as the subject and an empty body. Rebase merging stays off,
+because GitHub cannot sign the commits a rebase merge writes.
+
+The merge method follows from the pull request's commits:
+
+- All signed: merge with a merge commit ("Create a merge commit" in the web
+  UI, or `gh pr merge N --merge`). The contributor's commits land unchanged
+  with the merge commit on top, so their own squash stays one commit.
+- At least one unsigned: squash with `gh pr merge N --squash --admin`, which
+  makes one commit that GitHub signs.
+
+The web UI cannot merge the second kind. It checks the pull request's own
+commits, shows "Merging is blocked" with "Commits must have verified
+signatures" and disables Squash and merge. GitHub applies the rule to the
+commits that reach main, and a squash brings only its own signed commit.
+`gh pr merge` makes the web UI's check before it asks GitHub to merge, and
+`--admin` skips only that check. With no bypass list GitHub still enforces
+every rule: the merge fails while `ci` has not passed, and a merge commit
+that would bring an unsigned commit onto main fails with "Commits must have
+verified signatures".
+
+A bypass of Require signed commits for the admin role would enable Squash
+and merge in the web UI. It would also let a merge commit bring unsigned
+commits onto main without a warning, even from `gh pr merge N --merge`
+without `--admin`. That is why the rule has no bypass.
 
 ## The version
 
@@ -13,8 +55,9 @@ the lock files carry generated copies: the package `bwtidy` in
 `packages[""].version` of `frontend/package-lock.json` in semver's.
 `scripts/ci` fails when one of them differs from `backend/pyproject.toml`, and
 names the file and both versions. After a change to the version, `uv lock` in
-`backend/` and `demo/` (its lock holds the version of `bwtidy` too) and `npm install --package-lock-only` in `frontend/` write the
-copies in the lock files.
+`backend/` and `demo/` (its lock holds the version of `bwtidy` too) and
+`npm install --package-lock-only` in `frontend/` write the copies in the lock
+files.
 
 bwtidy is in beta: feature complete for 1.0, with a stored format (the
 database, the bwtidy note, the backups, the settings) changing only with a
@@ -55,10 +98,10 @@ the checkout's last commit. The page in the checkout keeps `COMMIT`.
 
 A page holds a diagram as a fenced code block whose language is a Kroki
 diagram type (`KROKI_TYPES` in `scripts/docs-site`, every type
-https://kroki.io/ lists) with `alt="TEXT"` after it. Before Zensical runs,
+<https://kroki.io/> lists) with `alt="TEXT"` after it. Before Zensical runs,
 the build turns each such block of its copy of `docs/` into a PNG beside the
 page and a Markdown picture of it with that alt text. It sends the source to
-the Kroki server that `BWTIDY_KROKI_URL` names, https://kroki.io (the free
+the Kroki server that `BWTIDY_KROKI_URL` names, <https://kroki.io> (the free
 public one) when it is unset, and asks for SVG, as 12 of Kroki's types have
 no PNG and its PNGs are drawn at 1x. resvg (`resvg-py` in the group `docs`)
 converts the SVG at twice its size on a white background, and the picture is
@@ -72,6 +115,18 @@ sans-serif and monospace it takes the first installed font of the lists in
 `GENERIC_FONTS` of the script, as resvg's own choices (Times New Roman, Arial,
 Courier New) are missing on many Linux systems and resvg leaves out a label
 whose font it cannot find.
+
+A label in a font that is not installed would be drawn in the serif font, so
+before resvg runs the build gives each font-family list without a generic
+family the one that `NAMED_FONTS` of the script lists for its font.
+Helvetica, Arial and their kin get sans-serif. Times and Georgia get serif,
+Courier and Consolas monospace. A font that d2 embeds in its SVG (resvg loads
+no embedded font) gets sans-serif, or monospace for its code font, with the
+bold or italic its name holds. Graphviz writes `sans-Serif` after Helvetica,
+and the build writes such a generic family in lower case (the only case resvg
+knows). Name a generic family after any other font, as in
+`fontname="Inter, sans-serif"`. Where that font is not installed, a list
+without one fails the build, which names the page, the line and the font.
 
 Building docs with a diagram therefore needs one of those fonts for each
 generic family its text uses, and DejaVu covers all three. Without one the
@@ -90,7 +145,9 @@ Each PNG is kept in `.cache/kroki/` at the repo root (git-ignored), named
 after a hash of the type, the source and the converter's settings, and a
 later build takes it from there without asking the server. So building docs
 that hold a diagram needs a Kroki server, unless the cache has every one
-(the image's build has no cache). A server that cannot be reached or answers
+(the image's build has no cache). The converter writes into a temp directory
+inside that cache, so a temp directory on another filesystem (such as a tmpfs
+`/tmp`) does not matter. A server that cannot be reached or answers
 with an error fails the build, naming the page, the line and the server's
 message. A diagram without alt text fails it before any request, and
 `scripts/docs-lint` reports it already. Docs without a diagram build without
@@ -98,33 +155,54 @@ any request. To use a Kroki server of your own, set `BWTIDY_KROKI_URL`: the
 Dockerfile's docs stage takes it as a build arg, and `scripts/dev-vault up`,
 `compose.dev.yaml` and `compose.build.yaml` pass on the one of the
 environment. `serve` shows a diagram as its code block, an editor's Kroki
-preview or a build shows the picture.
+preview or a build shows the picture. That takes `relaxed_headers` of
+SuperFences in `zensical.toml`: SuperFences refuses a fence whose info string
+holds an option it does not know (such as `alt`) and leaves it as text, so
+its closing fence would open a code block of what follows.
+
+The site's colors and its code font are in
+`docs/assets/stylesheets/theme.css` (`extra_css` in `zensical.toml`): a warm
+ivory and deep teal palette for each of the theme's two color schemes
+(`default` and `slate`, whose palettes name the colors `custom`, so none of
+the theme's named colors applies), the colors of the banner and the boxes,
+and IBM Plex Mono for code. The font's regular and bold woff2 files, IBM's
+complete build with the box-drawing characters of the directory trees, come
+from the npm package `@ibm/plex-mono` (the files only, as its postinstall
+would report to IBM's telemetry) and lie in `docs/assets/fonts/ibm-plex-mono/`
+with its `LICENSE.txt` (SIL Open Font License 1.1). The package's entry in
+`BUNDLED` of `scripts/third-party` puts it on the About page's list: files
+of another version change the version there too. The search dialog draws
+in a shadow root of its own: the stylesheet colors it through the theme's
+`--color-*` variables, but its code stays in the browser's monospace font.
 
 The theme overrides are in `overrides/` (outside `docs/`, so they are not
-built as pages). Its `main.html` fills the theme's `announce` block with the
-beta disclaimer banner on every page, one slim line with its text centered,
-which links to the disclaimer at the top of `docs/index.md`. Its inline style widens the content column (`.md-grid`,
-the theme's 61rem leaves tables little room), keeps paragraphs, list items,
-quotes and admonitions at most 80 characters wide unless they hold a picture,
-table or code block, keeps inline code on one line (in text and tables, except
-on a narrow screen where it would not fit) and frames the pictures in the
-content (a 1 px border and a small shadow, so a white screenshot shows on a
-white page), and its inline script makes a picture shown smaller than it is
-open larger in a dialog on a click (`data-zoom`). It also links every page to the
-issue form `.github/ISSUE_TEMPLATE/docs_improvement.yml` (`partials/improve-link.html`
-builds the link, `partials/toc.html` puts it in the right sidebar below the table of
-contents and `main.html` at the end of the content on a narrow screen), with the
-page's source path, its address on the GitHub Pages site and the version, which
-`scripts/docs-site` hands over as `extra.bwtidy_version`. Both stay inline, as a
-running bwtidy serves the site offline: nothing comes from a CDN. Zensical's
-own lightbox (its glightbox extension) loads GLightbox from unpkg.com, so it
-stays off. For the same reason the Markdown extensions in `zensical.toml` are
-those whose output needs nothing from another host: GitHub's alerts as boxes
-(`pymdownx.quotes` with `callouts`), the cards (`md_in_html` and `attr_list`)
-and their icons, which `pymdownx.emoji` draws inline from the theme's icon
-sets. An emoji shortcode such as `:smile:` would be a picture from a CDN, and
-a Mermaid diagram that Zensical draws loads its script from one, so diagrams
-become pictures at build time (see Diagrams above). After the build,
+built as pages). `partials/copyright.html` is the line at the bottom of the
+footer, which credits Zensical and the Diátaxis framework. `main.html` fills the
+theme's `announce` block with the beta disclaimer banner on every page, one slim
+line with its text centered, which links to the disclaimer at the top of
+`docs/index.md`. Its inline style widens the content column (`.md-grid`, the
+theme's 61rem leaves tables little room), keeps paragraphs, list items, quotes
+and admonitions as well as headings at most 72 characters wide (`72ch`, in each
+one's own font) unless they hold a picture, table or code block, keeps inline
+code on one line (in text and tables, except on a narrow screen where it would
+not fit) and frames the pictures in the content (a 1 px border and a small
+shadow, so a white screenshot shows on a white page), and its inline script
+makes a picture shown smaller than it is open larger in a dialog on a click
+(`data-zoom`). It also links every page to the issue form
+`.github/ISSUE_TEMPLATE/docs_improvement.yml` (`partials/improve-link.html`
+builds the link, `partials/toc.html` puts it in the right sidebar below the
+table of contents and `main.html` at the end of the content on a narrow screen),
+with the page's source path, its address on the GitHub Pages site and the
+version, which `scripts/docs-site` hands over as `extra.bwtidy_version`. Both
+stay inline, as a running bwtidy serves the site offline: nothing comes from a
+CDN. Zensical's own lightbox (its glightbox extension) loads GLightbox from
+unpkg.com, so it stays off. For the same reason the Markdown extensions in
+`zensical.toml` are those whose output needs nothing from another host: GitHub's
+alerts as boxes (`pymdownx.quotes` with `callouts`), the cards (`md_in_html` and
+`attr_list`) and their icons, which `pymdownx.emoji` draws inline from the
+theme's icon sets. An emoji shortcode such as `:smile:` would be a picture from
+a CDN, and a Mermaid diagram that Zensical draws loads its script from one, so
+diagrams become pictures at build time (see Diagrams above). After the build,
 `scripts/docs-site build` checks
 that every built HTML page has the banner (the attribute `data-disclaimer`)
 and fails naming those without it. It also fails on a numbered list that
@@ -168,7 +246,7 @@ rename fails.
 ### GitHub Pages
 
 The workflow "Docs" (`.github/workflows/docs.yml`) publishes the site at
-https://tnek213.github.io/bwtidy/. It runs on every push to `main` and by
+<https://tnek213.github.io/bwtidy/>. It runs on every push to `main` and by
 hand (`workflow_dispatch`, "Run workflow" on the workflow's page). Its build
 job runs `scripts/docs-site build _site` and uploads `_site` (git-ignored) as
 the Pages artifact, its deploy job deploys it with `actions/deploy-pages`.
@@ -179,7 +257,7 @@ The repo's Pages settings need "GitHub Actions" as the source.
 The site has no `site_url`, so its pages link to each other relatively and
 the same build works at `/bwtidy/` on Pages and at `/docs/` in the app. To
 see what Pages will serve, build it and serve the folder, then open
-http://localhost:8000/:
+<http://localhost:8000/>:
 
 ```sh
 scripts/docs-site build _site
@@ -203,29 +281,32 @@ main. The image is built for `linux/amd64` with the OCI labels `source`, `versio
 
 | Trigger | Tags |
 | --- | --- |
-| Push to main | `main` and the short commit (7 characters) |
+| Push to main | `main` and the short commit (the first 7 characters of its hash) |
 | Release | the version as `frontend/package.json` spells it (`1.0.0-beta.1`) and `latest` |
 
-The image builds on Debian 13 (trixie): `python:3.13-slim-trixie` is the base of the
-final stage, `node:24-trixie-slim` of the build stages. The stages `frontend`, `docs`,
-`bitwarden-cli` (`npm ci` in `docker/bitwarden-cli/`) and `backend` (the venv) build
-what the final stage `app` copies: the node binary, the CLI's `node_modules`, the venv,
-the static files and the docs site. npm, uv, uv's cache and the backend's sources stay
-in the build stages. The app stage also removes pip, which comes with the base image: nothing
-in the image runs it, and a scanner would report on its vendored packages.
+The image builds on Debian 13 (trixie): `python:3.13-slim-trixie` is the base of
+the final stage, `node:24-trixie-slim` of the build stages. The stages
+`frontend`, `docs`, `bitwarden-cli` (`npm ci` in `docker/bitwarden-cli/`) and
+`backend` (the venv) build what the final stage `app` copies: the node binary,
+the CLI's `node_modules`, the venv, the static files and the docs site. npm, uv,
+uv's cache and the backend's sources stay in the build stages. The app stage
+also removes pip, which comes with the base image: nothing in the image runs it,
+and a scanner would report on its vendored packages.
 
-A push to main that changes only files the image never copies (the `paths-ignore` list in
-the workflow: `README.md`, the other top-level docs, the Docker Hub overview, the
-compose files, `dev/`, the tests, the other workflows, `scripts/prune-tags`) builds nothing. Keep that list in step with the Dockerfile's `COPY`
-lines: a file the image copies must never be on it. A push to main never moves `latest`. The workflow fails, saying why, when the
-release tag is not `v` plus the version in `frontend/package.json`, when it is run
-by hand on another branch, or when the repository secret `DOCKERHUB_TOKEN` is
+A push to main that changes only files the image never copies (the
+`paths-ignore` list in the workflow: `README.md`, the other top-level docs, the
+Docker Hub overview, the compose files, `dev/`, the tests, the other workflows,
+`scripts/prune-tags`) builds nothing. Keep that list in step with the
+Dockerfile's `COPY` lines: a file the image copies must never be on it. A push
+to main never moves `latest`. The workflow fails, saying why, when the release
+tag is not `v` plus the version in `frontend/package.json`, when it is run by
+hand on another branch, or when the repository secret `DOCKERHUB_TOKEN` is
 missing. The job skips while the repository is private.
 
 Set it up once:
 
-- Create the repository `tnek213/bwtidy` on Docker Hub first. Docker Hub creates a
-  repository that does not exist yet as public when you push to it.
+- Create the repository `tnek213/bwtidy` on Docker Hub first. Docker Hub creates
+  a repository that does not exist yet as public when you push to it.
 - Make a Docker Hub personal access token with Read and Write and store it as the
   repository secret: `gh secret set DOCKERHUB_TOKEN --repo tnek213/bwtidy`.
 
@@ -240,9 +321,9 @@ To release:
    the version's entry. That pushes `VERSION` and `latest`.
 
 Every pushed image gets a signed SLSA build provenance attestation
-(`actions/attest-build-provenance`), stored on GitHub and pushed next to the image, plus
-BuildKit's own provenance and SBOM. Anyone can check that an image was built by this
-workflow from a given commit of this repository:
+(`actions/attest-build-provenance`), stored on GitHub and pushed next to the
+image, plus BuildKit's own provenance and SBOM. Anyone can check that an image
+was built by this workflow from a given commit of this repository:
 
 ```sh
 gh attestation verify oci://docker.io/tnek213/bwtidy:latest --owner tnek213
@@ -283,14 +364,14 @@ Every push to main that changes the image adds a short-commit tag, so the workfl
 repository through Docker Hub's API and keeps:
 
 - every tag that is not exactly 7 lowercase hex characters: the versions, `latest`,
-  `main` and any other name. The version tags are immutable on Docker Hub anyway (a
-  repository setting with the regex `^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$`).
+  `main` and any other name. The version tags are immutable on Docker Hub anyway
+  (a repository setting with the regex `^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$`).
 - the 10 newest short-commit tags by last push, so a recent build can still be run
   or compared.
-- the short commit of every commit a git tag `v*` points to, as a server may run a
-  release by its commit tag. The workflow checks out the full history with its tags,
-  and the script stops without deleting anything when Docker Hub has a version tag
-  but the checkout has no tag `v*`.
+- the short commit of every commit a git tag `v*` points to, as a server may run
+  a release by its commit tag. The workflow checks out the full history with its
+  tags, and the script stops without deleting anything when Docker Hub has a
+  version tag but the checkout has no tag `v*`.
 - every short-commit tag with the same digest as `main` or `latest`.
 
 It deletes the rest, prints why it keeps each tag it keeps, and stops with an error,
@@ -309,44 +390,47 @@ scripts/prune-tags --delete     # deletes, needs the token in DOCKERHUB_PAT
 
 With `DOCKERHUB_PAT` set, the dry run logs in too, which checks the token. Deleting
 a tag needs a personal access token with Read, Write, Delete, so the workflow uses
-the secret `DOCKERHUB_README_TOKEN` of the Docker Hub overview below. The script logs
-in at `/v2/auth/token` (`/v2/users/login` is deprecated) and never prints the token.
-A pull request from Dependabot or a fork gets no repository secrets, so its dry run
-fails and the next scheduled run checks the change. Check a change to the workflow
-with actionlint, as for the docs workflow above.
+the secret `DOCKERHUB_README_TOKEN` of the Docker Hub overview below. The script
+logs in at `/v2/auth/token` (`/v2/users/login` is deprecated) and never prints
+the token. A pull request from Dependabot or a fork gets no repository secrets,
+so its dry run fails and the next scheduled run checks the change. Check a
+change to the workflow with actionlint, as for the docs workflow above.
 
 ## The Docker Hub overview
 
 The workflow "Docker Hub README" (`.github/workflows/docker-readme.yml`) copies
 `docker/hub-overview.md` to the repository's overview on Docker Hub and the GitHub
-repository's description to its short description. It runs on every push to main that
-changes the overview or the workflow, and by hand. Docker Hub takes at most 25,000
-bytes of overview and 100 of short description.
+repository's description to its short description. It runs on every push to main
+that changes the overview or the workflow, and by hand. Docker Hub takes at most
+25,000 bytes of overview and 100 of short description.
 
 The overview is a file of its own and follows the overviews of Docker Official Images
-such as `httpd` and `mariadb`. A reader on Docker Hub looks for the tags and how to run
-the image first. `README.md` also leads a reader on GitHub to the contributing files and
-the developer guide. The overview starts with a quick reference and the tags. The
-introduction and the caution follow, then how to run the image with its port and volumes
-and its main settings. The license comes last. For everything else it links to the docs
-site.
+such as `httpd` and `mariadb`. A reader on Docker Hub looks for the tags and how
+to run the image first. `README.md` also leads a reader on GitHub to the
+contributing files and the developer guide. The overview starts with a quick
+reference and the tags. The introduction and the caution follow, then how to run
+the image with its port and volumes and its main settings. The license comes
+last. For everything else it links to the docs site.
 
-Docker Hub draws Markdown its own way. It hides HTML comments. Tables, code blocks and
-plain quotes look as they do on GitHub. It shows a GitHub alert (`> [!WARNING]`) as a
-quote titled Warning but prints the Markdown inside as plain text, so the overview
-holds the caution as a plain quote. It resolves no relative link. Every link in the
-overview is therefore absolute and the workflow needs no URL completion.
+Docker Hub draws Markdown its own way. It hides HTML comments. Tables, code
+blocks and plain quotes look as they do on GitHub. It shows a GitHub alert
+(`> [!WARNING]`) as a quote titled Warning but prints the Markdown inside as
+plain text, so the overview holds the caution as a plain quote. It resolves no
+relative link. Every link in the overview is therefore absolute and the workflow
+needs no URL completion.
 
 The overview shares the introduction, the caution and the trademark note with
 `README.md`. AGENTS.md (Writing docs) says which texts must stay the same, and
-`backend/tests/repo/test_docker_hub_overview.py` checks them. It also checks the links,
-the size and that every variable the overview names is in the configuration reference.
-The workflow "Image" ignores a push that changes only the overview.
+`backend/tests/repo/test_docker_hub_overview.py` checks them. It also checks the
+links, the size and that every variable the overview names is in the
+configuration reference. The workflow "Image" ignores a push that changes only
+the overview.
 
-The description API refuses a token with only Read and Write, so this workflow has a
-secret of its own, which it shares with the pruning of the short-commit tags
-([Pruning the short-commit tags](#pruning-the-short-commit-tags)), as deleting a tag
-needs the same scope: make a Docker Hub personal access token with Read, Write, Delete
-and store it with `gh secret set DOCKERHUB_README_TOKEN --repo tnek213/bwtidy`. Both
-workflows fail, saying why, when the secret is missing. `DOCKERHUB_TOKEN` (Read and
-Write) stays the one the image is pushed with.
+The description API refuses a token with only Read and Write, so this workflow
+has a secret of its own, which it shares with the pruning of the short-commit
+tags ([Pruning the short-commit tags](#pruning-the-short-commit-tags)), as
+deleting a tag needs the same scope: make a Docker Hub personal access token
+with Read, Write, Delete and store it with
+`gh secret set DOCKERHUB_README_TOKEN --repo tnek213/bwtidy`. Both workflows
+fail, saying why, when the secret is missing. `DOCKERHUB_TOKEN` (Read and Write)
+stays the one the image is pushed with.

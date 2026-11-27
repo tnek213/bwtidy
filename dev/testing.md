@@ -6,17 +6,17 @@ and e2e tests run on is in [The dev vault](dev-vault.md).
 
 ## The suites
 
-| Suite        | Where                                     | Runs                                              |
-| ------------ | ----------------------------------------- | ------------------------------------------------- |
-| Unit         | `backend/tests/unit`, mirrored on the packages of `bwtidy` | `scripts/ci`, on the host, with fakes  |
-| Scripts      | `backend/tests/scripts`, the scripts of `scripts/` | `scripts/ci`                             |
-| Repo         | `backend/tests/repo`, checks on the repo (the architecture doc, the test tree, versions, third-party) | `scripts/ci` |
-| Frontend     | `frontend/src`, `*.test.tsx` next to the code | `scripts/ci`, vitest                          |
-| Integration  | `backend/tests/integration`               | `scripts/integration`, in the app container      |
-| End-to-end   | `backend/tests/e2e`                       | `scripts/e2e`, Playwright on the host            |
-| Docs         | `backend/tests/e2e/docs`                  | `scripts/docs-shots`                              |
-| Demo         | `demo/tests`, the demo's own project      | `scripts/ci`, with fakes                          |
-| Demo stack   | `demo/tests/stack`                        | `scripts/demo-stack test`, against the running demo stack |
+| Suite       | Where                                                                                                 | Runs                                                      |
+| ----------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Unit        | `backend/tests/unit`, mirrored on the packages of `bwtidy`                                            | `scripts/ci`, on the host, with fakes                     |
+| Scripts     | `backend/tests/scripts`, the scripts of `scripts/`                                                    | `scripts/ci`                                              |
+| Repo        | `backend/tests/repo`, checks on the repo (the architecture doc, the test tree, versions, third-party) | `scripts/ci`                                              |
+| Frontend    | `frontend/src`, `*.test.tsx` next to the code                                                         | `scripts/ci`, vitest                                      |
+| Integration | `backend/tests/integration`                                                                           | `scripts/integration`, in the app container               |
+| End-to-end  | `backend/tests/e2e`                                                                                   | `scripts/e2e`, Playwright on the host                     |
+| Docs        | `backend/tests/e2e/docs`                                                                              | `scripts/docs-shots`                                      |
+| Demo        | `demo/tests`, the demo's own project                                                                  | `scripts/ci`, with fakes                                  |
+| Demo stack  | `demo/tests/stack`                                                                                    | `scripts/demo-stack test`, against the running demo stack |
 
 One file of each:
 
@@ -153,9 +153,9 @@ pytest prints both operands of a failed assert, the helpers fail with
 plain `assert`, not in `==`, `in` or a call like `same_secret(a, b)` either:
 compare into a bool first and assert the bool, or use `assert_absent` and
 `assert_present`. A timeout in a test that reads a console names the time and
-`last_prompt(console, prompts)`, a prompt the test knows, never the console. `BwCli.run` and the seeding in
-`scripts/devlib/seed.py` fail with bw's stderr only, or with the exit code
-when stderr is empty.
+`last_prompt(console, prompts)`, a prompt the test knows, never the console.
+`BwCli.run` and the seeding in `scripts/devlib/seed.py` fail with bw's stderr
+only, or with the exit code when stderr is empty.
 
 ## Integration tests
 
@@ -187,11 +187,12 @@ root run on the same stack, so the uid isolation is tested there too. Each
 run's output goes to `.integration-logs/FILE.log` (`test_gateway-root.log` for
 the root run, `integration.log` for the whole suite in one pytest), emptied at
 the start of such a run. The script prints a line when a run starts and ends,
-then the short traceback of every failed run, a `FAILED FILE on stack K, log
-PATH` line each, a `FAILED FILE, no result` line for every planned run that
-has none (a run that raised, such as a log that cannot be opened, is a failed
-run), and one summary line that adds the counts of every run, with the wall
-time of the whole run, in pytest's form (for example `===== 1 failed, 161 passed, 3 skipped in 1234.56s (0:20:34) =====`).
+then the short traceback of every failed run, a
+`FAILED FILE on stack K, log PATH` line each, a `FAILED FILE, no result` line
+for every planned run that has none (a run that raised, such as a log that
+cannot be opened, is a failed run), and one summary line that adds the counts of
+every run, with the wall time of the whole run, in pytest's form (for example
+`===== 1 failed, 161 passed, 3 skipped in 1234.56s (0:20:34) =====`).
 
 The script takes a sleep and idle lock (`systemd-inhibit --what=sleep:idle`,
 shown as "bwtidy tests" by `systemd-inhibit --list`) by running itself again
@@ -213,10 +214,10 @@ A test goes into `backend/tests/integration` and takes the fixtures of its
 `conftest.py`: `bw_cli` (the container's CLI, logged in first when it is
 logged out, the way `setup` does), `bw` (a session of it for a module) and
 `app` (the single-user backend for a module, with the auto-commit of the test
-stacks). The package `integration/support` holds the helpers the files share, imported by module
-(`support.cli`: `BwCli` and the dev credentials, `support.app`: `App`, `Elsewhere` and
-`wait_until_listed`, `support.vault`: the `Vault`, `support.restorer`). A test never imports
-`conftest`.
+stacks). The package `integration/support` holds the helpers the files share,
+imported by module (`support.cli`: `BwCli` and the dev credentials,
+`support.app`: `App`, `Elsewhere` and `wait_until_listed`, `support.vault`: the
+`Vault`, `support.restorer`). A test never imports `conftest`.
 
 - A test that writes to the vault undoes every change at the end of the
   module. `test_writes.py` does so with a PUT of the original item, a restore
@@ -238,7 +239,8 @@ stacks). The package `integration/support` holds the helpers the files share, im
 `test_gateway.py` starts the real gateway (docs/spec.md, Gateway) on a
 free port and logs two accounts in through it, each worker as its own uid.
 Its tests run twice, with the usage stats off and on (`stats-off` and
-`stats-on` in their ids). That needs root in the container, so the test skips in a plain run:
+`stats-on` in their ids). That needs root in the container, so the test skips in
+a plain run:
 
 ```sh
 scripts/integration --root tests/integration/test_gateway.py
@@ -435,10 +437,48 @@ item through the second CLI state of
 wait an hour meanwhile (and set back at the end). Then one test dismisses
 the failed entry and one retries it over the change elsewhere.
 
+### Accessibility tests
+
+`test_accessibility.py` checks the web UI for a screen reader and a keyboard
+(docs/reference/ui.md, Keyboard):
+
+```sh
+scripts/e2e tests/e2e/test_accessibility.py              # the whole file on one stack
+scripts/e2e tests/e2e/test_accessibility.py -k pass_axe  # only the axe tests
+```
+
+- The axe tests open every page, menu and dialog that docs/reference/ui.md
+  names and run axe-core on each, in the light and the dark color mode
+  (`Axes.scan`, which emulates the color scheme and waits until the theme and
+  the animations have settled). They check the rules of WCAG 2.2 A and AA and
+  axe's best practices, and fail with every violation they found, each named by
+  view, mode, rule and element. `KEPT` lists the few violations bwtidy keeps,
+  each with its rule, the selector of its element and why.
+- The keyboard tests press keys only (`tab_to`, `press`, `arrow_to_column`)
+  and check after each one that the element with the focus shows a ring
+  (`expect_focus_ring`): log in, find and edit a cell, reveal and hide a
+  secret through the cell menu, the header menu, approve and reject proposals
+  on the Queue, restore from the Change log, and that a menu or dialog takes
+  the focus and gives it back on Escape.
+
+axe-core comes from axe-playwright-python, a test dependency of the backend
+(MPL-2.0, like axe-core it bundles). Nothing of it ships, so
+`scripts/third-party` does not list it. A new view or dialog gets its scan in
+the test of its page. A new violation is fixed, or kept in `KEPT` for its
+element alone with the reason above it.
+
+The frontend tests of the same fixes sit next to their components: the names
+and live regions (`WriteAnnouncer.test.tsx`, `QueueButton.test.tsx`,
+`Masked.test.tsx`), what a focused cell says (`cellDescription.test.ts`), the
+cell and header menus from the keyboard (`GridPage.test.tsx`) and the focus
+ring (`colorMode.test.tsx`).
+
 ### Playwright gotchas
 
-- The Queue button's label is `Queue, N pending` and it polls every 10
-  seconds, so wait at least 12 seconds for an MCP proposal to show.
+- The Queue button's label is `Queue, N unsaved edits`, `Queue, N MCP
+  proposals to review` or with both `Queue, N pending: ...` (N their sum), and
+  it polls every 10 seconds, so wait at least 12 seconds for an MCP proposal
+  to show.
 - On the Queue page each entry's checkbox has the entry's summary as its
   accessible name.
 - Approve all runs in the background: read the tabs after the Working spinner
@@ -623,25 +663,27 @@ fail on a `backend/uv.lock` or `demo/uv.lock` that is out of date, `npm ci` on a
 `package-lock.json` that does not match its `package.json`. `scripts/ci` runs
 `npm ci` in a fresh worktree and again when `frontend/package-lock.json`
 changed since the last install (it stamps
-`frontend/node_modules/.bwtidy-lock-sha256` with the lock file's sha256). Its
-check `lock files` (`scripts/devlib/locks.py`) compares each npm lock
-file (`frontend/`, `docker/bitwarden-cli/`) with its `package.json` every
+`frontend/node_modules/.bwtidy-lock-sha256` with the lock file's sha256), and
+does the same in `tools/markdownlint/` for its markdownlint check
+(`scripts/devlib/markdownlint.py`). Its check `lock files`
+(`scripts/devlib/locks.py`) compares each npm lock file (`frontend/`,
+`docker/bitwarden-cli/`, `tools/markdownlint/`) with its `package.json` every
 time.
 
 Each dependency is declared with a compatible range in npm's caret sense
 (AGENTS.md, Checks), which `tests/repo/test_dependency_ranges.py` checks for
 `backend/pyproject.toml`. `scripts/update-deps` updates everything within the
-ranges: `uv lock --upgrade` in `backend/` and `demo/`, `npm update` and `npm ci` in
-`frontend/`, `npm update --package-lock-only` in `docker/bitwarden-cli/` (only
-the image installs the CLI), the digest of each image that the `Dockerfile`,
-`demo/Dockerfile` and `compose.demo.yaml` name
-(its tag stays) and the commit SHA of each action to the newest release tag
-of its major version. Then it runs `scripts/third-party` and the version
-check, prints what changed per ecosystem and lists the updates beyond the
-ranges (new majors, newer image tags) without applying them.
-`scripts/update-deps --dry-run` shows the same and writes nothing. It never
-commits and never changes the version of bwtidy, review and commit what it
-changed as any other change.
+ranges: `uv lock --upgrade` in `backend/` and `demo/`, `npm update` and `npm ci`
+in `frontend/`, `npm update --package-lock-only` in `docker/bitwarden-cli/`
+(only the image installs the CLI) and in `tools/markdownlint/` (`scripts/ci`
+installs it again once its lock file changed), the digest of each image that the
+`Dockerfile`, `demo/Dockerfile` and `compose.demo.yaml` name (its tag stays) and
+the commit SHA of each action to the newest release tag of its major version.
+Then it runs `scripts/third-party` and the version check, prints what changed
+per ecosystem and lists the updates beyond the ranges (new majors, newer image
+tags) without applying them. `scripts/update-deps --dry-run` shows the same and
+writes nothing. It never commits and never changes the version of bwtidy, review
+and commit what it changed as any other change.
 
 After a change to the dependencies (`npm install` in `frontend/`, `uv add` or
 `uv lock` in `backend/`), run `scripts/third-party` and commit the
@@ -651,21 +693,26 @@ A package whose metadata names no license makes it stop with the package's
 name. Look the license up in the package's own repository and add it to
 `OVERRIDES` in the script, with where you checked it.
 
+A package whose files are committed as they are instead (IBM Plex Mono, the
+docs site's code font in `docs/assets/fonts/ibm-plex-mono/`) has its entry in
+`BUNDLED` of the script. `tests/repo/test_third_party.py` checks that the list
+holds it and that its folder holds the two woff2 files and `LICENSE.txt`.
+
 ### Docs lint
 
 `scripts/docs-lint` (stdlib only, run by `scripts/ci` after the third-party
-check) reads every markdown file of the repo (`git ls-files -co
---exclude-standard`) and checks that each local image link (`![alt](path)`,
-`![alt][ref]`, an `img` tag's `src`, outside code) points to a file, and that
-every file in `docs/images/` is linked from some markdown file, whichever
-one. Every picture, also one that points to a URL, needs a non-empty alt text (an `img`
-tag needs a non-empty `alt` attribute). It also checks that each other local link
-(`[text](path)`, reference style, an `a` tag's `href`) points to a file, and
-that a `#anchor` on a link to a markdown file (or a bare `#anchor`) matches a
-heading of that file by GitHub's slug rules. Finally it applies the prose
-style rule of `AGENTS.md`: a semicolon, an em dash or ` -- ` as a dash
-outside code, HTML comments and link targets is a problem (an HTML entity
-such as `&amp;` is not). A diagram (a fenced code block of a Kroki type,
+check) reads every markdown file of the repo
+(`git ls-files -co --exclude-standard`) and checks that each local image link
+(`![alt](path)`, `![alt][ref]`, an `img` tag's `src`, outside code) points to a
+file, and that every file in `docs/images/` is linked from some markdown file,
+whichever one. Every picture, also one that points to a URL, needs a non-empty
+alt text (an `img` tag needs a non-empty `alt` attribute). It also checks that
+each other local link (`[text](path)`, reference style, an `a` tag's `href`)
+points to a file, and that a `#anchor` on a link to a markdown file (or a bare
+`#anchor`) matches a heading of that file by GitHub's slug rules. Finally it
+applies the prose style rule of `AGENTS.md`: a semicolon, an em dash or ` -- `
+as a dash outside code, HTML comments and link targets is a problem (an HTML
+entity such as `&amp;` is not). A diagram (a fenced code block of a Kroki type,
 see [Releasing](release.md#diagrams)) without `alt="TEXT"` after its type is
 a problem too. It prints one line per problem and exits 1, nothing
 and 0 when all is well.
@@ -685,8 +732,8 @@ npm run lint:exports    # knip: no file, export or type that nothing uses (knip.
 `scripts/mcp-reference` (run by `scripts/ci` with `--check` after the docs
 lint) writes `docs/reference/mcp-tools.md` from the tools the MCP server
 registers, so after a change to a tool run it and commit the page. It imports
-bwtidy, so it starts itself again through `uv run --locked` in the backend venv when
-needed. Its intro is in the script (`INTRO`). A tool's description is short
+bwtidy, so it starts itself again through `uv run --locked` in the backend venv
+when needed. Its intro is in the script (`INTRO`). A tool's description is short
 paragraphs and lists split by blank lines (`paragraphs` and `bullets` in
 `backend/src/bwtidy/mcp/texts.py`), which the page keeps, its `code` spans as
 code, and its parameters follow in a table.
@@ -709,8 +756,8 @@ it, so run it after a change to `demo/`, `compose.demo.yaml` or the gateway.
 `backend/tests/repo/test_demo_stack_files.py` reads `compose.demo.yaml` and
 `demo/Dockerfile` alone, in `scripts/ci`: the internal networks, the one
 published port, the one allowed server, the dropped capabilities, the
-Vaultwarden version of the dev stack and that the normal image holds no demo
-code.
+controller's own user, the Vaultwarden version of the dev stack and that the
+normal image holds no demo code.
 
 ## Smoke test on a real account
 

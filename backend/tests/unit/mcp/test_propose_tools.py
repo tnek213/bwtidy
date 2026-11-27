@@ -400,7 +400,7 @@ def test_propose_create_item_refuses_a_secret_value_and_an_unknown_type(env: App
     assert_no_secret(message)
     message = error(env, "propose_create_item", name="Forge", type="router")
     assert "unknown type 'router'" in message
-    assert "secureNote" in message
+    assert "login, note, card, identity, sshKey" in message
     message = error(env, "propose_create_item", name="Forge")
     assert "exactly one of type and template" in message
     assert queued(env) == []
@@ -459,6 +459,39 @@ def test_propose_convert_item_refuses_what_cannot_be_converted(env: AppEnv):
     assert "may not be mapped into the non-secret" in message
     assert_no_secret(message)
     assert queued(env) == []
+
+
+def test_the_type_list_items_answers_is_one_the_propose_tools_take(env: AppEnv):
+    enable(env)
+    listed = {item["type"]: item["id"] for item in data(env, "list_items")["items"]}
+    assert set(listed) == {"login", "note", "card", "identity", "sshKey"}
+    for word in sorted(listed):
+        if word == "sshKey":
+            message = error(env, "propose_create_item", name="New key", type=word)
+            assert "propose_convert_item" in message
+        else:
+            data(env, "propose_create_item", name=f"New {word}", type=word)
+        source = "card-1" if word == "identity" else "identity-1"
+        data(env, "propose_convert_item", item_id=source, type=word)
+    created = [
+        e["operation"]["type"] for e in queued(env) if e["operation"]["kind"] == "createItem"
+    ]
+    converted = [
+        e["operation"]["newType"] for e in queued(env) if e["operation"]["kind"] == "convertItem"
+    ]
+    assert sorted(created) == [1, 2, 3, 4]
+    assert sorted(converted) == [1, 2, 3, 4, 5]
+
+
+def test_the_propose_tools_take_bitwardens_word_for_a_secure_note(env: AppEnv):
+    enable(env)
+    data(env, "propose_create_item", name="Wifi", type="secureNote")
+    data(env, "propose_convert_item", item_id="card-1", type="secureNote")
+    [convert, create] = sorted(queued(env), key=lambda e: e["operation"]["kind"])
+    assert create["operation"]["type"] == 2
+    assert create["summary"] == 'Create secure note "Wifi"'
+    assert convert["operation"]["newType"] == 2
+    assert convert["summary"] == 'Convert "Visa debit" to secure note'
 
 
 def test_propose_convert_item_describes_the_ssh_key_way(env: AppEnv):
