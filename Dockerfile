@@ -49,6 +49,41 @@ RUN if grep -o 'bitwarden_license/bit-c[a-z]*/src/[^"]*' apps/cli/build/*.js; th
     fi
 ## where the CLI's corresponding source is, for the image to say so beside the build
 RUN node -e 'const s = require("/src/source.json"); console.log(`The build of the Bitwarden CLI is its open source build (GPL-3.0, LICENSE_GPL.txt), built from ${s.repository} at the tag ${s.tag}, commit ${s.commit}.`)' > /src/SOURCE
+## the build bundles @bitwarden/sdk-internal (GPL-3.0), whose npm package holds only its compiled
+## WebAssembly and names the commit of its repository in VERSION. SOURCE names that source too, and
+## a WebAssembly file in the build that is not the SDK's stops the build, as SOURCE would not name
+## its source. The SDK's package.json, VERSION and LICENSE go beside SOURCE with the sha256 of its
+## WebAssembly files.
+RUN sdk=node_modules/@bitwarden/sdk-internal \
+    && mkdir /src/sdk-internal \
+    && (cd "$sdk" && sha256sum *.wasm node/*.wasm) > /src/sdk-internal/wasm.sha256 \
+    && bundled=0 \
+    && for wasm in apps/cli/build/*.wasm; do \
+        [ -e "$wasm" ] || continue; \
+        sum="$(sha256sum "$wasm" | cut -d ' ' -f 1)"; \
+        if ! grep -q "^$sum " /src/sdk-internal/wasm.sha256; then \
+            echo "$wasm is no WebAssembly of @bitwarden/sdk-internal, so SOURCE would not name its source" >&2; \
+            exit 1; \
+        fi; \
+        bundled=$((bundled + 1)); \
+    done \
+    && if [ "$bundled" = 0 ]; then \
+        echo "apps/cli/build holds no WebAssembly of @bitwarden/sdk-internal, check whether SOURCE should still name its source" >&2; \
+        exit 1; \
+    fi \
+    && commit="$(cat "$sdk/VERSION" 2>/dev/null || true)" \
+    && if ! printf '%s' "$commit" | grep -Eqx '[0-9a-f]{40}'; then \
+        echo "$sdk/VERSION is missing or holds '$commit', not a commit of 40 hex characters, so SOURCE cannot name the SDK's source" >&2; \
+        exit 1; \
+    fi \
+    && repository="$(node -p 'const r = require("./'"$sdk"'/package.json").repository; (typeof r === "string" ? r : r.url).replace(/^git\+/, "").replace(/\.git$/, "")')" \
+    && if ! printf '%s' "$repository" | grep -Eqx 'https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+'; then \
+        echo "$sdk/package.json names the repository '$repository', not a GitHub repository" >&2; \
+        exit 1; \
+    fi \
+    && version="$(node -p 'require("./'"$sdk"'/package.json").version')" \
+    && echo "It bundles the compiled @bitwarden/sdk-internal $version (GPL-3.0, sdk-internal/LICENSE), built from $repository at the commit $commit." >> /src/SOURCE \
+    && cp "$sdk/package.json" "$sdk/VERSION" "$sdk/LICENSE" /src/sdk-internal/
 
 ## the Bitwarden CLI and every package it brings along, as its own lock file pins them, its build
 ## replaced by the open source one. npm stays in this stage: the app stage takes node and the
@@ -62,6 +97,7 @@ RUN npm ci --no-fund --no-audit
 RUN rm -rf node_modules/@bitwarden/cli/build
 COPY --from=bitwarden-cli-source /src/clients/apps/cli/build node_modules/@bitwarden/cli/build
 COPY --from=bitwarden-cli-source /src/SOURCE /src/clients/LICENSE_GPL.txt node_modules/@bitwarden/cli/
+COPY --from=bitwarden-cli-source /src/sdk-internal node_modules/@bitwarden/cli/sdk-internal
 
 FROM python:3.13-slim-trixie@sha256:7249d5587b78209a006dc4a3b5340678f84ea729239193aa559962cd8c1fce50 AS python
 
@@ -137,6 +173,9 @@ RUN chmod 644 /usr/local/lib/bwtidy/unref-share-timers.js \
 RUN mkdir -p /data/accounts
 
 COPY --from=backend /app/backend/.venv /app/backend/.venv
+## for `docker compose exec bwtidy bwtidy stats` (docs/reference/configuration.md). A link of the
+## one command, not the venv's bin on PATH, so python3 (the health check's) stays the image's own.
+RUN ln -s /app/backend/.venv/bin/bwtidy /usr/local/bin/bwtidy
 COPY --from=frontend /src/frontend/dist /app/static
 ## every backup holds it as RESTORE.md (collect.RESTORE_DOC)
 COPY docs/restore.md /app/docs/restore.md

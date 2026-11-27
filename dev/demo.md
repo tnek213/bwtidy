@@ -834,8 +834,9 @@ checks:
   `https://vaultwarden` with a four word id, the grid and MCP's
   `list_items` (with a token capped to one day) list the fixture's items.
 - The usage stats: `/demo/stats.json` shows the vault start, the grid and
-  `list_items` without the vault's id, and a dump of the stats database holds
-  no password of the fixture and nothing shaped like a vault's password.
+  `list_items` without the vault's id. `bwtidy stats` in the `demo`
+  container lists the grid. A dump of the stats database holds no password
+  of the fixture and nothing shaped like a vault's password.
 - Every refused route answers 403 with the wrapper's text, for a stranger
   and for a visitor, with a real server in the body and in other spellings
   of the path (sent raw). Afterwards the accounts root holds the one
