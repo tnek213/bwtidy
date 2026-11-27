@@ -45,6 +45,10 @@ def test_the_bitwarden_cli_lock_has_no_telemetry_package():
     assert telemetry(npm_packages("docker/bitwarden-cli")) == []
 
 
+def test_the_markdownlint_lock_has_no_telemetry_package():
+    assert telemetry(npm_packages("tools/markdownlint")) == []
+
+
 def test_the_check_finds_a_telemetry_package():
     names = ["fastapi", "opentelemetry-api", "opentelemetry-sdk", "@sentry/react"]
     assert telemetry(names) == ["@sentry/react", "opentelemetry-sdk"]

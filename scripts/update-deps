@@ -8,9 +8,10 @@ Backend and demo: uv lock --upgrade, within the ranges of backend/pyproject.toml
 demo/pyproject.toml. Frontend: npm update
 within the ranges of frontend/package.json (an exact pin stays), then npm ci so node_modules
 match. The image's Bitwarden CLI (docker/bitwarden-cli): npm update --package-lock-only, as only
-the image installs it. The Dockerfile, demo/Dockerfile and compose.demo.yaml (the demo's
-Vaultwarden and nginx): each image keeps the tag it names and gets the digest that tag points to
-now. The workflows: each action moves to the newest release tag of its major
+the image installs it. markdownlint-cli2 (tools/markdownlint) the same way, as scripts/ci runs npm
+ci there once its lock file changed. The Dockerfile, demo/Dockerfile and compose.demo.yaml (the
+demo's Vaultwarden and nginx): each image keeps the tag it names and gets the digest that tag
+points to now. The workflows: each action moves to the newest release tag of its major
 version, with its commit SHA and that tag in the comment above it. Then it runs
 scripts/third-party and the version check, and prints what changed (package, old version, new
 version) per ecosystem. Last it lists the updates outside the ranges (new major versions, newer
@@ -37,6 +38,7 @@ BACKEND = ROOT / "backend"
 DEMO = ROOT / "demo"
 FRONTEND = ROOT / "frontend"
 CLI = ROOT / "docker" / "bitwarden-cli"
+MARKDOWNLINT = ROOT / "tools" / "markdownlint"
 DOCKERFILE = ROOT / "Dockerfile"
 ## every file that pins images by tag and digest: the two Dockerfiles and the demo's compose file
 IMAGE_FILES = [DOCKERFILE, DEMO / "Dockerfile", ROOT / "compose.demo.yaml"]
@@ -450,7 +452,11 @@ def outside_packages(
         for name, locked, latest in uv_outdated(tree):
             if reached.get(name) != latest:
                 outside.append(f"{label} {name} {reached.get(name, locked)}: latest {latest}")
-    for label, project in (("frontend", FRONTEND), ("bitwarden-cli", CLI)):
+    for label, project in (
+        ("frontend", FRONTEND),
+        ("bitwarden-cli", CLI),
+        ("markdownlint", MARKDOWNLINT),
+    ):
         answer = run(["npm", "outdated", "--json"], project, check=False)
         start = answer.find("{")
         outdated = json.loads(answer[start:]) if start >= 0 else {}
@@ -483,6 +489,9 @@ def main(args: list[str]) -> int:
         "frontend (frontend/package-lock.json)": update_npm(FRONTEND, dry_run, install=True),
         "Bitwarden CLI (docker/bitwarden-cli/package-lock.json)": update_npm(
             CLI, dry_run, install=False
+        ),
+        "markdownlint (tools/markdownlint/package-lock.json)": update_npm(
+            MARKDOWNLINT, dry_run, install=False
         ),
         "images (Dockerfile, demo/Dockerfile, compose.demo.yaml)": update_images(
             dry_run, outside, errors
