@@ -107,4 +107,7 @@ pymdownx.inlinehilite = {}
 # GitHub's alerts (> [!NOTE], > [!TIP], > [!WARNING]) as boxes, so a box also shows on GitHub
 # and reads as a quote in a backup's RESTORE.md
 pymdownx.quotes.callouts = true
-pymdownx.superfences = {}
+# a code block even when its info string holds an option it does not know, such as a diagram's
+# alt="..." (scripts/docs-site serve shows a diagram as its code block, build makes it a picture
+# first). Without it the fence stays text and its closing fence opens a block of what follows.
+pymdownx.superfences.relaxed_headers = true

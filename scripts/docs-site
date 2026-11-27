@@ -66,7 +66,8 @@ root, so a later build finds it there and makes no request. resvg writes the PNG
 directory inside that cache, so each one is renamed into place on the same filesystem and a failed
 conversion leaves nothing. A server that cannot be reached or answers with an error fails the
 build, naming the page, the line and the server's message. Docs without a diagram build without
-any request. `serve` shows a diagram as its code block.
+any request. `serve` shows a diagram as its code block, as zensical.toml has SuperFences take a
+fence whose info string holds an option it does not know (relaxed_headers).
 """
 
 import hashlib
