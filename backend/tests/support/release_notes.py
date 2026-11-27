@@ -42,7 +42,7 @@ def withdrawn(date: str, gone: str, by: str) -> str:
     return f"{date} · Withdrawn on {gone}, see [{by}](#{slug})"
 
 
-## the newest is tagged on 2026-03-04 at 23:30 in New York, which is 2026-03-05 in UTC
+## the newest is tagged on 2026-03-04 at 23:30 in New York, which is 2026-03-05 in Sweden
 TAGS = {SEMVER: "2026-03-04T23:30:00-05:00", "0.0.2": "2026-02-03T12:00:00+00:00"}
 TAGGED = (
     INTRO

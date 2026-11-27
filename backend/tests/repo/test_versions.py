@@ -109,10 +109,22 @@ def test_tagged_notes_with_every_heading_pass(repo):
     assert versions.release_notes_problems(SEMVER) == []
 
 
-def test_the_date_is_the_utc_date_of_the_tagged_commit(repo):
+def test_the_date_is_the_swedish_date_of_the_tagged_commit(repo):
     repo.tagged(TAGGED.replace("2026-03-05", "2026-03-04"))
     found = versions.release_notes_problems(SEMVER)
-    only(found, line_of(TAGGED, "2026-03-05"), "is not 2026-03-05, the UTC date of the commit")
+    only(found, line_of(TAGGED, "2026-03-05"), "is not 2026-03-05, the date (Swedish time)")
+
+
+def test_a_commit_after_midnight_in_sweden_is_of_the_next_day(repo):
+    ## 23:30 UTC on 2026-03-04 is 00:30 on 2026-03-05 in Stockholm
+    repo.tag("0.0.2", TAGS["0.0.2"])
+    repo.tag(SEMVER, "2026-03-04T23:30:00+00:00")
+    assert problems(repo, TAGGED) == []
+
+
+def test_the_day_of_a_unix_time_is_swedish():
+    ## 2026-07-01 22:30 UTC is 00:30 on 2026-07-02 in Stockholm, in summer time
+    assert versions.day_of(1782945000) == "2026-07-02"
 
 
 def test_a_date_that_differs_from_the_tag_fails(repo):

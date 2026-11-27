@@ -12,7 +12,7 @@ Nothing yet.
 
 ## 1.0.0-beta.3
 
-2026-11-27 · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/v1.0.0-beta.3)
+2026-11-28 · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/v1.0.0-beta.3)
 
 No stored format changed since 1.0.0-beta.1. 1.0.0-beta.2 was never
 published, and its changes are in this release. Act on the breaking changes

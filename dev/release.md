@@ -180,8 +180,9 @@ YYYY-MM-DD · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/vV
 
 - PREVIOUS is the next older version heading of the file that was not
   withdrawn (below). A version with none has no All changes part.
-- The date is the UTC date of the commit that the tag `vVERSION` points at:
-  `TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%d 'vVERSION^{commit}'`.
+- The date is the date in Swedish time (Europe/Stockholm, the maintainer's) of
+  the commit that the tag `vVERSION` points at:
+  `TZ=Europe/Stockholm git log -1 --format=%cd --date=format-local:%Y-%m-%d 'vVERSION^{commit}'`.
 - The line may wrap like any other text (a line break before a `·`), as text
   is wrapped at 80 characters.
 - The newest version may have no metadata line while its tag does not exist
@@ -272,18 +273,18 @@ The workflow "Release" (`.github/workflows/release.yml`) does the rest:
 
 1. On a branch off main, run `scripts/release prepare VERSION`, with the
    version as `frontend/package.json` spells it (`1.0.0-beta.3`). It renames
-   `## Unreleased` to `## VERSION` with its metadata line, dated today (UTC)
-   and linking the version below, and puts a new `## Unreleased` with
-   "Nothing yet." above it. It bumps the version in `backend/pyproject.toml`
+   `## Unreleased` to `## VERSION` with its metadata line, dated today
+   (Swedish time) and linking the version below, and puts a new
+   `## Unreleased` with "Nothing yet." above it. It bumps the version in `backend/pyproject.toml`
    and `frontend/package.json` and refreshes the lock files as
    [The version](#the-version) says. Then it runs the check of the release
    notes and prints the files to commit.
 2. Commit them as "Release bwtidy VERSION" in a pull request and merge it the
-   same day (UTC), as the tag must have the date of the entry.
+   same day (Swedish time), as the tag must have the date of the entry.
 3. Run `scripts/release tag VERSION`. It fetches origin and refuses unless
-   main's version is VERSION, its entry is dated the UTC date of main's last
-   commit and the tag `vVERSION` does not exist. Then it tags that commit with
-   the annotated tag `vVERSION` and pushes the tag.
+   main's version is VERSION, its entry is dated the date (Swedish time) of
+   main's last commit and the tag `vVERSION` does not exist. Then it tags that
+   commit with the annotated tag `vVERSION` and pushes the tag.
 
 When the dates differ, the merge came a day later. Run
 `scripts/release prepare VERSION` again in a new pull request, which writes

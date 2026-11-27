@@ -12,6 +12,7 @@ import importlib.util
 import json
 import re
 import tomllib
+import zoneinfo
 from pathlib import Path
 from types import ModuleType
 from typing import NamedTuple
@@ -77,6 +78,8 @@ def package_lock_versions() -> tuple[str, str]:
 
 
 RELEASE_NOTES = "docs/releases.md"
+## a release is dated by Swedish time, the maintainer's
+TIMEZONE = zoneinfo.ZoneInfo("Europe/Stockholm")
 RULES = "dev/release.md, The release notes"
 REPO_URL = "https://github.com/tnek213/bwtidy"
 UNRELEASED = "Unreleased"
@@ -136,8 +139,18 @@ def version_key(version: str) -> tuple[int, ...]:
     return (int(major), int(minor), int(patch), *rank)
 
 
+def day_of(timestamp: int) -> str:
+    """The date (YYYY-MM-DD) of a Unix time in TIMEZONE."""
+    return datetime.datetime.fromtimestamp(timestamp, TIMEZONE).date().isoformat()
+
+
+def today() -> datetime.date:
+    """Today's date in TIMEZONE."""
+    return datetime.datetime.now(TIMEZONE).date()
+
+
 def tag_dates(repo: Path) -> dict[str, str]:
-    """The UTC date (YYYY-MM-DD) of the commit each tag v* of repo points at.
+    """The date (YYYY-MM-DD, Swedish time) of the commit each tag v* of repo points at.
 
     Empty when the checkout has no such tag or git cannot read it.
     """
@@ -148,8 +161,7 @@ def tag_dates(repo: Path) -> dict[str, str]:
     for tag in listed.stdout.split():
         shown = git("log", "-1", "--format=%ct", f"{tag}^{{commit}}", repo=repo, check=False)
         if shown.returncode == 0 and shown.stdout.strip().isdigit():
-            moment = datetime.datetime.fromtimestamp(int(shown.stdout), datetime.UTC)
-            dates[tag] = moment.date().isoformat()
+            dates[tag] = day_of(int(shown.stdout))
     return dates
 
 
@@ -417,7 +429,11 @@ def _metadata_problems(
         problems.append((first.line, f"{date} is no date as YYYY-MM-DD"))
     elif tagged and tags is not None and tags[tag] != date:
         problems.append(
-            (first.line, f"the date {date} is not {tags[tag]}, the UTC date of the commit of {tag}")
+            (
+                first.line,
+                f"the date {date} is not {tags[tag]}, "
+                f"the date (Swedish time) of the commit of {tag}",
+            )
         )
     wanted = f"{REPO_URL}/releases/tag/{tag}"
     if release != wanted:

@@ -265,7 +265,7 @@ def tag(repo: FakeRepo, version: str = SEMVER) -> tuple[Remote, str]:
 
 
 def test_tag_tags_the_head_of_origin_main_and_pushes_it(repo):
-    ## 23:30 in New York on 2026-03-04 is 2026-03-05 in UTC
+    ## 23:30 in New York on 2026-03-04 is 2026-03-05 in Sweden
     sha = on_origin_main(repo, "2026-03-05", "2026-03-04T23:30:00-05:00")
     ## a local commit that is not on origin/main yet is not the release
     repo.commit("2026-03-05T12:00:00+00:00", "Change more")

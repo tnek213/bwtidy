@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """release: release a version from its entry in docs/releases.md (dev/release.md, To release).
 
-  scripts/release prepare VERSION   turn Unreleased into the entry of VERSION, dated today (UTC),
-                                    and bump the version to it, for a pull request
+  scripts/release prepare VERSION   turn Unreleased into the entry of VERSION, dated today
+                                    (Swedish time), and bump the version to it, for a pull
+                                    request
   scripts/release tag VERSION       tag origin/main's head as vVERSION and push the tag, which
                                     starts .github/workflows/release.yml
   scripts/release notes VERSION     print the body of VERSION's GitHub release
@@ -22,8 +23,8 @@ the version and its entry: the bullets of Unreleased join the entry and its meta
 today's date. Then it runs the lint and prints what to commit.
 
 tag fetches origin and refuses unless origin/main's version is VERSION, its entry is dated the
-UTC date of origin/main's head and the tag does not exist yet. notes prints the entry without
-its heading and metadata line, with every relative link made absolute on the docs site
+date (Swedish time) of origin/main's head and the tag does not exist yet. notes prints the entry
+without its heading and metadata line, with every relative link made absolute on the docs site
 (https://tnek213.github.io/bwtidy/).
 """
 

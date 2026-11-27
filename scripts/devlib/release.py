@@ -338,18 +338,19 @@ def show(ref: str, path: str, root: Path) -> str | None:
 
 
 def commit_date(ref: str, root: Path) -> str:
-    """The UTC date (YYYY-MM-DD) of the commit ref points at."""
+    """The date (YYYY-MM-DD, Swedish time) of the commit ref points at."""
     shown = git("log", "-1", "--format=%ct", f"{ref}^{{commit}}", repo=root, check=False)
     if shown.returncode != 0 or not shown.stdout.strip().isdigit():
         raise fail(f"git cannot read the commit of {ref}: {shown.stderr.strip()}")
-    return datetime.datetime.fromtimestamp(int(shown.stdout), datetime.UTC).date().isoformat()
+    return versions.day_of(int(shown.stdout))
 
 
 def release_problems(version: str, ref: str, root: Path = ROOT) -> list[str]:
     """Why the commit ref cannot be released as version, empty when it can.
 
     Its frontend/package.json has version, and the entry of version in its docs/releases.md has
-    a metadata line dated the UTC date of the commit, as the tag vVERSION on it will have.
+    a metadata line dated the date (Swedish time) of the commit, as the tag vVERSION on it will
+    have.
     """
     package = show(ref, "frontend/package.json", root)
     if package is None:
@@ -372,7 +373,7 @@ def release_problems(version: str, ref: str, root: Path = ROOT) -> list[str]:
     if date != committed:
         return [
             f"## {version} in {NOTES} of {ref} is dated {date}, but its commit is from {committed} "
-            f"(UTC) and the tag must have the date of its entry: {again}"
+            f"(Swedish time) and the tag must have the date of its entry: {again}"
         ]
     return []
 
@@ -554,18 +555,18 @@ def main(args: list[str], usage: str) -> int:
         return 2
     version = rest[0]
     if command == "prepare":
-        today = datetime.datetime.now(datetime.UTC).date()
+        today = versions.today()
         changed = prepare(version, today)
         problem = versions.version_mismatch()
         if problem:
             print(problem)
             return 1
-        print(f"{NAME}: {version} is prepared, dated {today.isoformat()} (UTC). Commit")
+        print(f"{NAME}: {version} is prepared, dated {today.isoformat()} (Swedish time). Commit")
         for path in changed:
             print(f"  {path}")
         print(
-            f"as 'Release bwtidy {version}' in a pull request and merge it today (UTC), then run "
-            f"scripts/release tag {version}"
+            f"as 'Release bwtidy {version}' in a pull request and merge it today (Swedish time), "
+            f"then run scripts/release tag {version}"
         )
         return 0
     if command == "tag":
