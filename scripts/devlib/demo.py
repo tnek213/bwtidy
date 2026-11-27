@@ -1,10 +1,11 @@
 """The demo stack of a worktree (compose.demo.yaml): its project, images, port and commands.
 
 A worktree has one demo stack, with a compose project and two images of its own (the normal
-image the demo is built on, and the demo image), so the stacks of several worktrees never
-share a container, a volume or an image.
+image the demo is built on, and the demo image) and a public bridge, so the stacks of several
+worktrees never share a container, a volume, an image or a bridge.
 """
 
+import hashlib
 import os
 import re
 import subprocess
@@ -19,7 +20,14 @@ DOCKERFILE = "demo/Dockerfile"
 ## the container port of the edge that compose.demo.yaml publishes
 EDGE = ("edge", "80")
 ## what compose.demo.yaml reads from the environment and the stack sets itself
-OWN = ("BWTIDY_IMAGE", "DEMO_IMAGE", "DEMO_BIND", "DEMO_PORT", "DEMO_BUILD_CONTEXT")
+OWN = (
+    "BWTIDY_IMAGE",
+    "DEMO_IMAGE",
+    "DEMO_BIND",
+    "DEMO_PORT",
+    "DEMO_BUILD_CONTEXT",
+    "DEMO_PUBLIC_BRIDGE",
+)
 
 
 def slug(root: Path) -> str:
@@ -40,6 +48,15 @@ def demo_image(root: Path = ROOT) -> str:
     return f"{project_name(root)}:local"
 
 
+def public_bridge(root: Path = ROOT) -> str:
+    """The bridge of the stack's network public: a worktree's own, at most 15 characters.
+
+    Docker refuses a second network with a bridge name that one already has, so the stacks of
+    two worktrees with the default name could not run at once.
+    """
+    return "bwd-" + hashlib.sha256(project_name(root).encode()).hexdigest()[:10]
+
+
 def compose(root: Path, *args: str) -> list[str]:
     """docker compose ARGS of the worktree's demo stack, as a command.
 
@@ -54,13 +71,15 @@ def environment(root: Path, port: int, environ: Mapping[str, str] = os.environ) 
     """The environment of every compose command of the stack.
 
     The caller's DEMO_ settings (DEMO_MAX, DEMO_POOL_READY, the rates) pass through. The
-    images, the context and the address are the stack's own: built here, on loopback, at port.
+    images, the context, the address and the public bridge are the stack's own: built here, on
+    loopback, at port.
     """
     env = {name: value for name, value in environ.items() if name not in OWN}
     env["BWTIDY_IMAGE"] = base_image(root)
     env["DEMO_IMAGE"] = demo_image(root)
     env["DEMO_BIND"] = "127.0.0.1"
     env["DEMO_PORT"] = str(port)
+    env["DEMO_PUBLIC_BRIDGE"] = public_bridge(root)
     return env
 
 

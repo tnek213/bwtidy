@@ -21,8 +21,8 @@ Bitwarden's to fix: report it to Bitwarden.
 ## Verifying the image
 
 Every image on Docker Hub carries a signed build provenance attestation, which shows
-that GitHub Actions built it from a given commit of this repository. Check it with the
-GitHub CLI:
+that GitHub Actions built it from a given commit of this repository. Check it
+with the GitHub CLI:
 
 ```sh
 gh attestation verify oci://docker.io/tnek213/bwtidy:latest --owner tnek213
@@ -38,7 +38,7 @@ lists the vulnerabilities that have no fix yet.
 ## Reporting a vulnerability
 
 Report it privately through GitHub's private vulnerability reporting:
-https://github.com/tnek213/bwtidy/security/advisories/new
+<https://github.com/tnek213/bwtidy/security/advisories/new>
 
 Never report a vulnerability in a public issue or a pull request.
 

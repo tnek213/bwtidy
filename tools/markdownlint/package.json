@@ -1,0 +1,8 @@
+{
+  "name": "bwtidy-markdownlint",
+  "private": true,
+  "description": "markdownlint-cli2, which lints every Markdown file of the repo (scripts/ci), installed with npm ci from this lock file",
+  "devDependencies": {
+    "markdownlint-cli2": "0.24.2"
+  }
+}
