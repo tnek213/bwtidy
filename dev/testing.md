@@ -89,6 +89,11 @@ The tests of `tests/scripts` load a script by name with the fixture
 `load_script` (`load_script("dev-vault")`), and `backend/tests/conftest.py`
 puts `scripts/` on the import path so they import `devlib` too.
 
+`TMPDIR` can lie in a git checkout, and git looks for a repository in every
+parent of its working directory. So a test that runs git in a `tmp_path`
+without a repository sets `GIT_CEILING_DIRECTORIES` to the parent of
+`tmp_path` with `monkeypatch`, or git finds the checkout around it.
+
 The tests of `scripts/docs-site` (`tests/scripts/test_docs_site_script.py`)
 convert a diagram with the real resvg, so they need one of the fonts that
 [Releasing](release.md#diagrams) lists, as a docs build does. Without one
