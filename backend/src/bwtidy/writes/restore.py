@@ -170,9 +170,9 @@ async def _bring_back(
         if untrash:
             await client.restore_item(item_id)
             await path.sync(write.batch)
-            await list_until(
-                client.list_items, lambda items: any(i.get("id") == item_id for i in items)
-            )
+            ## an archived item stays archived, and only the archived listing holds it
+            listing = client.list_archived if current.get("archivedDate") else client.list_items
+            await list_until(listing, lambda items: any(i.get("id") == item_id for i in items))
         await _put_back(path, write, item_id, saved, contents, check=not untrash)
         return
     attachments = []

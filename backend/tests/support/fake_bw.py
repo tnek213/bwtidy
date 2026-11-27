@@ -222,13 +222,19 @@ class FakeBwServe:
             self.created.append(item)
             self.items.append(item)
             return ok(item)
-        ## like the real bw serve, GET answers a trashed or an archived item too
+        ## like the real bw serve, GET answers a trashed or archived item too, with its
+        ## deletedDate or archivedDate
         if method == "GET" and path.startswith("/object/item/"):
             item_id = path.removeprefix("/object/item/")
             found = [i for i in self.items + self.trashed + self.archived if i.get("id") == item_id]
             return ok(found[0]) if found else fail("Not found.")
         if method == "DELETE" and path.startswith("/object/item/"):
             item_id = path.removeprefix("/object/item/")
+            ## an archived item goes to the trash and stays archived
+            for index, item in enumerate(self.archived):
+                if item.get("id") == item_id and not item.get("deletedDate"):
+                    self.archived[index] = {**item, "deletedDate": "2026-10-26T15:00:00.000Z"}
+                    return ok(None)
             found = [i for i in self.items if i.get("id") == item_id]
             if not found:
                 return fail("Not found.")
@@ -238,6 +244,20 @@ class FakeBwServe:
         ## like the real bw serve, a restore gives the item a new revisionDate at once
         if method == "POST" and path.startswith("/restore/item/"):
             item_id = path.removeprefix("/restore/item/")
+            ## an archived item in the trash leaves the trash and stays archived, one that is
+            ## not in the trash leaves the archive
+            for index, item in enumerate(self.archived):
+                if item.get("id") != item_id:
+                    continue
+                restored = {k: v for k, v in item.items() if k != "deletedDate"}
+                restored["revisionDate"] = self._next_revision()
+                if item.get("deletedDate"):
+                    self.archived[index] = restored
+                else:
+                    del self.archived[index]
+                    self.items.append({k: v for k, v in restored.items() if k != "archivedDate"})
+                self.restored.append(item_id)
+                return ok(None)
             found = [i for i in self.trashed if i.get("id") == item_id]
             if not found:
                 return fail("Not found.")
@@ -289,7 +309,7 @@ class FakeBwServe:
             if method == "DELETE":
                 self.folders.remove(found[0])
                 ## like Bitwarden, the items still in it lose their folder
-                for item in self.items + self.trashed:
+                for item in self.items + self.trashed + self.archived:
                     if item.get("folderId") == folder_id:
                         item["folderId"] = None
                 return ok(None)
@@ -336,7 +356,7 @@ class FakeBwServe:
             item_id = path.removeprefix("/object/item/")
             self.put.append((item_id, body or {}))
             ## bw sends its own copy's revisionDate as lastKnownRevisionDate, never the body's
-            local = next((i for i in self.items if i.get("id") == item_id), None)
+            local = next((i for i in self.items + self.archived if i.get("id") == item_id), None)
             server = self.on_server.get(item_id)
             if local is not None and server is not None:
                 if seconds_newer(server, local) > 1:
@@ -344,11 +364,17 @@ class FakeBwServe:
                 del self.on_server[item_id]
             ## like the real bw serve, a PUT of the item leaves its collections alone
             changes = {k: v for k, v in (body or {}).items() if k != "collectionIds"}
-            for index, item in enumerate(self.items):
-                if item.get("id") == item_id:
-                    updated = {**item, **changes, "revisionDate": self._next_revision()}
-                    self.items[index] = updated
-                    return ok(updated)
+            ## an archived item stays archived, bw edit item keeps an archivedDate the body lacks
+            for listed in (self.items, self.archived):
+                for index, item in enumerate(listed):
+                    if item.get("id") == item_id:
+                        if item.get("deletedDate"):
+                            return fail("You may not edit a deleted item.")
+                        updated = {**item, **changes, "revisionDate": self._next_revision()}
+                        if item.get("archivedDate"):
+                            updated["archivedDate"] = item["archivedDate"]
+                        listed[index] = updated
+                        return ok(updated)
             return fail("Not found.")
         return httpx.Response(404, text="Not Found")
 

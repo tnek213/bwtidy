@@ -4,13 +4,14 @@ Writes).
 
 A folder write is checked against bw serve's folders right before it, like an item: the name
 the client showed still the folder's, the new one free, no secret of an item in the folder
-(the trash included) equal to it, no item left in a folder to delete. Every folder a batch
-renames, creates or deletes is remembered with _wrote_folder, so a later operation of the
-batch sees it as written while bw serve may still list it as before.
+(the trash and the archive included) equal to it, no item left in a folder to delete. Every
+folder a batch renames, creates or deletes is remembered with _wrote_folder, so a later
+operation of the batch sees it as written while bw serve may still list it as before.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from bwtidy.operations import DeleteFolder, Operation, RenameFolder, RestoreFolder
@@ -29,6 +30,16 @@ from bwtidy.writes.planners import (
 
 if TYPE_CHECKING:
     from bwtidy.writes.path import Write, WriteContext
+
+
+@dataclass(frozen=True)
+class FolderContents:
+    """The items that can be in a folder: the active ones, those in the trash (the archived
+    ones among them) and the archived ones that are not in the trash."""
+
+    items: list[dict[str, Any]]
+    trashed: list[dict[str, Any]]
+    archived: list[dict[str, Any]]
 
 
 async def _folders_now(path: WriteContext, write: Write) -> list[dict[str, Any]]:
@@ -65,11 +76,15 @@ def _wrote_folder(path: WriteContext, write: Write, folder_id: str, name: str | 
     path.cache.folders = folders
 
 
-async def _contents_of_folders(
-    path: WriteContext,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """The active items and the items in the trash as bw serve lists them now."""
-    return await list_items_settled(path.client), await path.client.list_trash()
+async def _contents_of_folders(path: WriteContext) -> FolderContents:
+    """The active items, the items in the trash and the archived items as bw serve lists them
+    now."""
+    client = path.client
+    return FolderContents(
+        items=await list_items_settled(client),
+        trashed=[*await client.list_trash(), *await client.list_archived(trash=True)],
+        archived=await client.list_archived(),
+    )
 
 
 def _check_folder_unchanged(
@@ -92,18 +107,20 @@ async def write_rename_folder(path: WriteContext, write: Write, op: RenameFolder
 
 
 async def _check_name_secrets(path: WriteContext, folder_id: str, name: str) -> None:
-    items, trashed = await _contents_of_folders(path)
+    contents = await _contents_of_folders(path)
     originals = path.cache.items_by_id()
     lookups = path.cache.lookups()
-    check_folder_name_secrets([*items, *trashed], folder_id, name, lookups, originals)
+    every = [*contents.items, *contents.trashed, *contents.archived]
+    check_folder_name_secrets(every, folder_id, name, lookups, originals)
 
 
 async def write_delete_folder(path: WriteContext, write: Write, op: DeleteFolder) -> None:
-    """Delete the folder when bw serve lists no item in it, in the trash neither."""
+    """Delete the folder when bw serve lists no item in it, in the trash and the archive
+    neither."""
     folders = await _folders_now(path, write)
     _check_folder_unchanged(path, op, folders)
-    items, trashed = await _contents_of_folders(path)
-    check_folder_empty(items, trashed, op.folderId)
+    contents = await _contents_of_folders(path)
+    check_folder_empty(contents.items, contents.trashed, contents.archived, op.folderId)
     await path.client.delete_folder(op.folderId)
     _wrote_folder(path, write, op.folderId, None)
 

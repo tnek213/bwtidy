@@ -517,13 +517,23 @@ def _items(count: int) -> str:
 
 
 def check_folder_empty(
-    items: list[dict[str, Any]], trashed: list[dict[str, Any]], folder_id: str
+    items: list[dict[str, Any]],
+    trashed: list[dict[str, Any]],
+    archived: list[dict[str, Any]],
+    folder_id: str,
 ) -> None:
-    """Refuse the delete of a folder that holds an item. One in the trash counts: the delete
-    would take it out of the folder too."""
+    """Refuse the delete of a folder that holds an item. One in the trash or the archive
+    counts: the delete would take it out of the folder too. trashed holds the items in the
+    trash (the archived ones among them), archived the archived items that are not."""
     active, trash = len(in_folder(items, folder_id)), len(in_folder(trashed, folder_id))
+    shelved = len(in_folder(archived, folder_id))
     if active:
         raise ValueError(f"the folder holds {_items(active)}, move them out first")
+    if shelved:
+        raise ValueError(
+            f"the folder holds {_items(shelved)} in the archive, take them out of the archive "
+            "and move them out first"
+        )
     if trash:
         raise ValueError(
             f"the folder holds {_items(trash)} in the trash, delete them for good or take "

@@ -1491,9 +1491,11 @@ item.
   has ignoring case (`another folder is named "X"`) and for a name equal to a
   secret value of an item in the folder.
 - A delete is refused for a folder that holds an item (`the folder holds N
-  items, move them out first`). That holds for an item in the trash too,
-  since Bitwarden would take the item out of the folder as well. Both
-  refusals are checked again at write time.
+  items, move them out first`). That holds for an item in the trash or the
+  archive too, since Bitwarden would take the item out of the folder as well.
+  Both refusals are checked again at write time. A rename checks the secret
+  values of the items in the trash and the archive in the same way, as they
+  get the folder's name too.
 - Each write's answer goes into the cache and into the batch's own view of
   the folders. `bw serve` lists a folder as it was before an own write for a
   moment. So a later operation of the batch sees the folders as written.
@@ -2107,9 +2109,11 @@ flowchart TD
   The rest of an item is fixed by its `revisionDate`. Only the folder, the
   favorite flag and the collections change without a new one (see Writes).
   The archived items count apart from the others. So archiving an item
-  changes the fingerprint even when its `revisionDate` stays. The cache lists
-  them for that alone. The trash does not count and neither do the archived
-  items in it.
+  changes the fingerprint even when its `revisionDate` stays. The trash does
+  not count and neither do the archived items in it. The cache lists the
+  archived items in and outside the trash for this, for the restores
+  (Restoring a change log row) and for the folder checks (`renameFolder` and
+  `deleteFolder`).
 - The fingerprint is stored in SQLite (the table `backup_fingerprints` with
   `name` and `fingerprint`) and removed with its backup. The `revisionDate`s
   it hashes are spelled as bwtidy first saw each revision. So a backup stays
@@ -2324,6 +2328,21 @@ and the tests prove that a backup brings the data back.
   | in neither file, as the row's operation created it | active | It moves the item to the trash ("move to the trash"). |
   | in neither file | not active | It leaves the item ("leave as it is"). |
 
+- An archived item counts as active and one in the trash as in the trash,
+  whether it is archived or not. A restore keeps an archived item archived.
+  The PUT and the untrash leave its `archivedDate` as it is, and the plan's
+  text ends in "(it stays archived)".
+    - An archived item has a `revisionDate` in `revisionDates` and is checked
+      for a conflict like an active one.
+    - It is refused (422) when its organization differs from the backup's. A
+      PUT cannot move it, and the copy a restore would make is not archived.
+      Taking it out of the archive first makes it an active item.
+    - An archived item that the row created, or that the backup holds in the
+      trash, is moved to the trash and stays archived there.
+
+  `bw serve` lists an archived item only when it is asked for archived items
+  (Backups). Without these listings a restore would take the item for gone and
+  plan it as created anew.
 - Whichever of these writes the item, its folder and collections go back by
   name when the vault no longer has their ids. The server refuses a
   `folderId` or a collection id that it does not have. Without this a restore
@@ -2336,8 +2355,9 @@ and the tests prove that a backup brings the data back.
     - An item whose collections are all gone keeps the ones it has now. One that
       has none (created anew or moved back in) fails with that reason.
 - Whether an item that is not active is in the trash or gone comes from the
-  trash listing that the vault in RAM loads with the items. It is asked of `bw
-  serve` again right before the item is brought back.
+  trash listings (the archived items in the trash too) that the vault in RAM
+  loads with the items. It is asked of `bw serve` again right before the item
+  is brought back.
 - A failed read alone never counts as gone, only the settled listings do.
   Right after a sync `bw serve` answers "Not found." for every object for a
   moment. A read that fails while the listings hold the item fails the
@@ -2357,6 +2377,7 @@ and the tests prove that a backup brings the data back.
     - an empty `itemIds`
     - an item that is active now but was not when the restore was planned, as
       its `revisionDate` was never checked
+    - an archived item whose organization changed since the backup
     - an item to create anew whose attachment the backup lacks
 
   Creating the item without an attachment or with another item's attachment
