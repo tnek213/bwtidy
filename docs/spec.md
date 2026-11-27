@@ -242,8 +242,9 @@ The gateway runs as root (`USER 0`) because it starts each worker as the
 account's uid. `compose.yaml` drops every capability but six. It keeps
 `CHOWN`, `DAC_OVERRIDE` and `FOWNER` for the account files. It keeps `SETUID`
 and `SETGID` to start a worker as its uid and `KILL` to stop it. It also sets
-`no-new-privileges` and makes the root file system read-only. The two volumes
-and a tmpfs on `/tmp` are the only places that take writes.
+`no-new-privileges` and makes the root file system read-only. The volumes of
+the accounts, the backups and the usage stats and a tmpfs on `/tmp` are the
+only places that take writes.
 
 The gateway's settings are in
 [Configuration](reference/configuration.md#gateway). These are the reasons
@@ -730,7 +731,9 @@ A unit test sends markers in all of these and finds none in the file.
   either in the events or in `daily`. `daily` and `errors` are kept for good.
   An error keeps its count and its last time.
 - The file is `BWTIDY_STATS_DB` or else `stats.db` in the parent of
-  `BWTIDY_ACCOUNTS_DIR` (`/data/stats.db`). The gateway makes it in WAL mode
+  `BWTIDY_ACCOUNTS_DIR` (`/data/stats.db`). `compose.yaml` sets
+  `/stats/stats.db` on the volume `bwtidy-stats`, because its root file system
+  is read-only and `/data` lies on it. The gateway makes it in WAL mode
   with mode 0600 and its own uid as the owner. It must lie outside the
   accounts directory and the backups root, whose directories the account uids
   own. A link stops the start, and so does a file that is not regular or that

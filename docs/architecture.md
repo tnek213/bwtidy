@@ -310,8 +310,10 @@ check on `/api/health`. Its port 8000 is published on the host's `127.0.0.1`
 (8765 by default). It mounts the volume `bwtidy-accounts` at `/data/accounts`
 and the backups at `/backups`. The backups are the volume `bwtidy-backups` or
 the host directory that `BWTIDY_BACKUPS` names, with
-`BWTIDY_BACKUPS_ROOT=/backups`. A stop gets 150 seconds. `STOP_TIMEOUT` in
-`gateway/workers.py` plus the gateway's request drain must stay below that.
+`BWTIDY_BACKUPS_ROOT=/backups`. It mounts the volume `bwtidy-stats` at
+`/stats` too, with `BWTIDY_STATS_DB=/stats/stats.db`. A stop gets 150
+seconds. `STOP_TIMEOUT` in `gateway/workers.py` plus the gateway's request
+drain must stay below that.
 
 The gateway runs as root and starts each worker as the account's uid. Without
 the worker settings `main.py` runs as a single-user backend on a TCP port,
