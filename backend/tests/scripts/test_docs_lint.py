@@ -244,3 +244,18 @@ def test_a_diagram_with_alt_text_and_other_code_pass(repo, docs_lint):
 
 def test_the_diagram_types_are_the_docs_sites(docs_lint, load_script):
     assert docs_lint.load_docs_site().KROKI_TYPES == load_script("docs-site").KROKI_TYPES
+
+
+def test_circled_digit_after_plain_space_is_reported(repo, docs_lint):
+    write(repo, "README.md", "ok\nSearch \u2460 shows\n")
+    assert docs_lint.lint(repo) == ["README.md:2: circled digit without a no-break space before it"]
+
+
+def test_circled_digit_after_no_break_space_is_fine(repo, docs_lint):
+    write(repo, "README.md", "Search\u00a0\u2460 shows and Columns\u00a0\u2462\n")
+    assert docs_lint.lint(repo) == []
+
+
+def test_circled_digit_in_code_is_ignored(repo, docs_lint):
+    write(repo, "README.md", "Use `a \u2460` here\n\n```\nb \u2461\n```\n")
+    assert docs_lint.lint(repo) == []

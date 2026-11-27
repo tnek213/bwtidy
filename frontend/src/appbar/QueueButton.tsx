@@ -9,6 +9,14 @@ interface QueueButtonProps {
   onClick: () => void
 }
 
+// The name holds the badge's number, which is the sum when both kinds wait (WCAG 2.5.3, label in name).
+function queueLabel(total: number, counts: string[]): string {
+  if (counts.length === 0) {
+    return 'Queue, nothing pending'
+  }
+  return counts.length === 1 ? `Queue, ${counts[0]}` : `Queue, ${total} pending: ${counts.join(', ')}`
+}
+
 // The Queue link with a badge counting every pending entry. Its tooltip says what the number is made of.
 export default function QueueButton({ current, onClick }: QueueButtonProps) {
   const pending = useQueue('pending').data ?? []
@@ -45,12 +53,18 @@ export default function QueueButton({ current, onClick }: QueueButtonProps) {
     >
       <NavButton
         current={current}
-        aria-label={counts.length > 0 ? `Queue, ${counts.join(', ')}` : 'Queue, nothing pending'}
+        aria-label={queueLabel(pending.length, counts)}
         onClick={onClick}
       >
-        <Badge badgeContent={pending.length} color="secondary" max={999} sx={{ '& .MuiBadge-badge': { right: -12 } }}>
-          Queue
-        </Badge>
+        {/* An empty queue has no badge: a hidden badge still holds a 0, which would be text the name lacks. */}
+        {pending.length > 0 ? (
+          <Badge badgeContent={pending.length} color="secondary" max={999} sx={{ '& .MuiBadge-badge': { right: -12 } }}>
+            {/* The space keeps the word apart from the badge's number in the text a screen reader compares with the name. */}
+            Queue{' '}
+          </Badge>
+        ) : (
+          'Queue'
+        )}
       </NavButton>
     </Tooltip>
   )

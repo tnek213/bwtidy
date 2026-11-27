@@ -12,6 +12,7 @@ import {
   RowSelectionModule,
   RowStyleModule,
   LargeTextEditorModule,
+  LocaleModule,
   ModuleRegistry,
   RenderApiModule,
   ScrollApiModule,
@@ -23,7 +24,7 @@ import {
   ValidationModule,
 } from 'ag-grid-community'
 import { type CellMarks, FAILED_CELL_CLASS } from './cellMarks.ts'
-import { ChipsCell, NameCell, RareFieldsCell, type RareFieldsCellParams, SecretCell } from './cells.tsx'
+import { ChipsCell, MaskedCell, NameCell, RareFieldsCell, type RareFieldsCellParams, SecretCell } from './cells.tsx'
 import { FieldHeader } from './ColumnHeader.tsx'
 import { CONFLICT_CELL_CLASS } from '../shared/conflicts.ts'
 import {
@@ -48,7 +49,7 @@ import { TO_FILL_CELL_CLASS, TO_FILL_TOOLTIP } from './toFill.ts'
 import type { Template, TemplateMatches } from '../api/templates.ts'
 import { TYPE_LABELS } from '../shared/templateRules.ts'
 import { matchLabel, matchOrder, matchTooltip } from './matches.ts'
-import { formatValue } from '../shared/values.ts'
+import { formatValue, isMasked } from '../shared/values.ts'
 import { columnTooltip, groupHeaderLabel, shortColumnLabel } from './labels.ts'
 import { compareValues } from './columnValues.ts'
 import { cellMatchesSearch } from './filters.ts'
@@ -65,6 +66,8 @@ ModuleRegistry.registerModules([
   TextEditorModule,
   LargeTextEditorModule,
   CheckboxEditorModule,
+  // Names the checkbox column for a screen reader (localeText in GridPage).
+  LocaleModule,
   RowApiModule,
   RenderApiModule,
   ColumnApiModule,
@@ -183,8 +186,12 @@ export function columnDef(
   if (column.secret) {
     // A queued value is masked and not in the vault yet, so there is nothing to reveal. A text
     // field's value is plain and the secret route does not answer it.
-    def.cellRendererSelector = ({ data }) =>
-      queuedCell(data, column.id) || (data && plainInSecretColumn(column, data)) ? undefined : { component: SecretCell }
+    def.cellRendererSelector = ({ data, value }) => {
+      if (queuedCell(data, column.id)) {
+        return isMasked(value) ? { component: MaskedCell } : undefined
+      }
+      return data && plainInSecretColumn(column, data) ? undefined : { component: SecretCell }
+    }
     def.initialWidth = 180
   } else if (column.multi) {
     def.cellRenderer = ChipsCell

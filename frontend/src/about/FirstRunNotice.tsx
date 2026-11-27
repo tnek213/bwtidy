@@ -14,7 +14,8 @@ export default function FirstRunNotice() {
     return null
   }
   return (
-    <Alert severity="info" role="note" aria-labelledby={titleId} sx={{ mb: 2 }}>
+    // The links take the note's own text color: the link color has too little contrast on its tint.
+    <Alert severity="info" role="note" aria-labelledby={titleId} sx={{ mb: 2, '& .MuiLink-root': { color: 'inherit' } }}>
       <AlertTitle id={titleId}>Before you start</AlertTitle>
       bwtidy is beta software made with AI, with very few users so far. Read{' '}
       <External href={CAUTION_URL}>the caution on GitHub</External> before you use it on your vault. If bwtidy works
