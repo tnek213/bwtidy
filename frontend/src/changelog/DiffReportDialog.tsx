@@ -41,7 +41,8 @@ export default function DiffReportDialog({
       <DialogTitle id={titleId}>Diff report</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 1 }}>{diffSummary(entries.length, lines.length)}</DialogContentText>
-        <TableContainer sx={{ maxHeight: '60vh' }}>
+        {/* Focusable, so the keyboard can scroll a long report: it holds no control of its own. */}
+        <TableContainer tabIndex={0} role="region" aria-label="Diff report rows" sx={{ maxHeight: '60vh' }}>
           <Table size="small" stickyHeader aria-label="Diff report">
             <TableHead>
               <TableRow>

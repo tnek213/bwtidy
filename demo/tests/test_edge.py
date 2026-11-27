@@ -1,5 +1,6 @@
 """The edge's config (demo/edge): the trusted proxies, the port and the compose override."""
 
+import json
 import os
 import re
 import shutil
@@ -99,3 +100,29 @@ def test_the_sidecar_override_is_valid_compose():
         text=True,
     )
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.skipif(shutil.which("docker") is None, reason="no docker")
+def test_the_sidecar_of_the_override_has_the_fewest_privileges():
+    result = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "-f",
+            str(ROOT / "compose.demo.yaml"),
+            "-f",
+            str(OVERRIDE),
+            "config",
+            "--format",
+            "json",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    sidecar = json.loads(result.stdout)["services"]["sidecar"]
+    assert sidecar["cap_drop"] == ["ALL"]
+    assert sidecar["cap_add"] == ["NET_ADMIN"]
+    assert sidecar["security_opt"] == ["no-new-privileges:true"]
+    assert sidecar["read_only"] is True
+    assert "privileged" not in sidecar

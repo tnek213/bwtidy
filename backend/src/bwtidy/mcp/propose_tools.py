@@ -436,7 +436,10 @@ async def propose_create_item(
     ] = "",
     collections: Annotated[
         list[str] | None,
-        Field(description="Collection names of the organization, at least one with one"),
+        Field(
+            description="Collection names of the organization, at least one when an"
+            " organization is given"
+        ),
     ] = None,
     values: Annotated[
         dict[str, Value] | None,

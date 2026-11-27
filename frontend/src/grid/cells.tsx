@@ -7,8 +7,10 @@ import type { CellValue, GridColumn, GridRow } from '../api/grid.ts'
 import { NameSuffixContext, shownSuffixes } from './nameSuffix.tsx'
 import type { ShownRow } from './queued.ts'
 import { useRevealedSecret } from './reveal.ts'
-import { jsonKey, jsonValue, rareEntries } from './rareFields.ts'
-import { isMasked, MASK } from '../shared/values.ts'
+import { jsonKey, jsonValue, RARE_FIELDS_COLUMN, rareEntries } from './rareFields.ts'
+import { useRevealer, VALUE } from './revealers.ts'
+import Masked from '../shared/Masked.tsx'
+import { isMasked } from '../shared/values.ts'
 
 export function rowInView(api: Pick<GridApi, 'getVerticalPixelRange'>, node: IRowNode): boolean {
   const { rowTop, rowHeight } = node
@@ -68,11 +70,14 @@ function RevealableSecret({
 }) {
   const { value: revealed, failed, loading, toggle } = useRevealedInRow(itemId, columnId, api, node)
   const shown = revealed !== null
+  useRevealer(itemId, columnId, { label: VALUE, shown, toggle })
   return (
     <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, width: '100%', verticalAlign: 'middle' }}>
+      {/* A live region, so a screen reader reads the value out once it arrives after Reveal value in the cell menu. */}
       <Box
         component="span"
         data-testid="secret-value"
+        aria-live="polite"
         sx={{
           flexGrow: 1,
           overflow: 'hidden',
@@ -83,7 +88,7 @@ function RevealableSecret({
         }}
         title={failed ? 'Could not reveal the value' : undefined}
       >
-        {shown ? revealed : MASK}
+        {shown ? revealed : <Masked />}
       </Box>
       <Tooltip title={shown ? 'Hide' : 'Reveal'}>
         <span>
@@ -105,13 +110,12 @@ function RevealableSecret({
 function RareSecret({ itemId, columnId, api, node }: { itemId: string; columnId: string; api: GridApi; node: IRowNode }) {
   const { value: revealed, failed, loading, toggle } = useRevealedInRow(itemId, columnId, api, node)
   const shown = revealed !== null
+  useRevealer(itemId, RARE_FIELDS_COLUMN, { label: columnId, shown, toggle })
   return (
     <>
-      {shown && (
-        <Box component="span" data-testid="rare-secret-value" sx={{ fontFamily: 'monospace' }}>
-          {jsonValue(revealed)}
-        </Box>
-      )}
+      <Box component="span" data-testid="rare-secret-value" aria-live="polite" sx={{ fontFamily: 'monospace' }}>
+        {shown ? jsonValue(revealed) : ''}
+      </Box>
       <Tooltip title={failed ? 'Could not reveal the value' : shown ? 'Hide' : 'Reveal'}>
         <span>
           <IconButton
@@ -158,6 +162,11 @@ export function RareFieldsCell(props: CustomCellRendererProps<ShownRow, string> 
       {' }'}
     </Box>
   )
+}
+
+// A queued secret value: masked and not in the vault yet, so there is no eye.
+export function MaskedCell() {
+  return <Masked />
 }
 
 export function ChipsCell(props: CustomCellRendererProps<GridRow, CellValue>) {
