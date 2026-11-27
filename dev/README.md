@@ -69,6 +69,7 @@ Every script prints its usage with `--help`.
 | `scripts/integration`   | the integration tests in the app container ([Testing](testing.md#integration-tests))     |
 | `scripts/e2e`           | the browser tests against the gateway ([Testing](testing.md#end-to-end-tests))           |
 | `scripts/demo-stack`    | the worktree's demo stack: `up`, `test`, `compose`, `down` ([The demo](demo.md#the-stack-test)) |
+| `scripts/demo-egress`   | run as root on the demo's host: limits what its public network reaches ([The demo](demo.md#limit-the-way-out)) |
 | `scripts/docs-shots`    | takes the documentation screenshots ([Testing](testing.md#documentation-screenshots))    |
 | `scripts/install-hooks` | installs the pre-push hook ([Testing](testing.md#the-pre-push-hook))                      |
 | `scripts/pre-push`      | what the pre-push hook runs: ci (quick unless main) on what is pushed, the docs screenshots of a UI change ([Testing](testing.md#the-pre-push-hook)) |

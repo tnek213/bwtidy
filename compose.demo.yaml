@@ -284,8 +284,12 @@ networks:
   ## internal too: the edge reaches the demo here and nothing else
   front:
     internal: true
-  ## the edge's published port
+  ## the edge's published port (or the sidecar's route out, dev/demo.md)
   public:
+    driver_opts:
+      ## a fixed bridge name, so scripts/demo-egress finds this network by it on the host also
+      ## after compose makes the network anew (Docker names a bridge br- and a random id)
+      com.docker.network.bridge.name: ${DEMO_PUBLIC_BRIDGE:-br-bwtidy-demo}
 
 volumes:
   secrets:

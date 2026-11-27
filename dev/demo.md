@@ -35,7 +35,9 @@ Three networks:
 
 - `back` (`internal: true`): `vaultwarden`, `demo` and `controller`.
 - `front` (`internal: true`): `edge` and `demo`.
-- `public` (a normal network): `edge` only.
+- `public` (a normal network): `edge` only. Its bridge has a fixed name
+  (`DEMO_PUBLIC_BRIDGE`), so the host's firewall can limit what it reaches
+  (Limit the way out).
 
 `init` needs no network (`network_mode: none`). An internal Docker network
 has no route out of the host, so only the edge can reach anything outside
@@ -510,6 +512,16 @@ services:
     networks:
       - front
       - public
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
 
   edge:
     network_mode: service:sidecar
@@ -522,7 +534,19 @@ services:
 
 The sidecar joins `front` (where the demo is) and `public` (the route out for
 the tunnel), and the edge shares its network namespace, so nginx reaches
-`demo:8000` through the sidecar's networks. Run both files:
+`demo:8000` through the sidecar's networks.
+
+The sidecar gets the fewest privileges, as the other containers do. A VPN
+client needs `NET_ADMIN` for its tunnel and its routes. Add only the
+capabilities its own docs ask for. Most clients also need the device
+`/dev/net/tun` (`devices: [/dev/net/tun]`). The root file system is
+read-only with a tmpfs for what the client writes while it runs. A client
+that keeps state (its keys, its login) needs a volume for that directory, and
+one that cannot run read-only at all goes without `read_only`.
+`no-new-privileges` keeps a process in it from gaining privileges through a
+setuid binary.
+
+Run both files:
 
 ```sh
 docker compose -f compose.demo.yaml -f sidecar.yaml up -d
@@ -532,7 +556,113 @@ Set `DEMO_EDGE_PORT` to the port the tunnel forwards to, and
 `DEMO_TRUSTED_PROXIES` to the proxy's address as the edge sees it (the tunnel
 address of the proxy). `demo/tests/files/sidecar-override.yaml` is this
 override with the stand-in, and a test checks that `docker compose config`
-accepts it.
+accepts it and that the sidecar keeps the privileges above.
+
+## Limit the way out
+
+`back` and `front` have no route out of the host, but `public` has one. From
+the edge (or the sidecar of Behind a reverse proxy, which the edge shares) a
+connection could reach the host's own services, the local network and the
+internet. `scripts/demo-egress` lets `public` reach only what its mode needs.
+It runs as root on the host, not in any image. It needs Python 3 and
+iptables alone, so the file works on a host without a checkout.
+
+It finds the network by its bridge. Docker names a bridge `br-` and a random
+id, a new one for every new network, so `compose.demo.yaml` fixes the name
+with `DEMO_PUBLIC_BRIDGE` (`br-bwtidy-demo` by default, at most 15
+characters).
+
+The modes:
+
+- `none`, for the edge alone on `public`: only the answers of connections
+  that came in leave the network. The edge answers on its published port and
+  Docker's resolver answers the name `demo` inside the container, so it needs
+  no connection of its own.
+- `vpn`, for a VPN sidecar on `public`: nothing to an address outside the
+  public internet, then UDP to any port and TCP to 80, 443 and 53. The ranges
+  it drops are "this network", the private ranges of RFC 1918, the shared
+  address space of RFC 6598 (which tailnets use), loopback, link-local,
+  multicast and the reserved range.
+
+Mode `vpn` fits a client like Tailscale: WireGuard over UDP to its peers'
+public addresses on any port, STUN on UDP 3478 and its servers over TCP 443
+and 80. What it leaves open is that UDP and TCP 443 (and 80 and 53) to any
+public address. A process that takes over the sidecar or the edge can still
+talk to the internet that way, never to the host or the local network.
+
+In both modes nothing reaches the host itself (any of its addresses, its
+public one too) apart from those answers. A client whose DNS stays in its
+own network namespace needs no more. Another client, or a host whose
+resolver is on the local network, needs `--allow-dns ADDRESS` with the
+resolver's address: UDP and TCP 53 to it pass before any drop, also to the
+host when the address is one of the host's own.
+
+It writes two chains of its own, named after the bridge. Docker checks its
+chain `DOCKER-USER` first for traffic it forwards and never flushes it, so
+`BWTIDY-FWD-NAME` is jumped to from there. Traffic to the host's own
+addresses goes through `INPUT` instead, which Docker leaves alone, so
+`BWTIDY-IN-NAME` is jumped to from `INPUT`. Each jump is the first rule of
+its chain and matches `-i NAME`. What passes returns to the rules after the
+jump, so the script never opens what Docker or the host's firewall closes.
+It needs Docker's iptables firewall (the default), which makes
+`DOCKER-USER`.
+
+The commands:
+
+```sh
+scripts/demo-egress print --bridge br-bwtidy-demo --mode vpn
+sudo scripts/demo-egress apply --bridge br-bwtidy-demo --mode vpn --allow-dns 192.0.2.53
+sudo scripts/demo-egress remove --bridge br-bwtidy-demo
+```
+
+`print` shows the iptables commands `apply` runs on a host without the
+chains and runs none of them. `apply` flushes and fills its chains again and
+keeps one jump each, so a second run changes nothing. While it runs a DROP
+rule for the bridge sits first in `DOCKER-USER` and `INPUT`, so the network
+is never open in between. A run that stops halfway leaves that rule and so
+the network closed. `remove` deletes the jumps, that rule and the chains.
+`apply` refuses a bridge name over 15 characters or with other characters
+than letters, digits, dot, dash and underscore. It stops with the cause
+when iptables is missing, when it does not run as root and when
+`DOCKER-USER` does not exist yet (Docker has not started).
+
+To run it at boot, install a copy that only root can change (root must not
+run a file of a checkout that another user can write) and a oneshot unit
+that runs after Docker:
+
+```sh
+sudo install -m 0755 scripts/demo-egress /usr/local/sbin/demo-egress
+sudo systemctl edit --force --full bwtidy-demo-egress.service
+sudo systemctl enable --now bwtidy-demo-egress.service
+```
+
+The unit:
+
+```ini
+[Unit]
+Description=Limit what the bwtidy demo's public network can reach
+After=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/demo-egress apply --bridge br-bwtidy-demo --mode vpn
+ExecStop=/usr/local/sbin/demo-egress remove --bridge br-bwtidy-demo
+
+[Install]
+WantedBy=docker.service
+```
+
+`After` starts it once Docker has made `DOCKER-USER`. `PartOf` stops and
+restarts it with Docker, and `WantedBy=docker.service` starts it whenever
+Docker starts. Docker starts the stack's containers as it starts, so for the
+moment until the unit has run the network is as open as without it. Use
+`--mode none` without a sidecar, and the bridge name of `DEMO_PUBLIC_BRIDGE`
+when you set one.
+
+It covers IPv4 alone. `compose.demo.yaml` gives no network IPv6, and a
+network with IPv6 needs the same rules in ip6tables.
 
 ## Testing
 
@@ -596,8 +726,9 @@ The admin API's user deletion is tested against the mock only.
 
 `scripts/demo-stack test` proves the two guarantees on running containers.
 It builds the normal image from the worktree, the demo image on top of it,
-starts the stack on a free port of 127.0.0.1 (in a compose project and with
-images named after the worktree, so several worktrees never share one) and
+starts the stack on a free port of 127.0.0.1 (in a compose project, with
+images and a public bridge named after the worktree, so several worktrees
+never share one) and
 runs `demo/tests/stack/test_demo_stack.py` against it. `scripts/ci` never
 runs it: the file skips without `DEMO_STACK=1`.
 
@@ -661,6 +792,7 @@ default. A `.env` beside the compose file or the environment changes it:
 | `DEMO_BIND`, `DEMO_PORT` | `127.0.0.1`, `8770`             | where the edge is published                                 |
 | `DEMO_EDGE_PORT`        | `80`                             | the port nginx listens on inside the edge, the published port maps to it |
 | `DEMO_TRUSTED_PROXIES`  | empty                            | reverse proxies whose `X-Forwarded-For` is believed (Behind a reverse proxy) |
+| `DEMO_PUBLIC_BRIDGE`    | `br-bwtidy-demo`                 | the bridge name of the network `public`, at most 15 characters (Limit the way out) |
 | `DEMO_HOST`             | empty                            | the public host name, for MCP's host check (`BWTIDY_MCP_HOSTS`) |
 | `DEMO_SECURE_COOKIES`   | empty                            | `1` behind HTTPS (`BWTIDY_SECURE_COOKIES`)                  |
 | `DEMO_POOL_READY`, `DEMO_MAX` | 2, 6                       | the pool and the visitors at once                           |
@@ -972,7 +1104,8 @@ A visitor cannot:
 - Log in to any other server or account: `BWTIDY_ALLOWED_SERVERS` holds only
   the demo's Vaultwarden, the routes that create or change a login or an
   account are refused (Refused routes), and no container but the edge has a
-  route out of the host.
+  route out of the host (which `scripts/demo-egress` limits, Limit the way
+  out).
 - See or reach another visitor's vault: each has its own account directory,
   its own uid and cookies, and its own Vaultwarden user.
 - Reach Vaultwarden's admin page, the controller or the demo gateway
