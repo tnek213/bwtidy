@@ -8,6 +8,9 @@ The versions of bwtidy follow [Semantic Versioning](https://semver.org) with
 
 Changes on main that are not yet in a versioned Docker image.
 
+- Say in the docs and in the description of the MCP tool list_items that
+  bwtidy shows only the items that are not archived
+  ([#225](https://github.com/tnek213/bwtidy/pull/225))
 - Restore a change of an item you archived since, which then stays archived,
   and keep a folder that still holds archived items from being deleted
   ([#220](https://github.com/tnek213/bwtidy/pull/220))
