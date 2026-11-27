@@ -3,8 +3,7 @@ Statistics page (docs/spec.md, Templates, Datatypes, Statistics).
 
 The template and the datatype are added through the API and taken out again at the end, every
 editor is closed with Cancel, so the vault is as seeded afterwards. Each save is a queue entry
-that stays applied, which the Queue and Change log shots of test_tutorials.py would show, so the
-file's name sorts after it. The Statistics page counts the vault's reloads, which differ by the
+that stays applied. The Statistics page counts the vault's reloads, which differ by the
 tests run, so its shot leaves that out.
 """
 

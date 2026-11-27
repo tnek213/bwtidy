@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Page, expect
+from support.accounts import ACCOUNT_DIR, account_dir_exists
 from support.api import Api, rows_by_name
 from support.elsewhere import DEV_VAULT
 from support.login import (
@@ -29,8 +30,6 @@ from support.login import (
 from support.pages import TIMEOUT, UNLOCK_TIMEOUT, grid
 
 WRONG_PASSWORD = "not-the-master-password"
-## the gateway's directory of an account on https://vaultwarden (docs/spec.md, Gateway)
-ACCOUNT_DIR = "/data/accounts/vaultwarden/{email}"
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -80,17 +79,6 @@ def create_dialog(page: Page, email: str):
 
 def names(page: Page) -> set[str]:
     return set(rows_by_name(Api(page.request)))
-
-
-def account_dir_exists(email: str) -> bool:
-    path = ACCOUNT_DIR.format(email=email)
-    done = subprocess.run(
-        [str(DEV_VAULT), "exec", "--root", "test", "-d", path],
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        timeout=60,
-    )
-    return done.returncode == 0
 
 
 STARTING = "Starting"

@@ -7,30 +7,17 @@ backups are gone. Delete my account runs on the restore account only, never on t
 the other files share. test_accounts.py makes the restore account anew at its start.
 """
 
-import subprocess
 import time
 
 from playwright.sync_api import Locator, Page, expect
+from support.accounts import account_dir_exists
 from support.api import COMMIT_TIMEOUT, Api, commit_new_entries, last_entry_id, rows_by_name
-from support.elsewhere import DEV_VAULT
 from support.login import EMAIL, RESTORE_EMAIL, SERVER, enter_account, log_in
 from support.pages import UNLOCK_TIMEOUT, grid, search, type_into
 
 ITEM = "Example Forge"
-## the gateway's directory of an account on https://vaultwarden (docs/spec.md, Gateway)
-ACCOUNT_DIR = "/data/accounts/vaultwarden/{email}"
 ## the deletion stops a running background backup first, which can take its next step
 DELETE_MS = COMMIT_TIMEOUT * 1000
-
-
-def account_dir_exists(email: str) -> bool:
-    done = subprocess.run(
-        [str(DEV_VAULT), "exec", "--root", "test", "-d", ACCOUNT_DIR.format(email=email)],
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        timeout=60,
-    )
-    return done.returncode == 0
 
 
 def open_settings(page: Page) -> Locator:
