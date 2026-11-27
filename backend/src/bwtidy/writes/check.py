@@ -339,10 +339,11 @@ def _check_op(
     elif isinstance(op, RenameFolder):
         check_folder_name(cache.folders, op.folderId, op.newName)
         _check_equal_values(op, planned, batch, lookups)
-        ## an item in the trash gets the name too
-        check_folder_name_secrets(cache.trashed, op.folderId, op.newName, lookups, {})
+        ## an item in the trash or the archive gets the name too
+        check_folder_name_secrets(cache.set_aside(), op.folderId, op.newName, lookups, {})
     elif isinstance(op, DeleteFolder):
-        check_folder_empty(cache.items, cache.trashed, op.folderId)
+        trashed = [*cache.trashed, *cache.archived_trash]
+        check_folder_empty(cache.items, trashed, cache.archived, op.folderId)
     elif isinstance(op, RenameAttachment):
         ## on the item as the renames before it leave it (the request's, as enqueue_ui passes
         ## them in earlier), so two renames of two attachments of one item to one name in one
@@ -354,7 +355,7 @@ def _check_op(
             raise ValueError("restoring needs the backups")
         step = plan_folder_restore(op, backups.read(op.backup), cache.folders)
         if step.action == RENAME_BACK:
-            every = [*cache.items, *cache.trashed]
+            every = [*cache.items, *cache.set_aside()]
             check_folder_name_secrets(every, op.folderId, step.name, lookups, {})
     elif isinstance(op, SetToolNoteSection):
         if tool_note_id is None:
@@ -450,14 +451,17 @@ def validate(
     if not edits_tool_note:
         check_tool_note(ops, note_id, tool_note_ops)
     items = cache.items_by_id()
+    ## a restore puts an archived item back too (plan_restore), no other operation sees one
+    restorable = {**cache.archived_by_id(), **items}
     conflicts: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for op in ops:
+        found = restorable if isinstance(op, RestoreItems) else items
         for item_id, expected in touched(op).items():
             if (item_id, expected) in seen:
                 continue
             seen.add((item_id, expected))
-            actual = items.get(item_id, {}).get("revisionDate")
+            actual = found.get(item_id, {}).get("revisionDate")
             ## an entry is applied right after its write, and until the reload after the batch
             ## the cache still holds the item from before that write
             now = cache.own.current_revision(item_id, actual) if isinstance(actual, str) else actual

@@ -90,10 +90,10 @@ def test_an_empty_item_list_right_after_the_sync_is_asked_again(env: AppEnv):
     response = env.post(op)
     assert response.status_code == 200, response.text
     assert env.item("login-1")["login"]["username"] == "patient@example.test"
-    ## two empty answers, the real one, the trash listing and the archived items (the same
-    ## path) before the check, the same five after the sync that follows the backup and for
-    ## the reload after the write
-    assert env.bw.calls("GET", "/list/object/items") == lists + 5 + 5 + 5
+    ## two empty answers, the real one, the trash listing and the archived items outside and
+    ## inside the trash (the same path) before the check, the same six after the sync that
+    ## follows the backup and for the reload after the write
+    assert env.bw.calls("GET", "/list/object/items") == lists + 6 + 6 + 6
     assert len(env.app.state.bw.session.cache.items) == len(env.bw.items)
 
 

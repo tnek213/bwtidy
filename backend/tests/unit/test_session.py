@@ -116,8 +116,8 @@ def test_login_waits_for_the_items_bw_serve_lists_empty_after_a_sync(env: AppEnv
     env.bw.empty_lists_after_sync = 3
     env.login()
     ## three empty listings, the settled one, then the trash listing and the archived items
-    ## on the same path
-    assert env.bw.calls("GET", "/list/object/items") == 6
+    ## outside and inside the trash on the same path
+    assert env.bw.calls("GET", "/list/object/items") == 7
     assert env.bw.posted == []
     assert [i["id"] for i in env.session.cache.items] == ["note-9"]
 

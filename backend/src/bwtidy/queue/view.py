@@ -276,14 +276,17 @@ def diff(
         if backups is None:
             raise ValueError("restoring needs the backups")
         contents = backups.read(op.backup)
+        ## plan_restore puts back or trashes only an item that is active or archived
+        restorable = {**cache.archived_by_id(), **items}
         for step in plan_restore(op, contents, cache):
             shown = {"id": step.item_id, "name": step.name}
             rows.append(row(shown, RESTORE_COLUMN, None, step.text))
             if step.action == PUT:
                 saved = contents.items[step.item_id]
-                rows.extend(_put_back_cells(item(step.item_id), saved, contents, cache, lookups))
+                now = restorable[step.item_id]
+                rows.extend(_put_back_cells(now, saved, contents, cache, lookups))
             elif step.action == TRASH:
-                rows.append(row(item(step.item_id), TRASH_COLUMN, False, True))
+                rows.append(row(restorable[step.item_id], TRASH_COLUMN, False, True))
     elif isinstance(op, CreateItem):
         rows.extend(_created_rows(op, cache, remembered, lookups))
     elif isinstance(op, RenameFolder):
