@@ -31,12 +31,13 @@ DEFAULT_MAX_WORKERS = 8
 ## the gateway's own variables that a worker gets as they are, when the gateway has them
 ## (BWTIDY_MCP_HOSTS so the public host name passes the worker's DNS rebinding check, the
 ## session timeouts, the backup retention and the failed entries' age limit so a deployment's
-## policy reaches every worker)
+## policy reaches every worker, BWTIDY_BW_BIN so an operator can run a Bitwarden CLI of their own)
 PASSED_ON = (
     "PATH",
     "NODE_EXTRA_CA_CERTS",
     "BWTIDY_IDLE_EXIT",
     "BWTIDY_MCP_HOSTS",
+    "BWTIDY_BW_BIN",
     "BWTIDY_HEARTBEAT_TIMEOUT",
     "BWTIDY_SESSION_IDLE_TIMEOUT",
     "BWTIDY_BACKUP_KEEP_NEWEST",

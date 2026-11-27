@@ -60,6 +60,7 @@ and starts one worker for each open account (see
 | --- | --- | --- |
 | `BWTIDY_SECURE_COOKIES` | `0` | `1` when the page is served over https, so the cookies are marked Secure. |
 | `BWTIDY_MCP_HOSTS` | | Host names (comma separated) that `/mcp` accepts besides 127.0.0.1, localhost and ::1. Set it behind a reverse proxy. |
+| `BWTIDY_BW_BIN` | | Absolute path in the container of a Bitwarden CLI of your own. Empty means the image's `bw`. See [Run your own Bitwarden CLI](../explanation/bw-cli.md#run-your-own-bitwarden-cli). |
 | `BWTIDY_ALLOWED_SERVERS` | | Servers (comma separated URLs) that skip the check for a public address, like a Vaultwarden on your own network. |
 | `BWTIDY_MAX_PENDING` | `2` | The most new accounts that wait for their first login at once. |
 | `BWTIDY_MAX_WORKERS` | `8` | The most accounts open at once, with one worker each. |
@@ -76,7 +77,7 @@ and starts one worker for each open account (see
 The gateway checks the six from `BWTIDY_HEARTBEAT_TIMEOUT` to
 `BWTIDY_FAILED_KEEP_HOURS` when it starts and passes them on to every
 worker. They take effect there. The retention never deletes a backup that is
-still in use. The gateway passes `BWTIDY_MCP_HOSTS` on as well.
+still in use. The gateway passes `BWTIDY_MCP_HOSTS` and `BWTIDY_BW_BIN` on as well.
 
 ### Set by the image
 
@@ -117,7 +118,7 @@ The gateway also gives a worker its own `PATH` (or the system default) and
 its `NODE_EXTRA_CA_CERTS` (for the Bitwarden CLI) when it has one. It sets
 `HOME` and `BITWARDENCLI_APPDATA_DIR` to directories of the account.
 
-A worker reads six more variables that the gateway does not pass on. Each of
+A worker reads five more variables that the gateway does not pass on. Each of
 them keeps its default in a worker:
 
 - `BWTIDY_HOST` and `BWTIDY_PORT` (`127.0.0.1` and `8000`) are the address a
@@ -127,7 +128,6 @@ them keeps its default in a worker:
   does.
 - `BWTIDY_COMMIT` is unset, so the `/api/health` of a worker shows the
   package version without a commit.
-- `BWTIDY_BW_BIN` (`bw`) is the Bitwarden CLI to run, found on `PATH`.
 - `BWTIDY_BW_SERVE_PORT` (`8087`) is only the port in the Host header that
   `bw serve` checks, since the worker reaches it on `BWTIDY_BW_SOCKET`.
 

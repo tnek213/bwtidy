@@ -30,6 +30,23 @@ def test_the_mcp_hosts_are_passed_on_to_the_workers(
         assert environment["BWTIDY_MCP_HOSTS"] == "bwtidy.example.test"
 
 
+def test_an_own_bitwarden_cli_is_passed_on_to_the_workers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("BWTIDY_BW_BIN", "/opt/bw/bw")
+    passed_on = passed_on_from_env()
+    assert passed_on["BWTIDY_BW_BIN"] == "/opt/bw/bw"
+    for env in make_env(tmp_path, passed_on=passed_on):
+        environment = env.session(env.started()).json()["env"]
+        assert environment["BWTIDY_BW_BIN"] == "/opt/bw/bw"
+    monkeypatch.delenv("BWTIDY_BW_BIN")
+    passed_on = passed_on_from_env()
+    assert "BWTIDY_BW_BIN" not in passed_on
+    for env in make_env(tmp_path, passed_on=passed_on):
+        environment = env.session(env.started()).json()["env"]
+        assert "BWTIDY_BW_BIN" not in environment
+
+
 POLICY = {
     "BWTIDY_HEARTBEAT_TIMEOUT": "90",
     "BWTIDY_SESSION_IDLE_TIMEOUT": "1800",
