@@ -238,7 +238,7 @@ for org in json.load(sys.stdin):
 bw import bitwardenjson org-OLDID-export.json --organizationid NEWID
 ```
 
-## 5. Upload the attachments
+## 5. Upload the attachments and set organization folders
 
 The import gives every item a new id. To get the files under
 `item-attachments/<old id>/` onto the right item, each backup item has to be
@@ -251,13 +251,22 @@ item and an imported item match when all of these are the same:
 - the folder and the collections, compared by name
 - the organization, compared by name (or both items are personal)
 
+An organization export holds no folder and no favorite flag, as both belong
+to each user and not to the organization. For an organization item the match
+leaves them out.
+
 Items that are equal in all of that are taken in order. It does not matter
 which of them gets which file, as the vault comes out the same. A backup
 item that matched no unused imported item gets a second try once every item
 has had its first. It then gets the one unused imported item of its type,
 name and organization if there is exactly one.
 
-```graphviz alt="attach.py first pairs every backup item it can with an unused imported item of the same content. For each backup item left it then takes the one unused imported item of its type, name and organization. With none or several it prints for each attachment that no imported item fits. For each attachment of a paired item it skips a file name the imported item already has. It prints a line when the backup lacks the file and otherwise uploads the file, where a failure prints the error of bw."
+Each paired organization item then gets the folder and the favorite flag it
+had in the backup. The program finds the folder by its name among the
+account's folders and saves both with `bw edit item`. An item that already
+has them is left as it is.
+
+```graphviz alt="attach.py first pairs every backup item it can with an unused imported item of the same content. For each backup item left it then takes the one unused imported item of its type, name and organization. With none or several it prints for each attachment that no imported item fits. A paired organization item gets the folder of the same name and the favorite flag it had in the backup unless it already has them. A folder name the account lacks prints a line. Then for each attachment of a paired item it skips a file name the imported item already has. It prints a line when the backup lacks the file and otherwise uploads the file, where a failure prints the error of bw."
 digraph {
   nodesep=0.3
   ranksep=0.3
@@ -268,6 +277,8 @@ digraph {
   content [label="First, the same content as\nan unused imported item?" fillcolor="#fff8e1" color="#f9a825"]
   place [label="Then for the rest, exactly\none unused imported\nitem of its type, name\nand organization?" fillcolor="#fff8e1" color="#f9a825"]
   paired [label="Paired with\nthat imported item" fillcolor="#f1f8e9" color="#558b2f"]
+  org [label="An organization item\nwithout its folder and\nfavorite of the backup?" fillcolor="#fff8e1" color="#f9a825"]
+  edit [label="Sets both with\nbw edit item (prints a line\nwhen the account has no\nfolder of that name)" fillcolor="#f1f8e9" color="#558b2f"]
   nofit [label="Prints \"no imported\nitem fits\" for each\nof its attachments" fillcolor="#ffebee" color="#c62828"]
   there [label="For each attachment,\na file of that name already\non the imported item?" fillcolor="#fff8e1" color="#f9a825"]
   skip [label="Skipped"]
@@ -279,7 +290,10 @@ digraph {
   content -> place [label=" no"]
   place -> paired [label=" yes"]
   place -> nofit [label=" no"]
-  paired -> there
+  paired -> org
+  org -> edit [label=" yes"]
+  org -> there [label=" no"]
+  edit -> there
   there -> skip [label=" yes"]
   there -> file [label=" no"]
   file -> upload [label=" yes"]
@@ -287,12 +301,14 @@ digraph {
 }
 ```
 
-First write the program that pairs the items and uploads the attachments. bw
-names an attachment after its file, so the program first copies each file to
-its real file name under `upload/`.
+First write the program that pairs the items, sets the organization items'
+folders and favorites and uploads the attachments. bw names an attachment
+after its file, so the program first copies each file to its real file name
+under `upload/`.
 
 ```sh
 cat > attach.py <<'EOF'
+import base64
 import json
 import os
 import shutil
@@ -350,8 +366,11 @@ class Names:
                 (self.organizations.get(org) or f"id {org}") if org else None]
 
     def key(self, item):
-        folder = item.get("folderId")
-        content = {k: v for k, v in item.items() if k not in LEFT_OUT}
+        # an organization export holds neither the folder nor the favorite flag
+        personal = not item.get("organizationId")
+        folder = item.get("folderId") if personal else None
+        content = {k: v for k, v in item.items()
+                   if k not in LEFT_OUT and (personal or k != "favorite")}
         return json.dumps(self.place(item) + [
             self.folders.get(folder) if folder else None,
             sorted(json.dumps(self.collections.get(c)) for c in item.get("collectionIds") or []),
@@ -398,6 +417,34 @@ for item in old:
             pairs[item["id"]] = fits[0]
             used.add(fits[0]["id"])
 
+# an organization item's folder and favorite flag by the backup, as the import sets neither
+folder_ids = {}
+for folder_id, folder_name in new_names.folders.items():
+    folder_ids.setdefault(folder_name, folder_id)
+for item in old:
+    target = pairs.get(item["id"])
+    if target is None or not item.get("organizationId"):
+        continue
+    folder = item.get("folderId")
+    wanted = {"folderId": None, "favorite": bool(item.get("favorite"))}
+    if folder:
+        wanted["folderId"] = folder_ids.get(old_names.folders.get(folder))
+        if wanted["folderId"] is None:
+            print(f"the account has no folder named as the one of backup item {item['id']}, "
+                  f"item {target['id']} stays in its folder", flush=True)
+            wanted["folderId"] = target.get("folderId")
+    if (target.get("folderId") == wanted["folderId"]
+            and bool(target.get("favorite")) == wanted["favorite"]):
+        continue
+    edited = dict(bw("get", "item", target["id"]), **wanted)
+    encoded = base64.b64encode(json.dumps(edited).encode("utf-8"))
+    # bw reads the encoded item from stdin, as a long one exceeds the Windows command line
+    done = subprocess.run([BW, "edit", "item", target["id"]], input=encoded,
+                          stdout=subprocess.DEVNULL)
+    if done.returncode == 0:
+        print(f"item {target['id']} has the folder and favorite of backup item {item['id']}",
+              flush=True)
+
 for item in old:
     target = pairs.get(item["id"])
     there = [a["fileName"] for a in (target or {}).get("attachments") or []]
@@ -424,16 +471,18 @@ EOF
 ```
 
 Then run it on the backup items of `raw/items.json`. It syncs bw and lists
-what the account has now. It prints a line for each attachment it uploads or
-cannot upload.
+what the account has now. It prints a line for each organization item whose
+folder or favorite it sets. It also prints one for each attachment it uploads
+or cannot upload.
 
 ```sh
 python3 attach.py raw/items.json
 ```
 
-A failed upload prints bw's error. Then run the program again. It skips each
-attachment that is already there (one of that file name on the item) and adds
-only what is missing.
+A failed upload or `bw edit item` prints bw's error. Then run the program
+again. It skips each attachment that is already there (one of that file name
+on the item) and each item that has its folder and favorite. It adds only what
+is missing.
 
 The program stops at once with "has organizations of the same name" when two
 organizations share a name. That can be in the backup (`raw/organizations.json`)
@@ -465,6 +514,10 @@ attachment ids and file names. `bw list items --search NAME` lists the new
 candidates, which include those whose name only contains NAME. Compare their
 values to find the right one. Copy each file to its real file name and upload
 it with `bw create attachment --file FILE --itemid NEWID`.
+
+Each "has no folder named as" line is an organization item whose folder in
+the backup has a name no folder of the account has. The item keeps the folder
+it is in. Create the folder in the web vault and run the program again.
 
 Each "has no file in the backup" line means that the zip is damaged or was
 unpacked only in part. Decrypt and unpack it again (step 1) and run the
@@ -544,12 +597,13 @@ checks this on the dev vault:
 
 Everything else comes back as it was:
 
-- every value of every item, including custom fields with duplicate names or
-  trailing spaces
+- every value of every item, including custom fields of every type and with
+  duplicate names or trailing spaces
 - passkeys and password history
 - favorites and master password reprompt
-- folders and collections by name
-- which item is in which folder and collections
+- folders and collections by name, the empty ones too
+- which item is in which folder and collections. Step 5 puts back the folders
+  and favorites of organization items, which no export holds.
 - every attachment with its file name and bytes
 
 A backup holds no Sends and no organization settings. It also leaves out
