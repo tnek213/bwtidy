@@ -20,14 +20,7 @@ import pytest
 import bwtidy.bw.process as bwprocess
 from bwtidy.config import SettingsError
 from bwtidy.gateway import workers as workers_module
-from bwtidy.gateway.accounts import (
-    MAX_EMAIL,
-    MAX_HOST,
-    AccountKey,
-    LimitError,
-    normalize_email,
-    normalize_server,
-)
+from bwtidy.gateway.accounts import MAX_EMAIL, NAME_MAX, AccountKey, LimitError
 from bwtidy.gateway.app import REQUEST_DRAIN, create_gateway_app
 from bwtidy.gateway.settings import GatewaySettings
 from bwtidy.gateway.workers import MAX_SOCKET_PATH, STOP_TIMEOUT, worker_env
@@ -44,6 +37,7 @@ from tests.support.gateway_env import (
     GatewayEnv,
     account,
     existing_account,
+    long_account,
     make_env,
     settings,
     wait_for,
@@ -128,19 +122,9 @@ def test_the_worker_gets_an_environment_built_from_scratch(env: GatewayEnv):
     }
 
 
-def long_account(host_length: int, email_length: int, port: str = "") -> AccountKey:
-    """An account whose host and email have these lengths, as the gateway accepts them."""
-    labels = ["h" * 63] * 3 + ["h" * (MAX_HOST - 3 * 64 - len(".test"))]
-    host = (".".join(labels) + ".test")[-host_length:].lstrip(".")
-    server, host_dir = normalize_server(f"https://{host}{port}")
-    email = normalize_email("e" * (email_length - len("@example.test")) + "@example.test")
-    assert (len(host), len(email)) == (host_length, email_length)
-    return AccountKey(server=server, email=email, host_dir=host_dir)
-
-
 def longest_account() -> AccountKey:
-    """The longest server and email the gateway accepts, with a port for a longer host_dir."""
-    return long_account(MAX_HOST, MAX_EMAIL, ":65535")
+    """The longest host_dir and email the gateway accepts, the host_dir with a port."""
+    return long_account(NAME_MAX - len("_65535"), MAX_EMAIL, ":65535")
 
 
 def test_the_sockets_fit_a_unix_socket_path_for_the_longest_account():

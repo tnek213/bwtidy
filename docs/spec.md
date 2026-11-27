@@ -285,6 +285,9 @@ An account key is a server and an email.
   user info, no query and no fragment. So it reads `https://host` with
   `:PORT` added for a port other than 443. The directory name is the host
   with `_PORT` added for such a port.
+- The host is at most 253 characters long and its directory name at most 255.
+  Otherwise the answer is 422 `The server's host name is not valid.` The
+  reason is that Linux allows at most 255 bytes in one file name.
 - Unless the server is in `BWTIDY_ALLOWED_SERVERS`, every address its host
   resolves to must be global (`ipaddress` `is_global`) and not multicast. The
   address must also lie outside the ranges below. `ipaddress` counts some of
@@ -306,10 +309,14 @@ An account key is a server and an email.
   server can still win the race. The second check only narrows that window.
   The rest of the login (`/output`, `/input` and `/finish`) is not checked
   again.
-- The email is lowercased and at most 254 characters long. It must match
+- The email is lowercased and at most 250 characters long. It must match
   `^[a-z0-9_%+-][a-z0-9._%+-]*@[a-z0-9.-]+[.][a-z]{2,}$` and hold no `..`, or
-  the answer is 422. The local part does not start with a dot because a
-  directory name with a dot in front is one of the gateway's temporary ones.
+  the answer is 422 `The email is not valid.` The local part does not start
+  with a dot because a directory name with a dot in front is one of the
+  gateway's temporary ones.
+- The limit of 250 lies below the 254 of an address. The reason is that the
+  temporary name `.new-EMAIL` must fit in the 255 bytes Linux allows in one
+  file name.
 - The account directory is `ACCOUNTS_DIR/HOST/EMAIL`. A path that resolves
   outside the accounts directory or through a symlink is refused (422).
 
@@ -366,7 +373,7 @@ ACCOUNTS_DIR/.run/
 
 - NAME is the first 16 hex digits of the SHA-256 of `HOST/EMAIL`. The
   reason is that Linux allows at most 107 bytes in a Unix socket path. A
-  host of 253 characters and an email of 254 would not fit under
+  host of 253 characters and an email of 250 would not fit under
   `ACCOUNTS_DIR/HOST/EMAIL`. NAME has the same length for every account.
 - `.run` starts with a dot, which no host name does. So it is never a host
   directory, and nothing in it counts as an account.
