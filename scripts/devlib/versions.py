@@ -78,7 +78,7 @@ def package_lock_versions() -> tuple[str, str]:
 
 
 RELEASE_NOTES = "docs/releases.md"
-## a release is dated by Swedish time, the maintainer's
+## a release is dated by Swedish time, the project's time zone wherever it is made
 TIMEZONE = zoneinfo.ZoneInfo("Europe/Stockholm")
 RULES = "dev/release.md, The release notes"
 REPO_URL = "https://github.com/tnek213/bwtidy"

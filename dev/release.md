@@ -180,8 +180,9 @@ YYYY-MM-DD · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/vV
 
 - PREVIOUS is the next older version heading of the file that was not
   withdrawn (below). A version with none has no All changes part.
-- The date is the date in Swedish time (Europe/Stockholm, the maintainer's) of
-  the commit that the tag `vVERSION` points at:
+- The date is the date in Swedish time (Europe/Stockholm) of the commit that
+  the tag `vVERSION` points at. Swedish time is the project's time zone, the
+  first one it used, also for a release made from elsewhere:
   `TZ=Europe/Stockholm git log -1 --format=%cd --date=format-local:%Y-%m-%d 'vVERSION^{commit}'`.
 - The line may wrap like any other text (a line break before a `·`), as text
   is wrapped at 80 characters.
