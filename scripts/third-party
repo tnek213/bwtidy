@@ -11,6 +11,15 @@ the installed metadata (License-Expression, else a License classifier), so it ru
 venv's python and starts itself through `uv run --locked` when it is not. A package whose license
 is not known is an error naming it: add it to OVERRIDES once its own repo says which. `direct`
 marks the dependencies frontend/package.json and backend/pyproject.toml name.
+
+The docs site at /docs/ ships the theme's own files from the group docs, which `uv export --no-dev`
+leaves out. Read through `uv run --locked --only-group docs`, they are zensical-ui itself (PyPI),
+the npm packages its script bundles (as its javascripts/LICENSE names them) and each icon set of
+its templates/.icons that the site draws, from zensical-ui with its version and the license of
+ICON_LICENSES. A set is drawn when the theme's stylesheets or scripts (copied as they are into the
+site's assets/) embed one of its icons, or when zensical.toml, overrides/ or a page of docs/ names
+one ("lucide/sun" or :lucide-sun:). The rest of the group (the Zensical builder, resvg-py) only
+builds the site and ships nothing.
 """
 
 import json
@@ -19,7 +28,9 @@ import subprocess
 import sys
 import tomllib
 from collections.abc import Callable
+from email.message import Message
 from importlib import metadata
+from pathlib import Path
 from typing import Any
 
 from devlib import venv
@@ -35,6 +46,37 @@ OVERRIDES = {
     ## https://github.com/woodruffw/pyrage are MIT
     "pyrage": "MIT",
 }
+
+## the package of the group docs whose files the docs site ships
+THEME = "zensical-ui"
+
+## the licenses of the theme's icon sets (zensical_ui/templates/.icons/SET), from each set's own
+## license file there
+ICON_LICENSES = {
+    ## LICENSE.txt: "Icons: CC BY 4.0 License" for the icons packaged as SVG
+    "fontawesome": "CC-BY-4.0",
+    ## LICENSE: ISC, and MIT for the icons derived from the Feather project
+    "lucide": "ISC AND MIT",
+    ## LICENSE: the Pictogrammers Free License, "Icons: Apache 2.0"
+    "material": "Apache-2.0",
+    "octicons": "MIT",
+    "simple": "CC0-1.0",
+}
+
+## run in the group docs: the theme's templates directory, version and license metadata
+THEME_PROBE = """
+import json
+from importlib import metadata
+from pathlib import Path
+import zensical_ui
+meta = metadata.metadata("zensical-ui")
+print(json.dumps({
+    "templates": str(Path(zensical_ui.__file__).parent / "templates"),
+    "version": meta["Version"],
+    "License-Expression": meta.get("License-Expression"),
+    "Classifier": meta.get_all("Classifier") or [],
+}))
+"""
 
 ## the License classifiers that name one license only
 CLASSIFIERS = {
@@ -125,6 +167,125 @@ def pypi_packages(export: str, direct: set[str], read: MetadataReader) -> list[P
     return found
 
 
+def svg_paths(text: str) -> set[str]:
+    """The d attributes of the SVG paths in a text, quoted either way (a CSS url() uses ')."""
+    return {match[2] for match in re.finditer(r"""\sd=(["'])(.+?)\1""", text)}
+
+
+def drawn_icon_sets(templates: Path, named: str) -> set[str]:
+    """The icon sets under templates/.icons that the site draws, see the docstring."""
+    sets = sorted(path.name for path in (templates / ".icons").iterdir() if path.is_dir())
+    embedded: set[str] = set()
+    for path in (templates / "assets").rglob("*"):
+        if path.suffix in (".css", ".js"):
+            embedded |= svg_paths(path.read_text())
+    drawn = {
+        name
+        for name in sets
+        if any(
+            svg_paths(icon.read_text()) & embedded
+            for icon in (templates / ".icons" / name).rglob("*.svg")
+        )
+    }
+    alternatives = "|".join(map(re.escape, sets))
+    pattern = rf"""["']({alternatives})/[\w/-]+["']|:({alternatives})-[\w-]+:"""
+    for match in re.finditer(pattern, named):
+        drawn.add(match[1] or match[2])
+    return drawn
+
+
+def bundled(templates: Path) -> list[tuple[str, str, str]]:
+    """(name, version, license) of each npm package the theme's script bundles."""
+    text = (templates / "assets" / "javascripts" / "LICENSE").read_text()
+    return re.findall(r"^Package: (.+)@([^@\s]+)\s*\nLicense: (.+?)\s*$", text, re.M)
+
+
+def theme_packages(templates: Path, version: str, license: str, named: str) -> list[Package]:
+    found = [
+        {
+            "name": THEME,
+            "version": version,
+            "ecosystem": "PyPI",
+            "license": license,
+            "direct": False,
+        }
+    ]
+    for name, npm_version, npm_license in bundled(templates):
+        found.append(
+            {
+                "name": name,
+                "version": npm_version,
+                "ecosystem": "npm",
+                "license": known(name, npm_license),
+                "direct": False,
+            }
+        )
+    for name in sorted(drawn_icon_sets(templates, named)):
+        if name not in ICON_LICENSES:
+            raise ValueError(
+                f"no license known for the icon set {name}, "
+                "add it to ICON_LICENSES in scripts/third-party"
+            )
+        found.append(
+            {
+                "name": name,
+                "version": version,
+                "ecosystem": THEME,
+                "license": ICON_LICENSES[name],
+                "direct": False,
+            }
+        )
+    return found
+
+
+def named_icons() -> str:
+    """The text of zensical.toml, the overrides and the pages, where the site names its icons."""
+    files = [
+        ROOT / "zensical.toml",
+        *(ROOT / "overrides").rglob("*.html"),
+        *(ROOT / "docs").rglob("*.md"),
+    ]
+    return "\n".join(path.read_text() for path in sorted(files))
+
+
+def theme_probe() -> dict[str, Any]:
+    return json.loads(
+        subprocess.run(
+            [
+                "uv",
+                "run",
+                "--locked",
+                "--quiet",
+                "--only-group",
+                "docs",
+                "python",
+                "-I",
+                "-c",
+                THEME_PROBE,
+            ],
+            cwd=BACKEND,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )
+
+
+def probed_metadata(probe: dict[str, Any]) -> Message:
+    meta = Message()
+    if probe["License-Expression"]:
+        meta["License-Expression"] = probe["License-Expression"]
+    for classifier in probe["Classifier"]:
+        meta["Classifier"] = classifier
+    return meta
+
+
+def theme() -> list[Package]:
+    probe = theme_probe()
+    license = pypi_license(THEME, lambda _: probed_metadata(probe))
+    return theme_packages(Path(probe["templates"]), probe["version"], license, named_icons())
+
+
 def deduplicated(packages: list[Package]) -> list[Package]:
     unique = {json.dumps(p, sort_keys=True): p for p in packages}
     return sorted(unique.values(), key=lambda p: (p["name"].lower(), p["ecosystem"], p["version"]))
@@ -155,7 +316,7 @@ def uv_export() -> str:
 def collect(read: MetadataReader = metadata.metadata) -> list[Package]:
     lock = json.loads((FRONTEND / "package-lock.json").read_text())
     return deduplicated(
-        npm_packages(lock, npm_direct()) + pypi_packages(uv_export(), pypi_direct(), read)
+        npm_packages(lock, npm_direct()) + pypi_packages(uv_export(), pypi_direct(), read) + theme()
     )
 
 

@@ -2633,6 +2633,16 @@ describe the About page and the More actions menu.
     package, with the project itself left out
   - from PyPI every package that `uv export --no-dev` names, with one for
     another platform (like `pywin32`) left out
+  - `zensical-ui` from the dependency group `docs`, the theme of the docs
+    site that the image serves at `/docs/`
+  - the npm packages that the theme's script bundles and each of its icon
+    sets that the site draws
+- An icon set comes with `zensical-ui` as its ecosystem and the version of
+  `zensical-ui`. Its license comes from the script's table of the sets'
+  license files. The site draws a set when the theme's stylesheets or scripts
+  embed one of its icons or when `zensical.toml`, `overrides/` or a page names
+  one. The rest of the group `docs` (the Zensical builder and `resvg-py`)
+  only builds the site and is left out.
 - A PyPI package's license comes from the installed metadata. That is
   `License-Expression` or else a License classifier that names one license.
   For a package whose metadata names none it comes from the script's

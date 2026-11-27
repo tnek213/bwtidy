@@ -144,3 +144,76 @@ def test_stale_names_names_what_differs():
 def test_the_committed_list_is_up_to_date():
     committed = json.loads(third_party.OUTPUT.read_text())
     assert third_party.stale_names(committed, third_party.collect()) == []
+
+
+def svg(path: str) -> str:
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="{path}"/></svg>'
+
+
+@pytest.fixture
+def templates(tmp_path):
+    """A theme with four icon sets, its stylesheet embedding an icon of the set alpha."""
+    for name, path in [
+        ("alpha/one", "M1 1h2"),
+        ("beta/sub/two", "M2 2h2"),
+        ("gamma/three", "M3 3h2"),
+        ("delta/four", "M4 4h2"),
+    ]:
+        icon = tmp_path / ".icons" / f"{name}.svg"
+        icon.parent.mkdir(parents=True, exist_ok=True)
+        icon.write_text(svg(path))
+    (tmp_path / ".icons" / "alpha" / "LICENSE").write_text("MIT License\n")
+    scripts = tmp_path / "assets" / "javascripts"
+    scripts.mkdir(parents=True)
+    (scripts / "LICENSE").write_text(
+        "-----\nPackage: clipboard@2.0.11\nLicense: MIT\nCopyright: someone\n\n"
+        "-----\nPackage: @scope/thing@1.2.3\nLicense: W3C\n"
+    )
+    styles = tmp_path / "assets" / "stylesheets"
+    styles.mkdir(parents=True)
+    (styles / "main.css").write_text(
+        ".copy{mask-image:url(\"data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg'>"
+        "<path d='M1 1h2'/></svg>\")}"
+    )
+    return tmp_path
+
+
+def test_the_theme_lists_itself_its_bundled_packages_and_the_icon_sets_it_draws(
+    templates, monkeypatch
+):
+    monkeypatch.setattr(
+        third_party, "ICON_LICENSES", {"alpha": "MIT", "beta": "ISC", "gamma": "CC-BY-4.0"}
+    )
+    named = 'toggle.icon = "beta/sub/two"\nA card :gamma-three: here.\n'
+    found = third_party.theme_packages(templates, "0.0.42", "MIT", named)
+    assert [(p["name"], p["version"], p["ecosystem"], p["license"]) for p in found] == [
+        ("zensical-ui", "0.0.42", "PyPI", "MIT"),
+        ("clipboard", "2.0.11", "npm", "MIT"),
+        ("@scope/thing", "1.2.3", "npm", "W3C"),
+        ("alpha", "0.0.42", "zensical-ui", "MIT"),
+        ("beta", "0.0.42", "zensical-ui", "ISC"),
+        ("gamma", "0.0.42", "zensical-ui", "CC-BY-4.0"),
+    ]
+    assert not any(p["direct"] for p in found)
+
+
+def test_an_icon_set_the_site_draws_without_a_license_names_it(templates, monkeypatch):
+    monkeypatch.setattr(third_party, "ICON_LICENSES", {"alpha": "MIT"})
+    with pytest.raises(ValueError, match="delta"):
+        third_party.theme_packages(templates, "0.0.42", "MIT", '"delta/four"')
+
+
+def test_the_committed_list_holds_the_docs_theme_and_its_icon_sets_only():
+    committed = {(p["name"], p["ecosystem"]): p for p in json.loads(third_party.OUTPUT.read_text())}
+    assert committed[("zensical-ui", "PyPI")]["license"] == "MIT"
+    ## the palette toggle draws lucide icons, the repository link fontawesome/brands/git-alt
+    assert committed[("lucide", "zensical-ui")]["license"] == "ISC AND MIT"
+    assert committed[("fontawesome", "zensical-ui")]["license"] == "CC-BY-4.0"
+    for set_name in ("material", "octicons"):
+        assert (
+            committed[(set_name, "zensical-ui")]["license"] == third_party.ICON_LICENSES[set_name]
+        )
+    ## Simple Icons comes with the theme but the site draws none of them
+    assert ("simple", "zensical-ui") not in committed
+    names = {name for name, _ in committed}
+    assert not names & {"zensical", "resvg-py", "pymdown-extensions"}
