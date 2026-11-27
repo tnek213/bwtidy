@@ -133,7 +133,9 @@ Each PNG is kept in `.cache/kroki/` at the repo root (git-ignored), named
 after a hash of the type, the source and the converter's settings, and a
 later build takes it from there without asking the server. So building docs
 that hold a diagram needs a Kroki server, unless the cache has every one
-(the image's build has no cache). A server that cannot be reached or answers
+(the image's build has no cache). The converter writes into a temp directory
+inside that cache, so a temp directory on another filesystem (such as a tmpfs
+`/tmp`) does not matter. A server that cannot be reached or answers
 with an error fails the build, naming the page, the line and the server's
 message. A diagram without alt text fails it before any request, and
 `scripts/docs-lint` reports it already. Docs without a diagram build without
