@@ -125,17 +125,17 @@ end-to-end tests run the gateway. These are the settings:
   counts until it finishes or is dropped. The exit is a clean shutdown with
   exit code 0, so nothing of the vault stays in RAM between sessions. A new
   login that replaces a running session does not make the worker exit.
-  - The exit counts as settled from the moment the session's end starts or
-    the idle time has passed. The end can take long since it commits the
-    pending edits. From then on `/api/health` answers 503 `{"status":
-    "exiting"}`, so the gateway never hands a browser a worker on its way out.
-  - A login that reaches the exiting worker anyway starts no session. It
-    answers 502 with the gateway's own text `The account's worker does not
-    answer`. The frontend reads that like a 502 of the gateway. It opens the
-    account again and repeats the login, and the gateway waits for the old
-    worker to go before it starts the next. Without this a new page's unlock
-    during the old page's log out would succeed on the exiting worker, whose
-    exit would then drop the session.
+    - The exit counts as settled from the moment the session's end starts or
+      the idle time has passed. The end can take long since it commits the
+      pending edits. From then on `/api/health` answers 503 `{"status":
+      "exiting"}`, so the gateway never hands a browser a worker on its way out.
+    - A login that reaches the exiting worker anyway starts no session. It
+      answers 502 with the gateway's own text `The account's worker does not
+      answer`. The frontend reads that like a 502 of the gateway. It opens the
+      account again and repeats the login, and the gateway waits for the old
+      worker to go before it starts the next. Without this a new page's unlock
+      during the old page's log out would succeed on the exiting worker, whose
+      exit would then drop the session.
 - `BWTIDY_BACKUPS_DIR` puts the backups in this directory instead of
   `backups` in `BWTIDY_DATA_DIR`. Everything that touches the backups uses it.
   That is the backups themselves and their retention, as well as the
@@ -276,11 +276,11 @@ An account key is a server and an email.
   resolves to must be global (`ipaddress` `is_global`) and not multicast. The
   address must also lie outside the ranges below. `ipaddress` counts some of
   them as global although they lead to an IPv4 address, private ones too.
-  - `64:ff9b::/96` and `64:ff9b:1::/48` (NAT64)
-  - `::/96` (IPv4 compatible)
-  - `::ffff:0:0:0/96` (IPv4 translated)
-  - `2002::/16` (6to4)
-  - `2001::/32` (Teredo)
+    - `64:ff9b::/96` and `64:ff9b:1::/48` (NAT64)
+    - `::/96` (IPv4 compatible)
+    - `::ffff:0:0:0/96` (IPv4 translated)
+    - `2002::/16` (6to4)
+    - `2001::/32` (Teredo)
 
   Otherwise the answer is 422 `SERVER does not resolve to a public address.`,
   and a host that does not resolve gets the same answer. The reason is that
@@ -376,19 +376,19 @@ account directory. So `ROOT` can be any mount apart from the account data.
 - `GET /gateway/account` answers what the page needs before a worker runs,
   for the browser's routing cookie. The answer is `{account: {server, email},
   running, exists, pending, loggedIn, firstRun}`.
-  - `running` says that the account's worker runs and its `/api/health`
-    answers 200.
-  - `exists` says that the account directory exists, and `pending` that it
-    has `.pending`.
-  - `loggedIn` is the line of `app/bw-login-state` (at most 64 bytes). The
-    file is read with the rules of the MCP token file (see MCP below).
-    Without a file to trust the account counts as logged out.
-  - `firstRun` is true when no account directory has both its SQLite file
-    and no `.pending`. The SQLite file must be a regular file reached without
-    a symlink, and only its existence counts. `firstRun` is the same for
-    every browser (see The account form).
-  - Without a routing cookie `account` is null and the rest is false, apart
-    from `firstRun`. `account` stays after the worker exited.
+    - `running` says that the account's worker runs and its `/api/health`
+      answers 200.
+    - `exists` says that the account directory exists, and `pending` that it
+      has `.pending`.
+    - `loggedIn` is the line of `app/bw-login-state` (at most 64 bytes). The
+      file is read with the rules of the MCP token file (see MCP below).
+      Without a file to trust the account counts as logged out.
+    - `firstRun` is true when no account directory has both its SQLite file
+      and no `.pending`. The SQLite file must be a regular file and not itself
+      a symlink, and only its existence counts. `firstRun` is the same for
+      every browser (see The account form).
+    - Without a routing cookie `account` is null and the rest is false, apart
+      from `firstRun`. `account` stays after the worker exited.
 - `POST /gateway/account {server, email, create}` validates and sets the
   routing cookie and answers like the `GET`. It starts no worker and makes no
   directory. A missing directory answers 404 `{"exists": false}` unless
@@ -423,17 +423,17 @@ account directory. So `ROOT` can be any mount apart from the account data.
 - Anyone who reaches the gateway can click Log in or Unlock without the
   master password, and each click starts a worker for up to 10 minutes. So
   the starts have caps:
-  - When `BWTIDY_MAX_PENDING` directories with `.pending` exist, a login that
-    would make a new one answers 429 `Too many new accounts wait for their
-    first login. Try again in a few minutes.` An existing pending account
-    still starts its worker.
-  - When `BWTIDY_MAX_WORKERS` workers run or are starting, the start of one
-    more answers 429 `Too many accounts are open at once. Try again later.`
-    This is checked before a new directory is made, so a refused login leaves
-    nothing behind.
-  - A worker counts from the moment its start begins until its start fails or
-    it exits. Each check and the reservation it guards happen without an
-    await in between, so concurrent clicks cannot pass a cap together.
+    - When `BWTIDY_MAX_PENDING` directories with `.pending` exist, a login that
+      would make a new one answers 429 `Too many new accounts wait for their
+      first login. Try again in a few minutes.` An existing pending account
+      still starts its worker.
+    - When `BWTIDY_MAX_WORKERS` workers run or are starting, the start of one
+      more answers 429 `Too many accounts are open at once. Try again later.`
+      This is checked before a new directory is made, so a refused login leaves
+      nothing behind.
+    - A worker counts from the moment its start begins until its start fails or
+      it exits. Each check and the reservation it guards happen without an
+      await in between, so concurrent clicks cannot pass a cap together.
 - A worker starts as root with the `bwtidy` entry point next to the gateway's
   own Python. It drops to the account's uid and gid with `extra_groups=[]`,
   umask 0o077 and a new session. Its environment is built from scratch, and
@@ -568,8 +568,12 @@ off. [architecture.md](architecture.md#the-container) says how the site is
 built. These make up its look:
 
 - a content column wider than the theme's
-- running text of at most 80 characters a line
+- running text of at most 72 characters a line
 - pictures with a thin border that open larger on a click
+- a warm ivory and deep teal palette of its own for each color scheme, its
+  text and links at WCAG 2.2 AA contrast
+- code in IBM Plex Mono, which the site carries itself
+- a footer that credits Zensical and the Diátaxis framework
 - nothing loaded from a CDN
 
 The site sends another site nothing about the host it is served from, as the
@@ -609,12 +613,12 @@ routed by its `Authorization: Bearer TOKEN` alone.
   directory whose `app/mcp-token.sha256` holds that hash on its first line,
   compared with `hmac.compare_digest`. The files are read as root on every
   request because there are few of them.
-- A token file counts only when it is a regular file owned by the account's
-  uid and reached without a symlink. So a worker cannot point the gateway at
-  another account's hash. The same rules hold for `app/bw-login-state` and
-  `app/delete-requested`, which are the only other files the gateway reads
-  from an account directory. When two accounts hold the same hash, neither is
-  used.
+- A token file counts only when the file itself is a regular file and not a
+  symlink, and the account's uid owns it. The owner check is why a worker
+  cannot point the gateway at another account's hash. The same rules hold for
+  `app/bw-login-state` and `app/delete-requested`, which are the only other
+  files the gateway reads from an account directory. When two accounts hold
+  the same hash, neither is used.
 - No token or no match gets 401 with the worker's own text `bwtidy MCP needs
   a token. Create one in the web UI.` and `WWW-Authenticate: Bearer`.
 - A match whose token expired gets 401 `bwtidy MCP token expired. Create a
@@ -789,33 +793,33 @@ session and its end.
   HttpOnly with SameSite=Strict and Path=/. It has no Max-Age and is Secure
   with `BWTIDY_SECURE_COOKIES=1`. One session runs at a time. A new login
   replaces the old one, but only with the running session's master password:
-  - While a session runs, `POST /api/session` (and `POST
-    /api/bw-login/finish`) first checks the password against a hash of the
-    running session's password. The hash is scrypt with N 2^17, r 8 and p 1
-    and a random 16 byte salt made at the login. It runs in a thread outside
-    the session's lock and is compared with `hmac.compare_digest`. A wrong
-    password answers 401 `Wrong master password` and changes nothing. There
-    is no commit and no lock. The session and its cookie stay. Without a
-    running session the unlock of `bw serve` checks the password.
-  - After 3 wrong passwords in a row against a running session each further
-    try is refused with 429 `Too many wrong passwords. Try again in N s.` and
-    `Retry-After: N`. That holds for the right password too until N seconds
-    after the last wrong one. N starts at 1 and doubles up to 60. A right
-    password and every new session start the count again. The count is per
-    worker and not per address because the gateway and the proxy in front of
-    it hide the address. Checks run one at a time, so parallel guesses cannot
-    pass the wait together.
-  - The reason is that anyone who reaches the gateway and knows an account's
-    server and email gets a routing cookie for it. Only the logged in browser
-    (with its session cookie) and an MCP client with the account's token may
-    end a session or log the CLI out. The hash is slow so that the check is no
-    fast oracle for guessing the master password. It is a hash of its own
-    because every unlock of `bw serve` invalidates the running session's key.
-  - Two things are accepted. A refusal with a session running takes the
-    hash's time and one without takes the unlock time of `bw serve`, so the
-    timing says whether a session runs. And when the master password changed
-    on the server during a session, a login with the new one is refused until
-    the session ends.
+    - While a session runs, `POST /api/session` (and `POST
+      /api/bw-login/finish`) first checks the password against a hash of the
+      running session's password. The hash is scrypt with N 2^17, r 8 and p 1
+      and a random 16 byte salt made at the login. It runs in a thread outside
+      the session's lock and is compared with `hmac.compare_digest`. A wrong
+      password answers 401 `Wrong master password` and changes nothing. There
+      is no commit and no lock. The session and its cookie stay. Without a
+      running session the unlock of `bw serve` checks the password.
+    - After 3 wrong passwords in a row against a running session each further
+      try is refused with 429 `Too many wrong passwords. Try again in N s.` and
+      `Retry-After: N`. That holds for the right password too until N seconds
+      after the last wrong one. N starts at 1 and doubles up to 60. A right
+      password and every new session start the count again. The count is per
+      worker and not per address because the gateway and the proxy in front of
+      it hide the address. Checks run one at a time, so parallel guesses cannot
+      pass the wait together.
+    - The reason is that anyone who reaches the gateway and knows an account's
+      server and email gets a routing cookie for it. Only the logged in browser
+      (with its session cookie) and an MCP client with the account's token may
+      end a session or log the CLI out. The hash is slow so that the check is no
+      fast oracle for guessing the master password. It is a hash of its own
+      because every unlock of `bw serve` invalidates the running session's key.
+    - Two things are accepted. A refusal with a session running takes the
+      hash's time and one without takes the unlock time of `bw serve`, so the
+      timing says whether a session runs. And when the master password changed
+      on the server during a session, a login with the new one is refused until
+      the session ends.
 - Every open tab sends `POST /api/session/heartbeat` every 30 seconds. The
   session ends when none came for `BWTIDY_HEARTBEAT_TIMEOUT` seconds. The
   default is 120, and less than 60 is refused as it must stay above the 30.
@@ -828,11 +832,11 @@ session and its end.
 - A session ends on a timeout, a logout or a new login with the right
   password. It also ends when the process exits and on MCP's `end_session` or
   `log_out_of_bitwarden`. Ending a session takes these steps:
-  - It commits the pending `ui` entries (see MCP and the queue).
-  - It stops a running background backup before its next step.
-  - It locks `bw serve`.
-  - It wipes the password and the session key from RAM.
-  - It disables MCP.
+    - It commits the pending `ui` entries (see MCP and the queue).
+    - It stops a running background backup before its next step.
+    - It locks `bw serve`.
+    - It wipes the password and the session key from RAM.
+    - It disables MCP.
 
   A worker with `BWTIDY_EXIT_AFTER_SESSION=1` then exits, except when a new
   login replaced the session. The end never waits long on `bw` (see Worker
@@ -845,13 +849,13 @@ session and its end.
   not even start while it is not. So `GET /api/session` always carries
   `bwLogin` with `loggedIn`, `server` and `email`. The frontend shows a
   Bitwarden login instead of the unlock while `loggedIn` is false.
-  - `loggedIn` comes from the status of `bw serve` when it answers and knows
-    a server. Otherwise it comes from `bw status`.
-  - `server` and `email` are what the CLI reports. Otherwise they are
-    `https://vault.bitwarden.com` and an empty email.
-  - While the account's worker does not run the page asks no worker.
-    `loggedIn` is then the gateway's, and the server and email are the
-    account's.
+    - `loggedIn` comes from the status of `bw serve` when it answers and knows
+      a server. Otherwise it comes from `bw status`.
+    - `server` and `email` are what the CLI reports. Otherwise they are
+      `https://vault.bitwarden.com` and an empty email.
+    - While the account's worker does not run the page asks no worker.
+      `loggedIn` is then the gateway's, and the server and email are the
+      account's.
 - bwtidy saves no server or email. The Bitwarden login form prefills them
   from the browser's localStorage. It takes the last values typed
   (`bwtidy.accountForm`) or else the account in use (`bwtidy.account`), and
@@ -1051,15 +1055,15 @@ Every value in the grid has a coordinate, which is also its column name.
 - Some parts of an item are never shown or written as leaves. They survive
   every write untouched (see Writes). The grid row carries each attachment's
   id with its name for a rename, but no cell shows it. These are the parts:
-  - `id`
-  - `object`
-  - `creationDate`
-  - `deletedDate`
-  - `passwordHistory`
-  - `login.passwordRevisionDate`
-  - the content of `login.fido2Credentials`
-  - the attachment metadata other than the file names, above all the url that
-    holds a token
+    - `id`
+    - `object`
+    - `creationDate`
+    - `deletedDate`
+    - `passwordHistory`
+    - `login.passwordRevisionDate`
+    - the content of `login.fido2Credentials`
+    - the attachment metadata other than the file names, above all the url that
+      holds a token
 
 ## Secret values
 
@@ -1215,15 +1219,15 @@ flowchart TD
 - Two `revisionDate`s are compared as instants and not as strings
   (`revision.py`). At most 1 ms apart is the same revision. A value that is
   no timestamp (none or empty) equals only itself.
-  - The server keeps more digits than the 3 of the answers of `bw serve`. It
-    is 7 on bitwarden.com and 6 on Vaultwarden. So one instant can reach
-    bwtidy in two spellings (cut and rounded), and a merge into an item that
-    nobody had changed would fail as a conflict. Every write gives an item a
-    new `revisionDate`, and no two writes of one item are 1 ms apart.
-  - bwtidy also keeps the spelling that `bw serve` answered first for each
-    item's revision and answers with that one. It keeps it in RAM with ids
-    and `revisionDate`s only. So the grid, MCP and a backup's fingerprint see
-    one spelling per revision.
+    - The server keeps more digits than the 3 of the answers of `bw serve`. It
+      is 7 on bitwarden.com and 6 on Vaultwarden. So one instant can reach
+      bwtidy in two spellings (cut and rounded), and a merge into an item that
+      nobody had changed would fail as a conflict. Every write gives an item a
+      new `revisionDate`, and no two writes of one item are 1 ms apart.
+    - bwtidy also keeps the spelling that `bw serve` answered first for each
+      item's revision and answers with that one. It keeps it in RAM with ids
+      and `revisionDate`s only. So the grid, MCP and a backup's fingerprint see
+      one spelling per revision.
 - A folder, favorite or collection change made elsewhere is a conflict too.
   The Bitwarden clients change an item's folder and favorite flag through a
   partial update without a new `revisionDate`. Vaultwarden does the same for
@@ -1231,10 +1235,10 @@ flowchart TD
   `moveToFolder`, a `setLeaf` of `favorite` or a `setCollections` would then
   overwrite the other device's choice without a word.
 - These operations therefore carry what the grid showed as optional fields:
-  - `shownFolderIds` is `{itemId: folderId or null}` for the items of
-    `itemIds` only.
-  - `shownFavorite` is for a `setLeaf` of `favorite` only.
-  - `shownCollectionIds` is compared as a set.
+    - `shownFolderIds` is `{itemId: folderId or null}` for the items of
+      `itemIds` only.
+    - `shownFavorite` is for a `setLeaf` of `favorite` only.
+    - `shownCollectionIds` is compared as a set.
 
   The check is a conflict when the item now differs, unless bwtidy's own
   writes since then turned the shown value into the one now (see Own writes
@@ -1258,27 +1262,27 @@ flowchart TD
   serve` to the `GET` is checked again. So are the shown values. This holds
   for every kind that writes an existing item, `trashItem` and the steps of
   `restoreItems` included.
-  - A sync inside the batch can bring in another client's change after the
-    check. Such a sync comes after a create, after a restore's move or
-    untrash or with a backup by hand.
-  - A mismatch fails that operation as a conflict. The operations before it
-    stay written and the ones after it are not applied.
-  - An item without a `revisionDate` to check is not checked. That is a new
-    item, the tool note of a section save or an item in the trash.
-  - A `GET` may answer a `revisionDate` that one of bwtidy's own writes turned
-    into a later one. Then it is asked again every 0.2 seconds for up to 5
-    seconds. Right after its own `PUT`, `bw serve` answers a `GET` of that
-    item for a moment as it was before the `PUT`. The batch's next write of
-    the item would then conflict with its own earlier write. One that is
-    still from before the own write after the wait fails as a conflict.
+    - A sync inside the batch can bring in another client's change after the
+      check. Such a sync comes after a create, after a restore's move or
+      untrash or with a backup by hand.
+    - A mismatch fails that operation as a conflict. The operations before it
+      stay written and the ones after it are not applied.
+    - An item without a `revisionDate` to check is not checked. That is a new
+      item, the tool note of a section save or an item in the trash.
+    - A `GET` may answer a `revisionDate` that one of bwtidy's own writes turned
+      into a later one. Then it is asked again every 0.2 seconds for up to 5
+      seconds. Right after its own `PUT`, `bw serve` answers a `GET` of that
+      item for a moment as it was before the `PUT`. The batch's next write of
+      the item would then conflict with its own earlier write. One that is
+      still from before the own write after the wait fails as a conflict.
 - The server refuses a write on a copy of the item older than its own, and
   bwtidy shows that as a conflict of the item. `bw` sends its copy's
   `revisionDate` as `lastKnownRevisionDate`. Both servers answer the refusal
   with a 400:
-  - Vaultwarden refuses the edit when its stored date is newer by 2 seconds or
-    more ("The client copy of this cipher is out of date").
-  - The official server refuses it when the dates differ by more than a
-    second ("The item cannot be saved because it is out of date").
+    - Vaultwarden refuses the edit when its stored date is newer by 2 seconds or
+      more ("The client copy of this cipher is out of date").
+    - The official server refuses it when the dates differ by more than a
+      second ("The item cannot be saved because it is out of date").
 
   bwtidy knows the answer by those texts. It syncs and fails the operation as
   a conflict like a mismatch right before the write. Any other refusal fails
@@ -1311,27 +1315,27 @@ flowchart TD
   `revisionDate` before and after its write. The "after" comes from the
   answer of `bw serve` to that very `PUT`, and both stay in RAM until the
   session ends.
-  - An operation's expected `revisionDate` may be a "before" of such a write
-    (in any spelling of its instant). Then it is checked against the "after"
-    instead, following the chain. So an edit made while a commit runs never
-    conflicts with bwtidy's own commit, and neither does one right after it
-    before the grid reloaded. Any other change still conflicts.
-  - Nothing that bwtidy did not write itself ever goes into the chain.
-  - The same writes remember the folder, the favorite flag and the
-    collections that the write found on the item and the ones it left. A
-    shown value holds when a run of them leads from it to the value now.
+    - An operation's expected `revisionDate` may be a "before" of such a write
+      (in any spelling of its instant). Then it is checked against the "after"
+      instead, following the chain. So an edit made while a commit runs never
+      conflicts with bwtidy's own commit, and neither does one right after it
+      before the grid reloaded. Any other change still conflicts.
+    - Nothing that bwtidy did not write itself ever goes into the chain.
+    - The same writes remember the folder, the favorite flag and the
+      collections that the write found on the item and the ones it left. A
+      shown value holds when a run of them leads from it to the value now.
 
 ### The change log
 
 - Every applied operation is logged in SQLite with these fields:
-  - the time
-  - the source, which is `ui` or `mcp` or else `mixed` for a batch with
-    entries from both
-  - the operation
-  - the ids of the affected items and of the items it created
-  - the coordinates it wrote
-  - the result
-  - the backup's file name
+    - the time
+    - the source, which is `ui` or `mcp` or else `mixed` for a batch with
+      entries from both
+    - the operation
+    - the ids of the affected items and of the items it created
+    - the coordinates it wrote
+    - the result
+    - the backup's file name
 
   Values and error messages are never logged, since either could carry a
   value.
@@ -1375,13 +1379,13 @@ flowchart TD
   with the newest first. The header `X-Bwtidy-More` is `true` when more rows
   matched and `false` otherwise. The filter runs in SQL over the whole log.
   The optional query parameters are combined with AND:
-  - `from` and `to` are UTC instants and inclusive. A fraction of a second of
-    `from` counts as the next whole second.
-  - `source` and `kind` match their fields and can be repeated.
-  - `column` matches a row when its `columns` hold any of the given ones. It
-    can be repeated.
-  - `item` matches a row's `itemIds` or `createdItemIds`. It can be repeated.
-  - `result` is `ok` or `failed`.
+    - `from` and `to` are UTC instants and inclusive. A fraction of a second of
+      `from` counts as the next whole second.
+    - `source` and `kind` match their fields and can be repeated.
+    - `column` matches a row when its `columns` hold any of the given ones. It
+      can be repeated.
+    - `item` matches a row's `itemIds` or `createdItemIds`. It can be repeated.
+    - `result` is `ok` or `failed`.
 
   An unknown
   `source` or `result` is a 422, and so is an instant that does not parse.
@@ -1402,24 +1406,24 @@ item, then one backup and one more sync. Then come the writes one by one.
   that the failed operation found changed right before its write or that the
   server refused as out of date. Otherwise it is empty.
 - These are the kinds:
-  - `setLeaf` and `removeLeaf`
-  - `moveToFolder`, which creates a missing folder (an empty name means no
-    folder)
-  - `setCollections` for organization items only
-  - `moveToOrganization` (`POST /move/{itemId}/{organizationId}`) for
-    personal items only
-  - `moveToPersonal`
-  - `trashItem`
-  - `convertItem`
-  - `applyTemplate` (see Templates)
-  - `renameField`, `mergeColumns` and `mergeItems` (see Normalizing)
-  - `setUris`
-  - `restoreItems` and `restoreFolder` (see Restoring a change log row)
-  - `createItem`
-  - `generateLeaf`
-  - `renameFolder` and `deleteFolder`
-  - `renameAttachment`
-  - `setToolNoteSection` for bwtidy's own note only
+    - `setLeaf` and `removeLeaf`
+    - `moveToFolder`, which creates a missing folder (an empty name means no
+      folder)
+    - `setCollections` for organization items only
+    - `moveToOrganization` (`POST /move/{itemId}/{organizationId}`) for
+      personal items only
+    - `moveToPersonal`
+    - `trashItem`
+    - `convertItem`
+    - `applyTemplate` (see Templates)
+    - `renameField`, `mergeColumns` and `mergeItems` (see Normalizing)
+    - `setUris`
+    - `restoreItems` and `restoreFolder` (see Restoring a change log row)
+    - `createItem`
+    - `generateLeaf`
+    - `renameFolder` and `deleteFolder`
+    - `renameAttachment`
+    - `setToolNoteSection` for bwtidy's own note only
 
   No other operation may touch the tool note.
 
@@ -1469,13 +1473,13 @@ secret.
 
 - These are refused (422) at `POST /api/queue`, in the check and at write
   time alike:
-  - an item that is not a login (`only a login has URIs`)
-  - the tool note
-  - no items or one named twice
-  - a uri that is empty after trimming (`URI N is empty`)
-  - a match other than 0 to 5 or null
-  - a uri with match 4 that Python's `re` cannot compile (`URI N is not a
-    valid regular expression`)
+    - an item that is not a login (`only a login has URIs`)
+    - the tool note
+    - no items or one named twice
+    - a uri that is empty after trimming (`URI N is empty`)
+    - a match other than 0 to 5 or null
+    - a uri with match 4 that Python's `re` cannot compile (`URI N is not a
+      valid regular expression`)
 
   Bitwarden evaluates such a uri as a JavaScript regular expression. So the
   check catches only what Python rejects too. The messages name the URI by
@@ -1507,36 +1511,36 @@ pass through MCP.
   `revisionDate`, but it leaves the name as it was. `bw serve` has no other
   route for it, and bwtidy never calls the server's API around `bw serve`. So
   the write takes these steps:
-  - `GET /object/attachment/{id}?itemid=` fetches the bytes into the write's
-    RAM only. They are never logged or kept.
-  - `POST /attachment?itemid=` uploads them under the new name.
-  - A check makes sure that the answer lists exactly one new attachment with
-    the new name and the old one's `size`.
-  - `DELETE` removes the old one.
+    - `GET /object/attachment/{id}?itemid=` fetches the bytes into the write's
+      RAM only. They are never logged or kept.
+    - `POST /attachment?itemid=` uploads them under the new name.
+    - A check makes sure that the answer lists exactly one new attachment with
+      the new name and the old one's `size`.
+    - `DELETE` removes the old one.
 
   The attachment gets a new id.
 - When the upload or anything after it fails, the copy is deleted again and
   the entry fails. So the item keeps exactly one attachment.
-  - While the delete of the old one has not started, the copy goes at once.
-    After a failed upload that is the copy the item lists anyway, found by its
-    name and an id it did not have.
-  - After the delete started the copy goes only when the item still lists the
-    old one, since a delete that failed late may have happened.
-  - A copy that cannot be deleted again is logged by its id and both stay.
+    - While the delete of the old one has not started, the copy goes at once.
+      After a failed upload that is the copy the item lists anyway, found by its
+      name and an id it did not have.
+    - After the delete started the copy goes only when the item still lists the
+      old one, since a delete that failed late may have happened.
+    - A copy that cannot be deleted again is logged by its id and both stay.
 - On Vaultwarden neither the upload nor the delete changes the item's
   `revisionDate`. The own write is recorded like a `PUT`'s (see Own writes).
   It comes from the upload's answer and from a `GET` right after the delete.
   So an edit queued before the rename never conflicts with it.
 - These are refused (422):
-  - the tool note
-  - an `attachmentId` the item does not have (`the item has no attachment
-    with the id ID`)
-  - an empty new name
-  - a name with a slash or a backslash, because the backups file an
-    attachment under `item-attachments/<itemId>/<fileName>`
-  - the name it has now
-  - the name of another attachment of the item (`the item has another
-    attachment named "NAME"`)
+    - the tool note
+    - an `attachmentId` the item does not have (`the item has no attachment
+      with the id ID`)
+    - an empty new name
+    - a name with a slash or a backslash, because the backups file an
+      attachment under `item-attachments/<itemId>/<fileName>`
+    - the name it has now
+    - the name of another attachment of the item (`the item has another
+      attachment named "NAME"`)
 
   Names are compared ignoring case (`str.casefold`). So a download of both to
   a file system that ignores case never overwrites one with the other.
@@ -1575,27 +1579,27 @@ refuse it like every other operation on the note.
   tabs that save templates or datatypes would otherwise lose each other's
   change. A save of the whole section would undo another save built on the
   same base. These are the changes per section:
-  - `generator` has `{"op": "setDefault", "options"}`, `{"op": "setItem",
-    "itemId", "options"}` and `{"op": "removeItem", "itemId"}`.
-  - `toFill` has `{"op": "addColumn", "itemId", "column", "since"}`, with
-    `since` only for a new entry. It also has `{"op": "removeColumn",
-    "itemId", "column"}`, and the entry goes with its last column.
-  - `templates` are known by name because they have no id. `{"op":
-    "addTemplate", "template"}` puts a template last in the list and is
-    refused when the name is taken ignoring case. `{"op": "setTemplate",
-    "template"}` replaces a template in its place. `{"op": "renameTemplate",
-    "name", "to"}` renames one and `{"op": "removeTemplate", "name"}` removes
-    one.
-  - `{"op": "moveTemplate", "name", "index"}` moves a template. A larger index
-    means the last place, since the first of several matches wins. A change
-    that names a template which a save before it renamed or deleted fails its
-    entry. It never writes the old template back.
-  - `datatypes` are known by id. `{"op": "addDatatype", "datatype"}` carries
-    the id given when it is queued. `{"op": "setDatatype", "datatype"}` fails
-    its entry when the datatype is gone. `{"op": "removeDatatype", "id"}` does
-    nothing when it is gone already. It is refused while a template of the
-    note as it is then uses the datatype.
-  - `note` has `{"op": "setName", "name"}` with a name that is not empty.
+    - `generator` has `{"op": "setDefault", "options"}`, `{"op": "setItem",
+      "itemId", "options"}` and `{"op": "removeItem", "itemId"}`.
+    - `toFill` has `{"op": "addColumn", "itemId", "column", "since"}`, with
+      `since` only for a new entry. It also has `{"op": "removeColumn",
+      "itemId", "column"}`, and the entry goes with its last column.
+    - `templates` are known by name because they have no id. `{"op":
+      "addTemplate", "template"}` puts a template last in the list and is
+      refused when the name is taken ignoring case. `{"op": "setTemplate",
+      "template"}` replaces a template in its place. `{"op": "renameTemplate",
+      "name", "to"}` renames one and `{"op": "removeTemplate", "name"}` removes
+      one.
+    - `{"op": "moveTemplate", "name", "index"}` moves a template. A larger index
+      means the last place, since the first of several matches wins. A change
+      that names a template which a save before it renamed or deleted fails its
+      entry. It never writes the old template back.
+    - `datatypes` are known by id. `{"op": "addDatatype", "datatype"}` carries
+      the id given when it is queued. `{"op": "setDatatype", "datatype"}` fails
+      its entry when the datatype is gone. `{"op": "removeDatatype", "id"}` does
+      nothing when it is gone already. It is refused while a template of the
+      note as it is then uses the datatype.
+    - `note` has `{"op": "setName", "name"}` with a name that is not empty.
 - Every item id is followed through the conversions that this session
   committed (`convertItem`, `moveToPersonal` and an `applyTemplate` that
   changes the type). So a change queued before a conversion and committed
@@ -1608,11 +1612,11 @@ refuse it like every other operation on the note.
   does not.
 - The changes are checked against their section. The section they leave is
   checked as a whole by its parser. Both checks run at these points:
-  - when the changes are queued, on the note as the saves under way of every
-    section leave it (422)
-  - in the check before the backup, where such an entry fails and the rest
-    goes on
-  - at write time
+    - when the changes are queued, on the note as the saves under way of every
+      section leave it (422)
+    - in the check before the backup, where such an entry fails and the rest
+      goes on
+    - at write time
 - Saves of a section may be pending or being committed. Every read of that
   section then applies all of them over the note in queue order, the same way
   the writes will. Such reads are the routes that say `saving`, the base of
@@ -1633,13 +1637,13 @@ refuse it like every other operation on the note.
   equal to one of the item's own secret leaves may not go into a non-secret
   column of that item. A value for a secret column may not equal a plain
   value of the item. Both are checked at these points:
-  - at `POST /api/queue` on the item with the earlier operations of the
-    request applied. Its pending `setLeaf` and `removeLeaf` entries are
-    applied too. So are its pending `generateLeaf`, `setUris` and
-    `renameField` entries.
-  - in the write path's check with the earlier operations of the batch
-    applied
-  - at write time on the `GET` of the item
+    - at `POST /api/queue` on the item with the earlier operations of the
+      request applied. Its pending `setLeaf` and `removeLeaf` entries are
+      applied too. So are its pending `generateLeaf`, `setUris` and
+      `renameField` entries.
+    - in the write path's check with the earlier operations of the batch
+      applied
+    - at write time on the `GET` of the item
 
   The same rule refuses a `moveToFolder` whose folder name equals a secret
   value of a moved item. At write time it refuses a `generateLeaf` whose
@@ -1761,22 +1765,22 @@ The folder is found by name or created.
 - These are refused (422) before anything is written, at `POST /api/queue`
   and in MCP as in the write path. Each message names the column and never
   the value.
-  - a secret column in `values` (`COLUMN is secret: a new item never takes a
-    secret value, fill it in the grid after it is created`)
-  - a column in `secretValues` that is not secret, an empty one or `name`
-  - a column that is also generated
-  - a value in `secretValues` that equals the name, the folder or one of the
-    `values` (a generated value that does is refused at write time)
-  - `generatePassword` on another type than a login
-  - a column in `generateColumns` that takes no generated value or is also in
-    `values`
-  - an unknown type or template, or both or neither of `type` and `template`
-  - an empty name or `name` among the values
-  - an unknown organization, an organization without collections or
-    collections without one
-  - a column that does not exist for the type
-  - a personal secure note named `bwtidy` or one whose `notes` hold a `note`
-    section with its own name, since either would be taken for the tool note
+    - a secret column in `values` (`COLUMN is secret: a new item never takes a
+      secret value, fill it in the grid after it is created`)
+    - a column in `secretValues` that is not secret, an empty one or `name`
+    - a column that is also generated
+    - a value in `secretValues` that equals the name, the folder or one of the
+      `values` (a generated value that does is refused at write time)
+    - `generatePassword` on another type than a login
+    - a column in `generateColumns` that takes no generated value or is also in
+      `values`
+    - an unknown type or template, or both or neither of `type` and `template`
+    - an empty name or `name` among the values
+    - an unknown organization, an organization without collections or
+      collections without one
+    - a column that does not exist for the type
+    - a personal secure note named `bwtidy` or one whose `notes` hold a `note`
+      section with its own name, since either would be taken for the tool note
 
 ## The tool note
 
@@ -1798,11 +1802,11 @@ it.
 - bwtidy finds the note by its id. It remembers the id in the `settings`
   table (key `tool_note_id`) whenever it finds or creates the note. The lookup
   tries these in turn:
-  - the remembered id, as long as it is a personal secure note whatever its
-    name is now
-  - the name `bwtidy`
-  - a personal secure note whose `note` section holds its own name, found
-    after a reinstall or by another bwtidy
+    - the remembered id, as long as it is a personal secure note whatever its
+      name is now
+    - the name `bwtidy`
+    - a personal secure note whose `note` section holds its own name, found
+      after a reinstall or by another bwtidy
 
   Every user of the note goes through that one lookup. A login creates a note
   only when none of them finds one. A rename in another app would otherwise
@@ -1812,11 +1816,11 @@ it.
   /api/queue` too. The answer is 422 `the bwtidy note is managed by bwtidy,
   edit the templates on the Types page`. The only exceptions are bwtidy's own
   writes:
-  - a section save, which is a `ui` queue entry of `setToolNoteSection` that
-    carries the permission with it so that the commit passes it on for that
-    entry alone
-  - Rename it back
-  - Keep this name
+    - a section save, which is a `ui` queue entry of `setToolNoteSection` that
+      carries the permission with it so that the commit passes it on for that
+      entry alone
+    - Rename it back
+    - Keep this name
 
   These say so explicitly in their call to the write path, which never judges
   by the column. The backup password updates write the note directly through
@@ -1834,18 +1838,18 @@ parser is in `sections/generator.py`.
 
 - OPTIONS are the options of Bitwarden's own generator. They are one of these
   two:
-  - `{"type": "password", "length", "uppercase", "lowercase", "number",
-    "special", "minNumber", "minSpecial", "ambiguous"}`, where `ambiguous`
-    true avoids ambiguous characters like `bw generate --ambiguous`
-  - `{"type": "passphrase", "words", "separator", "capitalize",
-    "includeNumber"}`
+    - `{"type": "password", "length", "uppercase", "lowercase", "number",
+      "special", "minNumber", "minSpecial", "ambiguous"}`, where `ambiguous`
+      true avoids ambiguous characters like `bw generate --ambiguous`
+    - `{"type": "passphrase", "words", "separator", "capitalize",
+      "includeNumber"}`
 - These are the limits:
-  - a length of 5 to 128
-  - 3 to 20 words
-  - `minNumber` and `minSpecial` of 0 to 9
-  - at least one character class
-  - a separator of one character or none, stored as the character or `""`
-    for none and sent to `bw` as `space` and `empty` where needed
+    - a length of 5 to 128
+    - 3 to 20 words
+    - `minNumber` and `minSpecial` of 0 to 9
+    - at least one character class
+    - a separator of one character or none, stored as the character or `""`
+      for none and sent to `bw` as `space` and `empty` where needed
 
   The minimums have to fit the length, since `bw` would silently make the
   password longer than asked. An item's own setting is often there for an app
@@ -1918,9 +1922,9 @@ fields empty. So secret fields are left for the user, and the list reminds
 them.
 
 - These add to the list:
-  - a `createItem` or `applyTemplate` committed from the queue, both from
-    `ui` entries and from `mcp` entries the user approved
-  - a cell that the user marks
+    - a `createItem` or `applyTemplate` committed from the queue, both from
+      `ui` entries and from `mcp` entries the user approved
+    - a cell that the user marks
 - A `createItem` from a template lists the template's required secret
   coordinates. An optional one may stay empty, and a field name pattern names
   no column.
@@ -1933,11 +1937,11 @@ them.
 - A write through `POST /api/operations` adds nothing. Adding never fails the
   write it follows, and a list that cannot be queued is only logged.
 - After every load of the vault in RAM the list is pruned. These are dropped:
-  - a column that has a value now, filled in bwtidy or in any Bitwarden app
-  - a column that the item no longer has as a secret
-  - an entry with no column left
-  - an item that is gone or in the trash
-  - the tool note
+    - a column that has a value now, filled in bwtidy or in any Bitwarden app
+    - a column that the item no longer has as a secret
+    - an entry with no column left
+    - an item that is gone or in the trash
+    - the tool note
 
   Checking a value only asks whether it is empty. It never logs or copies the
   value.
@@ -2049,10 +2053,10 @@ flowchart TD
 - A backup carries a fingerprint. That is a sha256 hex over what the backup
   covers, computed from the listings it stores so that the order does not
   matter. These are its parts:
-  - every item's `id` and `revisionDate`
-  - every item's `folderId`, `favorite` and `organizationId`
-  - every item's `collectionIds` and attachment ids
-  - the folders, collections and organizations as whole JSON
+    - every item's `id` and `revisionDate`
+    - every item's `folderId`, `favorite` and `organizationId`
+    - every item's `collectionIds` and attachment ids
+    - the folders, collections and organizations as whole JSON
 
   An attachment's `url` carries a token that differs between two listings.
   The rest of an item is fixed by its `revisionDate`. Only the folder, the
@@ -2156,12 +2160,12 @@ flowchart TD
 - `DELETE /api/backups/{name}` deletes one backup and its fingerprint under
   the backup lock. It drops the backup's decrypted copy from RAM too. These are
   refused with 409:
-  - the newest backup, since the next write may reuse it
-  - the backup that a running write selected
-  - a backup that a pending or approved `restoreItems` or `restoreFolder`
-    reads
-  - a backup that a failed queue entry's result names (dismiss the entry
-    first)
+    - the newest backup, since the next write may reuse it
+    - the backup that a running write selected
+    - a backup that a pending or approved `restoreItems` or `restoreFolder`
+      reads
+    - a backup that a failed queue entry's result names (dismiss the entry
+      first)
 
   The backups are the user's to prune.
 - The retention runs after each new backup. It deletes a backup that is not
@@ -2247,12 +2251,12 @@ and the tests prove that a backup brings the data back.
   `folderId` or a collection id that it does not have. Without this a restore
   after a deleted folder or collection would fail, half done in the case of
   the collection.
-  - A folder that the vault lacks becomes the first folder of that name or is
-    created. Without a name in the backup the item goes without a folder.
-  - A collection that the organization lacks becomes the collection of that
-    name there, or else it is left out.
-  - An item whose collections are all gone keeps the ones it has now. One that
-    has none (created anew or moved back in) fails with that reason.
+    - A folder that the vault lacks becomes the first folder of that name or is
+      created. Without a name in the backup the item goes without a folder.
+    - A collection that the organization lacks becomes the collection of that
+      name there, or else it is left out.
+    - An item whose collections are all gone keeps the ones it has now. One that
+      has none (created anew or moved back in) fails with that reason.
 - Whether an item that is not active is in the trash or gone comes from the
   trash listing that the vault in RAM loads with the items. It is asked of `bw
   serve` again right before the item is brought back.
@@ -2268,14 +2272,14 @@ and the tests prove that a backup brings the data back.
   each get their own files.
 - These are refused with 422 before anything is written, at `POST /api/queue`
   and in the write path alike:
-  - the tool note among the ids, since it holds the backup password (the
-    templates are restored by saving them on the Types page)
-  - a backup that does not exist or does not decrypt with the session's
-    password
-  - an empty `itemIds`
-  - an item that is active now but was not when the restore was planned, as
-    its `revisionDate` was never checked
-  - an item to create anew whose attachment the backup lacks
+    - the tool note among the ids, since it holds the backup password (the
+      templates are restored by saving them on the Types page)
+    - a backup that does not exist or does not decrypt with the session's
+      password
+    - an empty `itemIds`
+    - an item that is active now but was not when the restore was planned, as
+      its `revisionDate` was never checked
+    - an item to create anew whose attachment the backup lacks
 
   Creating the item without an attachment or with another item's attachment
   would be silent data loss.
@@ -2292,11 +2296,11 @@ and the tests prove that a backup brings the data back.
   not mark the row it undid.
 - `restoreFolder {backup, folderId, changeLogId?}` puts a folder back as the
   backup's `raw/folders.json` holds it:
-  - A folder that exists gets that name again ("rename back to "NAME"").
-  - A folder that is gone is created again with a new id ("create again as
-    "NAME"").
-  - Nothing happens to a folder that has the name already. Nothing happens to
-    a gone one either when a folder of that name exists ("leave as it is").
+    - A folder that exists gets that name again ("rename back to "NAME"").
+    - A folder that is gone is created again with a new id ("create again as
+      "NAME"").
+    - Nothing happens to a folder that has the name already. Nothing happens to
+      a gone one either when a folder of that name exists ("leave as it is").
 
   It is refused (422) for a backup that holds no folder with the id and for a
   rename back to a name that another folder has now. The rename back passes
@@ -2539,12 +2543,12 @@ what it stores:
 - `PUT /api/settings/display` takes any of the three and answers like the
   `GET`. It saves only what it got, so changing one never resets the others.
   These get 422:
-  - an unknown format
-  - a `hideToolNote` that is not a boolean
-  - a `rareFieldsMax` that is not a whole number from 0 to 99, which must be a
-    JSON integer and not a string or a boolean
-  - a field set to null
-  - a body with none of the fields
+    - an unknown format
+    - a `hideToolNote` that is not a boolean
+    - a `rareFieldsMax` that is not a whole number from 0 to 99, which must be a
+      JSON integer and not a string or a boolean
+    - a field set to null
+    - a body with none of the fields
 - The password generator's default lives in the tool note. Its routes are
   there too (see The tool note, The `generator` section).
 
@@ -2575,13 +2579,13 @@ keep. Both act on the logged in account alone.
   and the header `X-Bwtidy-Request: 1` (403 without it), like `POST
   /api/bw-logout`. It takes `{"pending": "write" | "drop" | null}`. These are
   its answers:
-  - 409 `{"pending": N, "mcpPending": M}` when entries are pending and
-    `pending` is null
-  - 409 with the failure when Write first could not write
-  - 409 `{"detail": ...}` while a commit is running
-  - otherwise 200 `{"backups": ..., "changeLog": ..., "queue": ...,
-    "keptBackups": [...]}` with the counts deleted and the backups kept for a
-    pending restore proposal
+    - 409 `{"pending": N, "mcpPending": M}` when entries are pending and
+      `pending` is null
+    - 409 with the failure when Write first could not write
+    - 409 `{"detail": ...}` while a commit is running
+    - otherwise 200 `{"backups": ..., "changeLog": ..., "queue": ...,
+      "keptBackups": [...]}` with the counts deleted and the backups kept for a
+      pending restore proposal
 - `POST /api/account/delete` takes the same body and answers the same 409s.
   On success it deletes everything, with Write first the pending MCP
   proposals too. Then it writes the marker `app/delete-requested` and logs the
@@ -2624,19 +2628,23 @@ describe the About page and the More actions menu.
 - Every direct dependency has an entry under Thanks in
   `frontend/src/about/credits.ts` with the license that its package names.
   The direct dependencies are the `dependencies` of `frontend/package.json`
-  and of `backend/pyproject.toml`. The tools that bwtidy is built and tested
-  with stand beside them.
+  and of `backend/pyproject.toml` and the packages bundled in the docs. The
+  tools that bwtidy is built and tested with stand beside them.
 - The table of every package comes from `frontend/src/about/thirdParty.json`.
-  `scripts/third-party` writes it from the lock files, and it is committed.
+  `scripts/third-party` writes it from the lock files and the packages
+  bundled in the docs, and it is committed.
   These are the packages it holds:
-  - from npm every package of `frontend/package-lock.json` that is not a dev
-    package, with the project itself left out
-  - from PyPI every package that `uv export --no-dev` names, with one for
-    another platform (like `pywin32`) left out
-  - `zensical-ui` from the dependency group `docs`, the theme of the docs
-    site that the image serves at `/docs/`
-  - the npm packages that the theme's script bundles and each of its icon
-    sets that the site draws
+    - from npm every package of `frontend/package-lock.json` that is not a dev
+      package, with the project itself left out
+    - from PyPI every package that `uv export --no-dev` names, with one for
+      another platform (like `pywin32`) left out
+    - the packages whose files the repo holds as they are, which no lock file
+      names (`BUNDLED` in the script). That is IBM Plex Mono, the code font of
+      the docs site, in `docs/assets/fonts/ibm-plex-mono/` with its license.
+    - `zensical-ui` from the dependency group `docs`, the theme of the docs
+      site that the image serves at `/docs/`
+    - the npm packages that the theme's script bundles and each of its icon
+      sets that the site draws
 - An icon set comes with `zensical-ui` as its ecosystem and the version of
   `zensical-ui`. Its license comes from the script's table of the sets'
   license files. The site draws a set when the theme's stylesheets or scripts
@@ -2893,10 +2901,10 @@ in the name of an ordinary field coordinate stays a literal character.
 - The operation `applyTemplate` takes `itemId`, `revisionDate` and
   `template` by name along with a `mapping` `{template column: source
   column}`. Every target must be a coordinate of the template.
-  - With the same type the mapped values move and unmapped leaves stay. A
-    custom field source is removed, a built-in source is cleared and `name`
-    stays.
-  - With another type it is a `convertItem` with the same mapping.
+    - With the same type the mapped values move and unmapped leaves stay. A
+      custom field source is removed, a built-in source is cleared and `name`
+      stays.
+    - With another type it is a `convertItem` with the same mapping.
 - Either way every template field that the item lacks is created empty with
   the template's field type. An optional one is created too, so the item shows
   the slot. A new target field gets the template's field type.
@@ -3008,11 +3016,11 @@ editor.
 - `GET /api/datatypes` answers `{"datatypes": [...], "saving": bool}` and
   `error` when the section cannot be read. While a save is under way it lists
   what that save holds. Each datatype has these keys:
-  - the stored keys
-  - `wholeValue` always, as true or false
-  - the pattern facts `states`, `maxRepeat` and `shortest` (null when
-    broken)
-  - `broken` with the reason or null
+    - the stored keys
+    - `wholeValue` always, as true or false
+    - the pattern facts `states`, `maxRepeat` and `shortest` (null when
+      broken)
+    - `broken` with the reason or null
 - `PUT /api/datatypes` with `{"changes": [...]}` changes single datatypes by
   id (see `setToolNoteSection` in Writes). It validates the changes on the
   datatypes as the saves under way leave them. A failure is a 422 and nothing
@@ -3055,14 +3063,14 @@ engine (`patterns.py`).
 - `statistics.py` keeps one collector per worker process on the vault cache.
   For every item, column and datatype that the scoring reached it keeps the
   last scoring. That is these facts:
-  - the item name and the column
-  - the datatype's name and its pattern facts (`states`, `maxRepeat` and
-    `shortest`)
-  - the length of the value after NFC
-  - the distance
-  - the most copies used per counted repetition
-  - the steps and the time it took
-  - whether it was too long
+    - the item name and the column
+    - the datatype's name and its pattern facts (`states`, `maxRepeat` and
+      `shortest`)
+    - the length of the value after NFC
+    - the distance
+    - the most copies used per counted repetition
+    - the steps and the time it took
+    - whether it was too long
 - A column with several values (`login.uris`) has one row. It holds the
   longest length, the distance that counts and the most copies. The steps
   and the time are summed. A column without a value has no row.
@@ -3110,9 +3118,9 @@ client](how-to/mcp.md) covers the switch and the token.
   `mcpEnabled`. The switch is off after every login.
 - Turning it on needs a token that exists and has not expired. Otherwise the
   answer is 409 with one of these:
-  - `{"detail": "Create an MCP token first: MCP token menu, Create."}`
-  - `{"detail": "The MCP token has expired. Replace it first: MCP token menu,
-    Replace."}`
+    - `{"detail": "Create an MCP token first: MCP token menu, Create."}`
+    - `{"detail": "The MCP token has expired. Replace it first: MCP token menu,
+      Replace."}`
 
   Turning it off always works.
 - While MCP is disabled or locked every tool returns the text "bwtidy MCP is
@@ -3137,9 +3145,9 @@ client](how-to/mcp.md) covers the switch and the token.
 - Only the token's sha256 is stored. It goes into `mcp-token.sha256` in the
   data directory, written atomically with mode 0600. Each line ends in a
   newline. These are the lines:
-  - the hex
-  - the expiry, which is a UTC ISO timestamp or `never`
-  - the creation time, since not every copy keeps the file's own time
+    - the hex
+    - the expiry, which is a UTC ISO timestamp or `never`
+    - the creation time, since not every copy keeps the file's own time
 - `DELETE /api/mcp/token` needs the session, removes the file and answers 204.
   `GET /api/mcp/token` answers `{"createdAt", "expiresAt", "lastUsedAt"}` and
   404 without a token. It never answers the token or its hash.
@@ -3253,10 +3261,10 @@ client](how-to/mcp.md) covers the switch and the token.
 - `propose_create_item` proposes a `createItem` with `generate_secrets` as its
   `generateColumns`. MCP never gives a secret value and has two choices per
   secret field:
-  - Left blank it counts as not set in the fill scores and goes on the To fill
-    in list.
-  - Generated at write time it is a value that MCP can never read. The fill
-    scores count it as set and nothing more.
+    - Left blank it counts as not set in the fill scores and goes on the To fill
+      in list.
+    - Generated at write time it is a value that MCP can never read. The fill
+      scores count it as set and nothing more.
 - A type `sshKey` or a template of type 5 is refused at once. The private key
   is a secret that MCP never gives, so the item could only fail with "SSH key
   private key is required". The message points to `propose_convert_item` on an
@@ -3311,6 +3319,8 @@ digraph {
 }
 ```
 
+<!-- markdownlint-disable MD038 -->
+
 - An entry stays `approved` only while its commit runs. It is `applied` as
   soon as its own write is done, before the rest of its batch is written.
 - Agent proposals wait for the user, who approves or rejects them one by one
@@ -3350,12 +3360,12 @@ digraph {
 - `GET /api/queue?status=...` lists the entries in id order with the
   operation, the result and a diff. The diff has one row per changed cell. A
   row has `itemId` and `itemName` with its `column`, `before` and `after`.
-  - A secret value shows as `{"masked": true}` and a missing value as null.
-  - A trashed item shows as the pseudo column `trash` that goes from false to
-    true.
-  - A `createItem` has one row per value it gives with `before` null and
-    `itemId` null. When a password is generated it also has a
-    `login.password` row that goes to `(generated)`.
+    - A secret value shows as `{"masked": true}` and a missing value as null.
+    - A trashed item shows as the pseudo column `trash` that goes from false to
+      true.
+    - A `createItem` has one row per value it gives with `before` null and
+      `itemId` null. When a password is generated it also has a
+      `login.password` row that goes to `(generated)`.
 - A pending entry's diff is computed against the vault now, and `diffError`
   says why when the operation no longer fits. A decided entry keeps the diff
   it was decided on. `valueGone` is true for a failed entry whose hidden value
@@ -3381,14 +3391,14 @@ digraph {
   as one batch with the same answer. A write failure (`writeFailed`) and an
   `invalid` entry are retried as they are.
 - These are refused with 409, and nothing is retried then:
-  - an entry that is not failed
-  - one cut off during its commit (`interrupted`), since its write may be
-    done
-  - a merge conflict, which needs a choice per item (the merge is proposed
-    again with one)
-  - one whose value is gone after a restart
-  - a conflict without `"overwrite": true`
-  - a conflict whose item or folder is gone
+    - an entry that is not failed
+    - one cut off during its commit (`interrupted`), since its write may be
+      done
+    - a merge conflict, which needs a choice per item (the merge is proposed
+      again with one)
+    - one whose value is gone after a restart
+    - a conflict without `"overwrite": true`
+    - a conflict whose item or folder is gone
 
   No ids or an unknown one are a 422.
 - With overwrite a conflict is retried after a sync. Its `revisionDate`s and
@@ -3397,12 +3407,12 @@ digraph {
   over the change made elsewhere, and the item's other values stay as they
   are now. The backup of that write holds the other value. These are the shown
   values:
-  - `shownFolderIds`
-  - `shownFavorite`
-  - `shownCollectionIds`
-  - `shownUris`
-  - `shownFileName`
-  - a folder's `shownName`
+    - `shownFolderIds`
+    - `shownFavorite`
+    - `shownCollectionIds`
+    - `shownUris`
+    - `shownFileName`
+    - a folder's `shownName`
 - A failed entry's hidden value does not outlive its worker. Every start first
   fails the entries left approved. Right after that each failed entry with an
   encrypted value gets the marker `(gone after a restart)` in place of the
@@ -3420,6 +3430,8 @@ digraph {
   account's ids start from 1. A tab shown for 4 seconds without interruption
   marks its entries as seen. The backend knows nothing of what was read.
 
+<!-- markdownlint-enable MD038 -->
+
 ### Auto-commit
 
 - The backend commits all pending `ui` entries as one approve with one backup
@@ -3435,17 +3447,17 @@ digraph {
   `conflicts` or `mergeConflicts`, or else `invalid` or `writeFailed`.
 - `GET /api/queue/auto-commit` answers `{"afterSeconds", "maxEntries",
   "pending", "committing", "nextCommitAt", "commitCount", "phase"}`:
-  - `pending` counts the pending `ui` entries.
-  - `committing` is true for the whole commit (the reload included) and also
-    for an approval.
-  - `nextCommitAt` is an ISO time or null.
-  - `commitCount` is the number of commits and approvals that ended since the
-    worker started, but not one that left its entries pending. The frontend
-    watches it to reload after one.
-  - `phase` says what the write path does. Its values are `syncing` and
-    `backingUp` as well as `writing` (with `done` and `total`) and
-    `reloading`. It is null while no write path runs. A commit can take a
-    while and the user sees where it is.
+    - `pending` counts the pending `ui` entries.
+    - `committing` is true for the whole commit (the reload included) and also
+      for an approval.
+    - `nextCommitAt` is an ISO time or null.
+    - `commitCount` is the number of commits and approvals that ended since the
+      worker started, but not one that left its entries pending. The frontend
+      watches it to reload after one.
+    - `phase` says what the write path does. Its values are `syncing` and
+      `backingUp` as well as `writing` (with `done` and `total`) and
+      `reloading`. It is null while no write path runs. A commit can take a
+      while and the user sees where it is.
 - `PUT /api/queue/auto-commit` with `{"afterSeconds", "maxEntries"}` saves
   them in the `settings` table. `afterSeconds` takes 1 to 3600 and
   `maxEntries` 1 to 1000, and other values get 422.
@@ -3507,12 +3519,12 @@ digraph {
   is masked in the operation and the diff. The result is `{"error":
   "secretValue", "detail": ...}`. The agent's value and reason are not stored
   in plain. These are the summaries:
-  - `Refused proposal for "<item name>": it would put a secret value of the
-    item into <column>`
-  - for several items `Refused proposal for N items: it would put a secret
-    value of an item into folder`
-  - for a folder `Refused proposal for the folder "NAME": it would put a
-    secret value of an item in it into its name`
+    - `Refused proposal for "<item name>": it would put a secret value of the
+      item into <column>`
+    - for several items `Refused proposal for N items: it would put a secret
+      value of an item into folder`
+    - for a folder `Refused proposal for the folder "NAME": it would put a
+      secret value of an item in it into its name`
 - The agent gets the entry id and the same summary that it would get for an
   accepted proposal. No answer, error or timing may depend on whether a value
   that the agent chose equals a secret. Otherwise a refusal would confirm a

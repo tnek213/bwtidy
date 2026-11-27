@@ -217,3 +217,13 @@ def test_the_committed_list_holds_the_docs_theme_and_its_icon_sets_only():
     assert ("simple", "zensical-ui") not in committed
     names = {name for name, _ in committed}
     assert not names & {"zensical", "resvg-py", "pymdown-extensions"}
+
+
+def test_the_bundled_font_is_listed_and_ships_with_its_license():
+    names = {(p["name"], p["version"]) for p in third_party.collect()}
+    for package in third_party.BUNDLED:
+        assert (package["name"], package["version"]) in names
+    files = {path.name for path in third_party.BUNDLED_FONT.iterdir()}
+    assert files == {"IBMPlexMono-Regular.woff2", "IBMPlexMono-Bold.woff2", "LICENSE.txt"}
+    license = (third_party.BUNDLED_FONT / "LICENSE.txt").read_text()
+    assert "SIL Open Font License, Version 1.1" in license

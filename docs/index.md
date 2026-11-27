@@ -2,7 +2,8 @@
 
 ## Bring order to a messy vault
 
-<!-- intro: the same text in README.md and docs/index.md -->
+<!-- intro: the same text in README.md, docs/index.md and
+docker/hub-overview.md -->
 
 Password vaults get inconsistent over time. Some items use `Password` while
 others use `password`. Some web addresses include a protocol prefix and others
@@ -20,9 +21,10 @@ secret values. You review each proposal and decide whether to accept it. Only
 accepted proposals are written to your vault.
 
 Before each write of your changes bwtidy saves a backup of the whole vault.
-The backup is an age-encrypted ZIP stored in bwtidy's backups volume. You can restore it with
-standard tools. Your vault stays on your Bitwarden or Vaultwarden server.
-bwtidy reads and writes vault data through Bitwarden's official CLI.
+The backup is an age-encrypted ZIP stored in bwtidy's backups volume. You can
+restore it with standard tools. Your vault stays on your Bitwarden or
+Vaultwarden server. bwtidy reads and writes vault data through Bitwarden's
+official CLI.
 
 bwtidy is for people who want their Bitwarden or Vaultwarden vault to follow
 standards they define themselves. It helps them apply those standards
@@ -50,9 +52,9 @@ New to bwtidy? [Run it](how-to/run.md) first and then follow
   machine. It reads and writes your vault through `bw`, Bitwarden's official
   CLI.
 - **A backup before your changes are written.** bwtidy saves a backup of the
-  whole vault before each write of your changes. The backup is a ZIP encrypted with age using your master
-  password as the passphrase. It lives in bwtidy's backups volume and can be
-  restored with standard tools without bwtidy.
+  whole vault before each write of your changes. The backup is a ZIP encrypted
+  with age using your master password as the passphrase. It lives in bwtidy's
+  backups volume and can be restored with standard tools without bwtidy.
 - **Your master password.** It remains in memory while you are logged in and is
   wiped when you log out. It is also wiped two minutes after you close the last
   tab or after two hours without activity. Both timings are defaults. A copy is

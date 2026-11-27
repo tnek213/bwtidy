@@ -3,9 +3,10 @@
 import re
 import tomllib
 from pathlib import Path
+from typing import Literal
 from urllib.parse import parse_qs, urlsplit
 
-from playwright.sync_api import Page, Request, Response, expect
+from playwright.sync_api import Locator, Page, Request, Response, expect
 
 from bwtidy.version import semver
 
@@ -93,17 +94,20 @@ def test_the_content_column_is_wide_and_keeps_inline_code_on_one_line(page: Page
 
 
 def test_running_text_wraps_at_a_readable_length_while_pictures_use_the_column(page: Page):
+    page.set_viewport_size({"width": 1600, "height": 900})
     page.goto("/docs/tutorial/first-cleanup/")
     column = page.locator("article").evaluate("e => e.getBoundingClientRect().width")
-    ## the longest line a paragraph may hold, measured in the paragraph's own font
+    ## the longest line a paragraph may hold (72ch), measured in the paragraph's own font without
+    ## the theme's letter spacing, which ch leaves out
     limit = page.locator("article p").first.evaluate(
-        "p => { const s = document.createElement('span'); s.textContent = '0'.repeat(80);"
-        " p.appendChild(s); const w = s.getBoundingClientRect().width; s.remove(); return w }"
+        "p => { const s = document.createElement('span'); s.textContent = '0'.repeat(72);"
+        " s.style.letterSpacing = 'normal'; p.appendChild(s);"
+        " const w = s.getBoundingClientRect().width; s.remove(); return w }"
     )
     text = page.locator("article p:not(:has(img))")
     assert text.count() > 3
     widest = max(text.evaluate_all("ps => ps.map(p => p.getBoundingClientRect().width)"))
-    assert widest <= limit * 1.01
+    assert limit * 0.97 <= widest <= limit * 1.01
     assert widest < column - 150
     picture = page.locator("article p:has(img)").first
     assert picture.evaluate("p => p.getBoundingClientRect().width") > column - 50
@@ -297,3 +301,101 @@ def test_the_header_shows_the_version_without_asking_github(page: Page):
     source = page.locator(".md-header .md-source")
     expect(source).to_have_attribute("href", "https://github.com/tnek213/bwtidy")
     expect(source.locator(".md-source__fact--version")).to_have_text(VERSION)
+
+
+## the contrast of an element's color property (color or outlineColor) against the background it
+## stands on: the backgrounds of it and its ancestors laid over each other, down to the first opaque
+## one, and a see-through color laid over that background (WCAG 2.2, relative luminance)
+CONTRAST = """([element, property]) => {
+    const parse = (color) => {
+        const parts = color.match(/[\\d.]+/g).map(Number)
+        return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1]
+    }
+    const over = (top, bottom) =>
+        [0, 1, 2].map((i) => top[i] * top[3] + bottom[i] * (1 - top[3])).concat(1)
+    const layers = []
+    for (let node = element; node; node = node.parentElement) {
+        const color = parse(getComputedStyle(node).backgroundColor)
+        if (color[3] > 0) layers.unshift(color)
+        if (color[3] >= 1) break
+    }
+    const background = layers.reduce((below, color) => over(color, below), [255, 255, 255, 1])
+    const foreground = over(parse(getComputedStyle(element)[property]), background)
+    const luminance = (color) => {
+        const [r, g, b] = color.slice(0, 3).map((value) => {
+            const c = value / 255
+            return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+        })
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+    const [light, dark] = [luminance(foreground), luminance(background)].sort((a, b) => b - a)
+    return (light + 0.05) / (dark + 0.05)
+}"""
+## the browser's color scheme and the theme's name for it
+SCHEMES: list[tuple[Literal["light", "dark"], str]] = [("light", "default"), ("dark", "slate")]
+
+
+def contrast(locator: Locator, prop: str = "color") -> float:
+    return locator.evaluate(f"element => ({CONTRAST})([element, {prop!r}])")
+
+
+def test_text_links_and_the_selected_page_are_readable_in_both_schemes(page: Page):
+    for scheme, name in SCHEMES:
+        page.emulate_media(color_scheme=scheme)
+        page.goto("/docs/how-to/run/")
+        expect(page.locator("body")).to_have_attribute("data-md-color-scheme", name)
+        text = page.locator("article p").first
+        link = page.locator("article p a").first
+        selected = page.locator(".md-nav--primary a.md-nav__link--active", has_text="Run bwtidy")
+        expect(selected).to_be_visible()
+        assert contrast(text) >= 4.5, scheme
+        assert contrast(link) >= 4.5, scheme
+        assert contrast(selected) >= 4.5, scheme
+
+
+def test_a_focused_link_has_an_outline_that_stands_out_in_both_schemes(page: Page):
+    for scheme, _ in SCHEMES:
+        page.emulate_media(color_scheme=scheme)
+        page.goto("/docs/how-to/run/")
+        focused = page.locator(":focus")
+        ## by the keyboard, as the theme draws the outline for keyboard focus only
+        for _ in range(60):
+            page.keyboard.press("Tab")
+            if focused.evaluate("e => e.matches('article p a')"):
+                break
+        assert focused.evaluate("e => e.matches('article p a')"), scheme
+        assert focused.evaluate("e => getComputedStyle(e).outlineStyle") != "none", scheme
+        assert contrast(focused, "outlineColor") >= 3, scheme
+
+
+def test_code_is_drawn_in_ibm_plex_mono_from_the_site_itself(page: Page):
+    fonts: list[str] = []
+    page.on("request", lambda r: fonts.append(r.url) if r.resource_type == "font" else None)
+    page.goto("/docs/how-to/run/")
+    code = page.locator("article pre code").first
+    expect(code).to_be_visible()
+    family = code.evaluate("c => getComputedStyle(c).fontFamily")
+    assert family.startswith('"IBM Plex Mono"')
+    page.wait_for_function(
+        "() => [...document.fonts].some(f => f.family.replaceAll('\"', '') === 'IBM Plex Mono'"
+        " && f.status === 'loaded')"
+    )
+    host = urlsplit(page.url).netloc
+    assert fonts
+    assert all(
+        urlsplit(url).netloc == host and "/docs/assets/fonts/ibm-plex-mono/" in url for url in fonts
+    )
+
+
+def test_the_footer_credits_zensical_and_the_diataxis_framework(page: Page):
+    page.goto("/docs/")
+    footer = page.locator(".md-footer .md-copyright")
+    text = footer.evaluate("e => e.textContent.replace(/\\s+/g, ' ').trim()")
+    assert text == ("Made with Zensical · Documentation organized with the Diátaxis framework.")
+    zensical = footer.get_by_role("link", name="Zensical", exact=True)
+    expect(zensical).to_have_attribute("href", "https://zensical.org")
+    diataxis = footer.get_by_role("link", name="Diátaxis framework", exact=True)
+    expect(diataxis).to_have_attribute("href", "https://diataxis.fr")
+    for link in (zensical, diataxis):
+        expect(link).to_have_attribute("target", "_blank")
+        assert set((link.get_attribute("rel") or "").split()) >= {"noopener", "noreferrer"}

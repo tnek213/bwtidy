@@ -9,6 +9,7 @@ on:
     # files the image never copies, so a change to only these builds nothing new
     paths-ignore:
       - README.md
+      - docker/hub-overview.md
       - SECURITY.md
       - CONTRIBUTING.md
       - CODE_OF_CONDUCT.md

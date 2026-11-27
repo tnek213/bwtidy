@@ -46,8 +46,8 @@ menu and two dialogs to make it.
     ![The app bar with the MCP token menu open and Create outlined](../images/tutorial-mcp-token-menu.png)
 
 2. Keep the lifetime of 90 days and click Create.
-3. The dialog shows the token once. Copy the token (1) and paste it
-   somewhere safe for a minute. Then copy the MCP URL (2) too.
+3. The dialog shows the token once. Copy the token ① and paste it
+   somewhere safe for a minute. Then copy the MCP URL ② too.
 
     ![The MCP token dialog with Copy of the token and Copy of the MCP URL outlined and numbered 1 and 2](../images/tutorial-mcp-token.png)
 
@@ -111,11 +111,11 @@ lists every item with the column it changes and the value before and after.
 Read them as you would read a colleague's suggestions. The auto-commit never
 writes an agent's proposal, so they wait until you decide.
 
-Tick Select all (1), which ticks every pending entry. Untick a proposal you
+Tick Select all ①, which ticks every pending entry. Untick a proposal you
 do not agree with and it stays pending. To turn it down for good you tick it
 alone and click Reject selected.
 
-Click Approve selected (2). bwtidy makes sure it has a backup of the vault
+Click Approve selected ②. bwtidy makes sure it has a backup of the vault
 as it is and then writes the approved proposals. A message above the list
 names them and the backup.
 

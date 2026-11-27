@@ -147,8 +147,8 @@ bwtidy note every entry is disabled.
 - Rename attachments shows on an attachments cell (see
   [Rename an attachment](../how-to/rename-attachment.md)).
 - Add field adds a custom field with a name and a value to the item. You
-  pick Text or Hidden as its field type. When the item already has an empty field of that name,
-  that field keeps its type.
+  pick Text or Hidden as its field type. When the item already has an empty
+  field of that name, that field keeps its type.
 - Convert to template… maps the item's values onto the coordinates of a
   template you pick. For another item type bwtidy creates a new item and moves
   the old one to the trash.
@@ -210,8 +210,8 @@ Organization when you belong to one.
 - Generate a password shows for a login and is on by default. The password
   is generated and nobody sees it until you reveal it in the grid.
 - From a template every required field needs a value that fits its
-  datatype's format, or Create stays disabled. A field marked optional may stay blank. For a
-  field name pattern (like `user_*`) you name the field too.
+  datatype's format, or Create stays disabled. A field marked optional may stay
+  blank. For a field name pattern (like `user_*`) you name the field too.
 - An SSH key needs only its private key in OpenSSH or PEM format without a
   passphrase. bwtidy fills in its public key and fingerprint.
 - Create queues the new item. It shows in the grid once it is written.
@@ -392,9 +392,9 @@ its backup. That backup is the vault as it was right before the write.
   as text. It never holds a value.
 - The table shows Time and Source first. Operation follows (hover it for what
   it did) and then Items, Result and Backup.
-- The name on a backup's own row downloads the encrypted file. Decrypt it with `age -d` and
-  the master password (see
-  [step 1 of the restore](../restore.md#1-decrypt-the-backup-on-a-tmpfs)).
+- The name on a backup's own row downloads the encrypted file. Decrypt it with
+  `age -d` and the master password (see [step 1 of the
+  restore](../restore.md#1-decrypt-the-backup-on-a-tmpfs)).
 - Restore on a row puts its items back as that backup holds them. A dialog
   first says what happens to each item. On a folder's row Restore gives the
   folder its old name back or creates a deleted folder again. On an attachment
@@ -476,7 +476,8 @@ their packages with their licenses.
 
 If bwtidy works for you, a thumbs up in Works for me helps others decide. A
 comment helps even more. Name your bwtidy version and whether you use
-Bitwarden or Vaultwarden. Say roughly how many items your vault has. Only what you post there is shared. bwtidy itself sends nothing.
+Bitwarden or Vaultwarden. Say roughly how many items your vault has. Only what
+you post there is shared. bwtidy itself sends nothing.
 
 ![The About page](../images/about-page.png)
 
@@ -555,13 +556,13 @@ its end.
 
 ### More actions
 
-The three dots at the right end of the app bar (1) open the More actions
+The three dots at the right end of the app bar ① open the More actions
 menu.
 
 ![The app bar with the three dots button outlined and numbered 1](../images/more-menu-closed.png)
 
 The menu holds Settings, Switch account (while an account is open) and About
-bwtidy (2). Settings opens the [Settings](#settings) page. Switch account
+bwtidy ②. Settings opens the [Settings](#settings) page. Switch account
 tries to write the edits that wait, ends the session and takes you back to the
 account form. About bwtidy opens the [About](#about) page.
 

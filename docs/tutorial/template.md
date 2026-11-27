@@ -48,8 +48,8 @@ has a datatype, its value must fit it too.
    `A login to a website or a device's web page.` as the Description.
 3. Click Add coordinate and pick `login.username`. Do the same for
    `login.password` and `login.uris`.
-4. In the row of `login.uris` pick Web address as the Datatype (1). Then
-   click Save (2).
+4. In the row of `login.uris` pick Web address as the Datatype ①. Then
+   click Save ②.
 
     ![The new template's coordinates login.username, login.password and login.uris with the datatype Web address and Save outlined as 1 and 2](../images/tutorial-template-editor.png)
 
@@ -59,7 +59,7 @@ saves them right away (see [The bwtidy note](../explanation/tool-note.md)).
 ## See it in the grid
 
 Click Vault. The template column now says Web login for most of your
-logins. Pick Off their format in the Format filter (1) and switch on Hide
+logins. Pick Off their format in the Format filter ① and switch on Hide
 empty columns. The grid then keeps the logins whose address is missing or
 does not fit Web address.
 
@@ -84,7 +84,7 @@ flowchart LR
 An address that fits in part earns part of its point. Mail relay has four
 full points and 0.89 for the format of its `smtp://` address.
 
-The small round mark in the top right corner of a uris cell (2) shows how
+The small round mark in the top right corner of a uris cell ② shows how
 well the address matches Web address. It is filled for a full match and half
 filled for part of one. It stays empty for none. Bike club and Gaming
 desktop have no address at all.
@@ -151,10 +151,10 @@ mark.
 
 ## Find it in the Change log
 
-Click Change log. The conversion of the two notes goes into one write (1)
-and the two addresses into the next (2). Each write names the backup of
-the vault as it was right before it. The conversion rows name the notes by their id
-because the notes are in the trash. Further down the saves of the datatype
+Click Change log. The conversion of the two notes goes into one write ①
+and the two addresses into the next ②. Each write names the backup of
+the vault as it was right before it. The conversion rows name the notes by their
+id because the notes are in the trash. Further down the saves of the datatype
 and the template have rows of their own as writes to the bwtidy note.
 
 ![The Change log with the two address rows and the two Apply template rows, the Backup of each write outlined and numbered 1 and 2](../images/tutorial-template-change-log.png)
