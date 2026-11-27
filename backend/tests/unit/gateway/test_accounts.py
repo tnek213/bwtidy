@@ -10,7 +10,15 @@ from pathlib import Path
 import pytest
 
 from bwtidy.gateway import accounts as accounts_module
-from bwtidy.gateway.accounts import TEMPORARY_PREFIX, AccountError, Accounts, is_public
+from bwtidy.gateway.accounts import (
+    MAX_EMAIL,
+    MAX_HOST,
+    NAME_MAX,
+    TEMPORARY_PREFIX,
+    AccountError,
+    Accounts,
+    is_public,
+)
 from bwtidy.login_state import LoginStateFile
 from bwtidy.mcp_token import token_digest
 from bwtidy.protocol import ACCOUNT_COOKIE as COOKIE
@@ -33,6 +41,8 @@ from tests.support.gateway_env import (
     account,
     assert_unauthorized,
     bearer,
+    long_email,
+    long_host,
     make_env,
     mcp_token,
     wait_for,
@@ -100,8 +110,52 @@ def test_a_dotted_email_starts_no_worker_and_makes_no_directory(env: GatewayEnv,
     assert not env.root.exists() or not list(env.root.rglob("*"))
 
 
-def test_a_too_long_email_is_refused(env: GatewayEnv):
-    assert env.open(email="a" * 250 + "@x.yz").status_code == 422
+def assert_refused_before_the_disk(env: GatewayEnv, response, detail: str) -> None:
+    assert response.status_code == 422, response.text
+    assert response.json() == {"detail": detail}
+    assert COOKIE not in response.cookies
+    assert env.worker_pids() == []
+    assert not env.root.exists() or not list(env.root.rglob("*"))
+
+
+def test_the_longest_email_logs_in_and_gets_its_directory(env: GatewayEnv):
+    """Its temporary name is TEMPORARY_PREFIX and the email, a file name of NAME_MAX bytes."""
+    email = long_email(MAX_EMAIL)
+    assert len(TEMPORARY_PREFIX + email) == NAME_MAX
+    env.started(email=email)
+    path = env.directory(email=email)
+    assert (path / PENDING_MARKER).is_file()
+    assert sorted(p.name for p in path.parent.iterdir()) == [email]
+
+
+@pytest.mark.parametrize("length", [MAX_EMAIL + 1, 254, 255])
+def test_an_email_too_long_for_its_temporary_name_is_refused(env: GatewayEnv, length: int):
+    response = env.open(email=long_email(length))
+    assert_refused_before_the_disk(env, response, "The email is not valid.")
+
+
+def test_the_longest_host_with_a_port_logs_in_and_gets_its_directory(tmp_path: Path):
+    host = long_host(NAME_MAX - len("_8443"))
+    server = f"https://{host}:8443"
+    for env in make_env(tmp_path, allowed_servers=frozenset({server})):
+        env.started(server=server)
+        assert (env.directory(f"{host}_8443") / PENDING_MARKER).is_file()
+
+
+@pytest.mark.parametrize(("length", "port"), [(NAME_MAX - len("_8443") + 1, 8443), (MAX_HOST, 10)])
+def test_a_host_too_long_for_its_directory_name_with_the_port_is_refused(
+    env: GatewayEnv, length: int, port: int
+):
+    response = env.open(server=f"https://{long_host(length)}:{port}")
+    assert_refused_before_the_disk(env, response, "The server's host name is not valid.")
+
+
+def test_the_longest_host_without_a_port_is_accepted(tmp_path: Path):
+    host = long_host(MAX_HOST)
+    server = f"https://{host}"
+    for env in make_env(tmp_path, allowed_servers=frozenset({server})):
+        env.started(server=f"{server}:443")
+        assert (env.directory(host) / PENDING_MARKER).is_file()
 
 
 def test_an_allowed_server_skips_the_address_check(env: GatewayEnv):

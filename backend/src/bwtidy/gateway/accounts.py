@@ -35,9 +35,12 @@ from bwtidy.protocol import (
 
 log = logging.getLogger(__name__)
 
+## Linux allows at most 255 bytes in one file name, and the host and the email are directory names
+NAME_MAX = 255
 ## a directory being made is .new-EMAIL beside the final name, so a crash leaves no account
 TEMPORARY_PREFIX = ".new-"
-MAX_EMAIL = 254
+## below the 254 of an address, so that the temporary name fits too
+MAX_EMAIL = NAME_MAX - len(TEMPORARY_PREFIX)
 EMAIL_RE = re.compile(r"^[a-z0-9_%+-][a-z0-9._%+-]*@[a-z0-9.-]+[.][a-z]{2,}$")
 ## a host name as it can be a directory name: labels of letters, digits and hyphens
 HOST_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?([.][a-z0-9]([a-z0-9-]*[a-z0-9])?)*$")
@@ -119,7 +122,10 @@ def normalize_server(server: str) -> tuple[str, str]:
         raise AccountError("The server's host name is not valid.")
     if port is None or port == 443:
         return f"https://{host}", host
-    return f"https://{host}:{port}", f"{host}_{port}"
+    host_dir = f"{host}_{port}"
+    if len(host_dir) > NAME_MAX:
+        raise AccountError("The server's host name is not valid.")
+    return f"https://{host}:{port}", host_dir
 
 
 def normalize_email(email: str) -> str:
