@@ -4,9 +4,9 @@ bwtidy is beta software: its features are complete for 1.0, and a stored
 format (the database, the bwtidy note, the backups, the settings) changes only
 with a migration. Behavior may still change where a bug or feedback calls for
 it. What the beta needs before 1.0 is in
-[Road to 1.0](docs/releases.md#road-to-10). It has one maintainer for now and
-is meant to grow in the open, so issues, ideas and changes are welcome. There
-is no promise of a review time or of a change going in.
+[Road to 1.0](docs/explanation/road-to-1.0.md). It has one maintainer for now
+and is meant to grow in the open, so issues, ideas and changes are welcome.
+There is no promise of a review time or of a change going in.
 
 Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). Report
 behavior that breaks it to <tnek213.recollect098@slmail.me>.
@@ -56,7 +56,9 @@ allows it.
 Work only against the dev stack, never against a real vault.
 
 The pull request template (`.github/pull_request_template.md`) holds the
-checklist for a pull request.
+checklist for a pull request. A pull request with a user-visible change adds
+its bullet under Unreleased in `docs/releases.md`, as
+[The release notes](dev/release.md#the-release-notes) says.
 
 Dependencies change only through the lock files (`backend/uv.lock`, `demo/uv.lock`,
 `frontend/package-lock.json`, `docker/bitwarden-cli/package-lock.json`,

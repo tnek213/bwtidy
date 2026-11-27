@@ -30,6 +30,8 @@ up. -->
 - [ ] The docs and `docs/spec.md` are updated where behavior changed ([Where to
   start](../CONTRIBUTING.md#where-to-start)).
 - [ ] The commit messages follow the style ([Commits](../CONTRIBUTING.md#commits)).
+- [ ] A user-visible change has its bullet under Unreleased in docs/releases.md
+  ([The release notes](../dev/release.md#the-release-notes)).
 
 By opening this pull request you agree to publish the change under the project's
 license ([License of your

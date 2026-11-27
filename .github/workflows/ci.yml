@@ -20,6 +20,9 @@ jobs:
     steps:
       # v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        # the whole history with its tags, as the release notes lint compares each date with its tag
+        with:
+          fetch-depth: 0
       # setup-uv publishes no major version tag, only full versions
       # v10.4.0
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d

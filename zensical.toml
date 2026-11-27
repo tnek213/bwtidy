@@ -42,6 +42,7 @@ nav = [
     "explanation/tool-note.md",
     "explanation/bw-cli.md",
     "explanation/isolation.md",
+    "explanation/road-to-1.0.md",
   ] },
   { "For contributors" = [
     "contributing.md",

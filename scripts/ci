@@ -9,8 +9,9 @@
 First it checks that frontend/package.json has the version of backend/pyproject.toml (Python's
 0.1.0a1 is 0.1.0-alpha.1 as semver.org spells it, b is beta, rc is rc), the only version that is
 written by hand, as do the copies in the lock files (the package bwtidy in backend/uv.lock, the
-version and packages[""].version of frontend/package-lock.json), that docs/releases.md has a
-heading for the version (its release notes), that each npm lock file
+version and packages[""].version of frontend/package-lock.json), that docs/releases.md (the
+release notes) has an entry for the version and follows the format of dev/release.md (The release
+notes, its dates compared with the tags v*), that each npm lock file
 (frontend/, docker/bitwarden-cli/, tools/markdownlint/) lists what its package.json asks for, and
 that frontend/src/about/thirdParty.json lists the packages of the lock files (scripts/third-party),
 then that every Markdown file of the repo follows the rules of .markdownlint-cli2.jsonc

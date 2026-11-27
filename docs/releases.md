@@ -1,119 +1,108 @@
 # Release notes
 
-This page says what each version of bwtidy brings, newest first.
-[Run bwtidy](how-to/run.md) says how to run a version.
+The versions of bwtidy follow [Semantic Versioning](https://semver.org) with
+`-alpha.N`, `-beta.N` and `-rc.N` pre-releases. [Road to
+1.0](explanation/road-to-1.0.md) says what the beta needs before 1.0.
 
-## Road to 1.0
+## Unreleased
 
-The beta started with 1.0.0-beta.1. bwtidy is feature complete for 1.0, and
-the beta is for finding bugs and for feedback from real vaults. From the beta
-on, every stored format changes only with a migration. That covers the
-database and the bwtidy note as well as the backups and the settings.
+Changes on main that are not yet in a versioned Docker image.
 
-```graphviz alt="A new beta comes with each fix and each new release of the Bitwarden CLI. The beta becomes a release candidate once the gates below hold. The release candidate becomes 1.0.0 after 8 weeks with no serious bug, counted from the release candidate."
-digraph {
-  rankdir=LR
-  nodesep=0.4
-  ranksep=0.7
-  fontname="sans-serif"
-  node [fontname="sans-serif" fontsize=13 shape=box style="rounded,filled" fillcolor="#ffffff" color="#5c6bc0" margin="0.14,0.08"]
-  edge [fontname="sans-serif" fontsize=12 color="#455a64"]
-  beta [label="Beta\n1.0.0-beta.N" fillcolor="#e8eaf6"]
-  rc [label="Release candidate\n1.0.0-rc.N"]
-  final [label="1.0.0" fillcolor="#f1f8e9" color="#558b2f"]
-  beta -> beta [label="  a fix or a new\n  Bitwarden CLI release"]
-  beta -> rc [label="the gates\nhold"]
-  rc -> final [label="8 weeks with\nno serious bug"]
-}
-```
-
-A new beta (1.0.0-beta.2, 1.0.0-beta.3 and so on) comes whenever something is
-fixed or the Bitwarden CLI has a new release. The beta becomes a release
-candidate when all of these hold:
-
-- At least 10 "Works for me" reports from different people in the
-  [Works for me discussion](https://github.com/tnek213/bwtidy/discussions/16),
-  with Bitwarden and Vaultwarden each at least once.
-- 8 weeks of real use with no bug that lost or damaged vault data and no open
-  security report. The 8 weeks start at the first "Works for me" report by
-  someone other than the author rather than at the release. That way they
-  measure use instead of time.
-- No serious bug open.
-- An upgrade from one beta to the next that goes through a migration and is
-  tested.
-- Docker Hub pulls of at least 0.01% of the pulls of `vaultwarden/server`,
-  measured on the day of the decision.
-
-The release candidate becomes 1.0.0 after another 8 weeks with no serious
-bug, counted from the release candidate.
+- Find archived items and their attachments in every backup, those in the
+  trash too. A restore brings their attachments back
+  ([#201](https://github.com/tnek213/bwtidy/pull/201))
+- Run version 2026.11.0 of the Bitwarden CLI, which the image builds from
+  Bitwarden's source ([#108](https://github.com/tnek213/bwtidy/pull/108))
+- Read the usage stats with `bwtidy stats` in the container as the docs say.
+  The image did not find the command before
+  ([#209](https://github.com/tnek213/bwtidy/pull/209))
 
 ## 1.0.0-beta.2
 
-The image now carries Bitwarden's open source build of the Bitwarden CLI,
-built from Bitwarden's source. The earlier images carried Bitwarden's npm
-build, which includes code under the Bitwarden License. Those images are
-withdrawn from Docker Hub: 0.1.0-alpha.1, 1.0.0-beta.1 and every `main` and
-commit tag from before this release. Pull `1.0.0-beta.2` or `latest`.
+No stored format changed since 1.0.0-beta.1. Act on the breaking changes
+below, then pull the new image and start it.
 
-No stored format changed since 1.0.0-beta.1, so the upgrade needs nothing
-else: pull the new image and start it. If you want to run another Bitwarden
-CLI, `BWTIDY_BW_BIN` can now name your own. [Run your own Bitwarden
-CLI](explanation/bw-cli.md#run-your-own-bitwarden-cli) says how and what you
-take on.
+### Breaking changes
 
-What changed since 1.0.0-beta.1:
+- Pull `1.0.0-beta.2` or `latest` if you run an earlier image. Every earlier
+  image is withdrawn from Docker Hub: 0.1.0-alpha.1, 1.0.0-beta.1 and each
+  `main` and commit tag from before this release. They carried Bitwarden's npm
+  build of the Bitwarden CLI, which includes code under the Bitwarden License
+  ([#195](https://github.com/tnek213/bwtidy/pull/195), [#197](https://github.com/tnek213/bwtidy/pull/197))
+- Check `BWTIDY_MAX_PENDING`, `BWTIDY_MAX_WORKERS` and `BWTIDY_UID_BASE` in
+  `.env` before you start the new image. The gateway now refuses to start when
+  a number setting is not a whole number in its range, and the error names the
+  setting ([#143](https://github.com/tnek213/bwtidy/pull/143))
 
-- The Bitwarden CLI in the image is Bitwarden's open source build. You can
-  point every worker at a CLI of your own with `BWTIDY_BW_BIN`.
-- The web UI works with a screen reader and a keyboard, and the docs have an
-  accessibility statement.
-- You can turn on usage stats that stay on your machine. They are off by
-  default, and the file is on its own volume (`bwtidy-stats`) so it is
-  writable. The gateway now checks its number settings when it starts.
-- The restore page promises only what a restore brings back.
-- The MCP tools use one name for the secure note type, and the attachment and
-  folder dialogs compare names without regard to case.
-- A demo mode runs bwtidy against its own Vaultwarden, with limits on what
-  its containers can reach and use. The docs explain how to run a public
-  demo.
-- The docs have a new warm theme, a rewritten landing page and better
-  writing and diagrams on every page. Diagrams are drawn at build time, and
-  the screenshots no longer catch the toolbar mid layout.
-- The docs say which image tags are scanned every day and how a
-  contributor's signed commits are merged.
+### Other changes
+
+- Run bwtidy with Bitwarden's open source build of the Bitwarden CLI, which
+  the image now builds from Bitwarden's source
+  ([#195](https://github.com/tnek213/bwtidy/pull/195))
+- Point every worker at a Bitwarden CLI of your own with `BWTIDY_BW_BIN`.
+  [Run your own Bitwarden
+  CLI](explanation/bw-cli.md#run-your-own-bitwarden-cli) says how and what you
+  take on ([#191](https://github.com/tnek213/bwtidy/pull/191))
+- Use the web UI with a screen reader or a keyboard. The
+  [accessibility statement](https://github.com/tnek213/bwtidy/blob/main/ACCESSIBILITY.md)
+  says what works and how to report a barrier
+  ([#166](https://github.com/tnek213/bwtidy/pull/166), [#167](https://github.com/tnek213/bwtidy/pull/167))
+- Turn on [usage stats](reference/configuration.md#usage-stats) that stay on
+  your machine with `BWTIDY_STATS=1`. They are off by default and kept on
+  their own volume (`bwtidy-stats`)
+  ([#96](https://github.com/tnek213/bwtidy/pull/96), [#174](https://github.com/tnek213/bwtidy/pull/174))
+- Get organization items back in their folders and with their favorite marks
+  when you restore a backup. The restore page promises only what a restore
+  brings back ([#190](https://github.com/tnek213/bwtidy/pull/190))
+- Create and convert secure notes through MCP with the type `note`, the name
+  the MCP tools list them by
+  ([#177](https://github.com/tnek213/bwtidy/pull/177))
+- See a name clash in the attachment and folder dialogs and the template
+  editor before you save. They compare names without regard to case
+  ([#172](https://github.com/tnek213/bwtidy/pull/172), [#196](https://github.com/tnek213/bwtidy/pull/196))
+- Run a demo of bwtidy against its own Vaultwarden, with limits on what its
+  containers can reach and use. [Run a public demo](how-to/run-demo.md) says
+  what a public one needs
+  ([#47](https://github.com/tnek213/bwtidy/pull/47), [#147](https://github.com/tnek213/bwtidy/pull/147),
+  [#149](https://github.com/tnek213/bwtidy/pull/149), [#151](https://github.com/tnek213/bwtidy/pull/151),
+  [#164](https://github.com/tnek213/bwtidy/pull/164))
 
 ## 1.0.0-beta.1
 
+2026-11-26 · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/v1.0.0-beta.1)
+· [All changes](https://github.com/tnek213/bwtidy/compare/v0.1.0-alpha.1...v1.0.0-beta.1)
+
 bwtidy is feature complete for 1.0 and enters its beta. From this version on,
-a stored format changes only with a migration. [Road to 1.0](#road-to-10) says
-what the beta needs before 1.0. If bwtidy works for you, say so in the
+a stored format changes only with a migration. [Road to
+1.0](explanation/road-to-1.0.md) says what the beta needs before 1.0. If
+bwtidy works for you, say so in the
 [Works for me discussion](https://github.com/tnek213/bwtidy/discussions/16).
 
-What changed since 0.1.0-alpha.1:
-
-- The bwtidy note can keep a new name. The warning about a renamed note offers
-  Keep this name next to Rename it back.
-- New tutorials cover templates with datatypes and a first cleanup with an AI
-  agent over MCP. Each one builds on the one before.
-- Restoring a backup needs only age, Python 3 and the Bitwarden CLI. The steps
-  cover Windows and macOS too.
-- The docs site is wider but keeps text at a readable width. A click opens a
-  screenshot larger, and every page links to a form for suggesting an
-  improvement.
-- The image builds on Debian 13 (trixie) and holds neither npm nor pip, so it
-  is smaller. Every image still has a signed provenance attestation, and the
-  published images are scanned for known vulnerabilities every day.
-  Corrected: the scan covers the `latest` and `main` images, not every
-  published tag.
+- Keep a new name for the bwtidy note with Keep this name, which the warning
+  about a renamed note now offers next to Rename it back
+  ([#21](https://github.com/tnek213/bwtidy/pull/21))
+- Learn templates with datatypes in [Your first
+  template](tutorial/template.md) and a cleanup by an AI agent over MCP in
+  [Your first MCP-assisted cleanup](tutorial/mcp.md). Each tutorial builds on
+  the one before
+  ([#23](https://github.com/tnek213/bwtidy/pull/23), [#35](https://github.com/tnek213/bwtidy/pull/35),
+  [#43](https://github.com/tnek213/bwtidy/pull/43))
+- Restore a backup with only age, Python 3 and the Bitwarden CLI installed
+  ([#19](https://github.com/tnek213/bwtidy/pull/19))
+- Pull a smaller image, built on Debian 13 (trixie) with neither npm nor pip.
+  Every image still has a signed provenance attestation
+  ([#25](https://github.com/tnek213/bwtidy/pull/25), [#39](https://github.com/tnek213/bwtidy/pull/39))
+- Count on a daily scan of the `latest` and `main` images for known
+  vulnerabilities ([#20](https://github.com/tnek213/bwtidy/pull/20))
 
 ## 0.1.0-alpha.1
+
+2026-11-25 · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/v0.1.0-alpha.1)
 
 The first release is a web UI and MCP server for a Bitwarden or Vaultwarden
 vault. It shows the vault as one grid, normalizes field names and applies
 templates. An AI agent can propose changes that you approve, with an encrypted
 backup before every write.
 
-Claude wrote this first version over many small steps. I gave technical
-guidance, UI improvements and feature tweaks along the way. No human has read
-every line of the code, though. Codex (GPT-6.2-Astra) and Claude Fable 5.1
-reviewed it for security and stability over three rounds.
+How bwtidy was written and reviewed is in the
+[README](https://github.com/tnek213/bwtidy#readme).
