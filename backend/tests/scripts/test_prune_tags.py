@@ -262,6 +262,8 @@ def test_release_commits_maps_the_short_commit_of_each_v_tag(prune, tmp_path):
     assert prune.release_commits(tmp_path) == {first[:7]: "v0.1.0", second[:7]: "v0.2.0"}
 
 
-def test_release_commits_fails_outside_a_git_checkout(prune, tmp_path):
+def test_release_commits_fails_outside_a_git_checkout(prune, tmp_path, monkeypatch):
+    # git looks for a repository in every parent of its cwd, and tmp_path may lie in a checkout
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
     with pytest.raises(prune.PruneError, match="git tag"):
         prune.release_commits(tmp_path)
