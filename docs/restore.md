@@ -14,17 +14,21 @@ Every item comes back as a new item with a new id (see
 
 Every step is on this page and none of them needs bwtidy. You need `age` (or
 `rage`) from any distribution and Python 3.8 or later with nothing but its
-standard library. You also need the official Bitwarden CLI and a bash to run
-the commands in. Every backup holds this page as `RESTORE.md`, and the
-repository has it as `docs/restore.md`.
+standard library. You also need the official Bitwarden CLI and Bash or
+PowerShell to run the commands. Every backup holds this page as `RESTORE.md`.
+The repository has it as `docs/restore.md`.
 
 ## What you need on your system
 
-The commands are written for bash. They work the same on every system once
-these four tools are installed. To check them, run `age --version` and
-`python3 --version` as well as `bw --version` and `bash --version`.
+The Python programs are the same on every system. Each step gives the shell
+commands as a pair. Use the Bash commands on Linux or macOS and the
+PowerShell commands on Windows. Check your tools with `age --version` and
+`bw --version`.
 
 ### Linux
+
+The same instructions work in WSL. Run `python3 --version` and
+`bash --version` to check Python and Bash.
 
 - `age` from your distribution or as a release binary. It is
   `apt install age` on Debian or Ubuntu and `dnf install age` on Fedora.
@@ -52,35 +56,25 @@ these four tools are installed. To check them, run `age --version` and
 
 ### Windows
 
-- bash, either Git Bash from
-  [Git for Windows](https://git-scm.com/download/win) or WSL. In WSL
-  everything works as on Linux. Install the four tools there and skip the
-  rest of this list.
+- Windows PowerShell 5.1 comes with Windows 10 and 11. Run
+  `$PSVersionTable.PSVersion` to check its version.
 - Python from [python.org](https://www.python.org/downloads/windows/) or the
-  Microsoft Store. Its command there is `python` or `py` rather than
-  `python3`. Either put `alias python3=python` before the first command in
-  Git Bash or replace `python3` in the commands. The alias is a shell alias
-  for this window only.
-- `age` from `winget install --id FiloSottile.age` or
-  `scoop bucket add extras && scoop install age`. You can also take the
-  Windows release binary from the
+  Python install manager from the Microsoft Store. Run `py --version` to
+  check it.
+- `age` from `winget install --id FiloSottile.age` or Scoop. For Scoop run
+  `scoop bucket add extras` and then `scoop install age`. You can also take
+  the Windows release binary from the
   [age page](https://github.com/FiloSottile/age#installation) and put
-  `age.exe` on the `PATH`.
+  `age.exe` on your `PATH`.
 - The Bitwarden CLI in one of the three ways the
   [CLI documentation](https://bitwarden.com/help/cli/) names. They are the
   standalone `bw.exe` from the [download page](https://bitwarden.com/download/),
   `choco install bitwarden-cli` and `npm install -g @bitwarden/cli`. Step 3
-  installs it from npm, which works in Git Bash too.
-- Step 1 sets `PYTHONUTF8=1` so that Python reads and writes UTF-8 as it does
-  on Linux. Without it Python would use the Windows code page.
-- `age` asks for the passphrase on the terminal. Git Bash's default terminal
-  (mintty) is not a Windows console. A program that reads the console
-  directly may then not see what you type. If `age -d` does not ask or fails
-  right away, start it as `winpty age -d ...` or run the command in Windows
-  Terminal or PowerShell.
-- Windows and macOS have no tmpfs at `/dev/shm`. Step 1 then uses the
-  temporary folder instead, which is on the disk. The decrypted files stay
-  there until step 7 deletes them.
+  installs it from npm.
+- Step 1 sets `$env:PYTHONUTF8 = "1"` so Python reads and writes UTF-8 as it
+  does on Linux. Without it Python would use the Windows code page.
+- On Windows and macOS step 1 uses the temporary folder on disk. The
+  decrypted files stay there until step 7 deletes them.
 
 ## What a backup holds
 
@@ -112,10 +106,11 @@ name, the second one is stored as `<attachmentId>-<fileName>`.
 premium, such as one whose premium ended. Its archived items in the trash are
 missing, as bw lists them nowhere without premium.
 
-## 1. Decrypt the backup on a tmpfs
+## 1. Decrypt the backup
 
 The decrypted files hold every secret in plain text. They therefore stay in
-RAM (`/dev/shm` where the system has it) and step 7 deletes them at the end.
+RAM on systems with `/dev/shm` and in the temporary folder elsewhere.
+Step 7 deletes them.
 
 Pick the newest backup from before the loss. bwtidy keeps each one as
 `HOST/EMAIL/<UTC timestamp>.zip.age` under its backups mount. `HOST` is the
@@ -136,11 +131,12 @@ is done, so for an older copy you may need to remember it yourself. Every
 backup that opens holds the note too. The program `unpack.py` below prints
 these two fields.
 
-This block makes the restore directory `$D` for the decrypted files and
-decrypts the backup there. Put the path of your backup in place of
-`/path/to/FILE.zip.age` and its file name in place of `FILE.zip.age`. At the
-end the block prints the path of `$D`, where you save the programs of the
-steps below. In Git Bash `pwd -W` prints it as a Windows path.
+These commands make the restore directory `$D` and decrypt the backup there.
+Replace the example backup path with yours. Keep the quotes around the
+Windows path. Replace `FILE.zip.age` with your backup's file name. The last
+command prints the path of `$D` where you save the Python programs.
+
+Linux, macOS, WSL (Bash):
 
 ```sh
 export PYTHONUTF8=1
@@ -151,6 +147,21 @@ cd "$D"
 cp /path/to/FILE.zip.age .
 age -d -o backup.zip FILE.zip.age && rm FILE.zip.age
 echo "$D"
+```
+
+Windows (PowerShell):
+
+```powershell
+$env:PYTHONUTF8 = "1"
+$D = Join-Path $env:TEMP ("bwtidy-restore." + [IO.Path]::GetRandomFileName())
+New-Item -ItemType Directory -Path $D -ErrorAction Stop | Out-Null
+Set-Location -LiteralPath $D -ErrorAction Stop
+Copy-Item -LiteralPath "C:\path\to\FILE.zip.age" -Destination .
+age -d -o backup.zip FILE.zip.age
+if ($LASTEXITCODE -eq 0) {
+    Remove-Item -LiteralPath FILE.zip.age
+}
+$D
 ```
 
 The program `unpack.py` unpacks the backup and prints how many items it
@@ -191,8 +202,16 @@ for item in load("raw/items.json"):
         print(json.dumps(fields, indent=2))
 ```
 
+Linux, macOS, WSL (Bash):
+
 ```sh
 python3 unpack.py
+```
+
+Windows (PowerShell):
+
+```powershell
+py unpack.py
 ```
 
 ## 2. Prepare an empty account
@@ -218,19 +237,35 @@ and goes on your `PATH`. The npm package goes into a directory of its own,
 which may be on the disk since it holds no secrets. These commands install
 the version that bwtidy uses.
 
+Linux, macOS, WSL (Bash):
+
 ```sh
 CLI=$(mktemp -d)
 npm install --prefix "$CLI" --no-fund --no-audit @bitwarden/cli@2026.11.0
 export PATH="$CLI/node_modules/.bin:$PATH"
 ```
 
-With a native `bw` on the `PATH` you skip this block and leave `CLI` unset.
+Windows (PowerShell):
+
+```powershell
+$CLI = Join-Path $env:TEMP ("bwtidy-cli." + [IO.Path]::GetRandomFileName())
+npm.cmd install --prefix $CLI --no-fund --no-audit @bitwarden/cli@2026.11.0
+$OriginalPath = $env:Path
+$env:Path = "$CLI\node_modules\.bin;$env:Path"
+Set-Alias bw (Join-Path $CLI "node_modules\.bin\bw.cmd")
+```
+
+With a native `bw` on the `PATH` you skip these commands and leave `CLI`
+unset. For an npm install PowerShell uses the `bw.cmd` shim because the
+default execution policy blocks `bw.ps1`. Use a fresh shell for the restore.
 
 The CLI keeps its state (`BITWARDENCLI_APPDATA_DIR`) in `$D` as well, apart
 from any CLI state that something else on the machine uses. Then log in to
 the account of step 2. `bw config server` takes the `HOST` of step 1 as a
 URL, and a self-hosted server goes by its own URL. For a new device
 bitwarden.com mails you a one-time code.
+
+Linux, macOS, WSL (Bash):
 
 ```sh
 export BITWARDENCLI_APPDATA_DIR="$D/bw"
@@ -239,12 +274,29 @@ bw login EMAIL
 export BW_SESSION=$(bw unlock --raw)
 ```
 
+Windows (PowerShell):
+
+```powershell
+$env:BITWARDENCLI_APPDATA_DIR = Join-Path $D "bw"
+bw config server https://vault.bitwarden.com
+bw login EMAIL
+$env:BW_SESSION = bw unlock --raw
+```
+
 ## 4. Import the exports
 
 bw import has no zip format, so the personal export goes in as its
 `data.json` in the format `bitwardenjson`.
 
+Linux, macOS, WSL (Bash):
+
 ```sh
+bw import bitwardenjson data.json
+```
+
+Windows (PowerShell):
+
+```powershell
 bw import bitwardenjson data.json
 ```
 
@@ -271,8 +323,17 @@ for org in bw("list", "organizations"):
     print(org["id"], org["name"])
 ```
 
+Linux, macOS, WSL (Bash):
+
 ```sh
 python3 orgs.py
+bw import bitwardenjson org-OLDID-export.json --organizationid NEWID
+```
+
+Windows (PowerShell):
+
+```powershell
+py orgs.py
 bw import bitwardenjson org-OLDID-export.json --organizationid NEWID
 ```
 
@@ -515,8 +576,16 @@ for item in old:
 shutil.rmtree("upload", ignore_errors=True)
 ```
 
+Linux, macOS, WSL (Bash):
+
 ```sh
 python3 attach.py raw/items.json raw/archived.json
+```
+
+Windows (PowerShell):
+
+```powershell
+py attach.py raw/items.json raw/archived.json
 ```
 
 A failed upload or `bw edit item` prints bw's error. Then run the program
@@ -554,9 +623,18 @@ with open(sys.argv[1], encoding="utf-8") as file:
             print(json.dumps(item, indent=2))
 ```
 
+Linux, macOS, WSL (Bash):
+
 ```sh
 python3 show.py raw/items.json OLDID
 python3 show.py raw/archived.json OLDID
+```
+
+Windows (PowerShell):
+
+```powershell
+py show.py raw/items.json OLDID
+py show.py raw/archived.json OLDID
 ```
 
 Its files are under `item-attachments/OLDID/`, and the old item lists their
@@ -603,10 +681,20 @@ with open("with-trash.json", "w", encoding="utf-8") as file:
     json.dump(load("raw/items.json") + moved, file)
 ```
 
+Linux, macOS, WSL (Bash):
+
 ```sh
 python3 trash.py
 bw import bitwardenjson trash-import.json
 python3 attach.py with-trash.json raw/archived.json
+```
+
+Windows (PowerShell):
+
+```powershell
+py trash.py
+bw import bitwardenjson trash-import.json
+py attach.py with-trash.json raw/archived.json
 ```
 
 `with-trash.json` holds the active items and the trashed ones with their old
@@ -622,8 +710,8 @@ The account must now have as many items and attachments as the backup. The
 program `check.py` syncs bw and prints one line for the account and one for the
 backup items of the files you give it. The two must show the same numbers. Each
 "not uploaded" line of step 5 is one missing attachment. If you imported the
-trash in step 6, put `with-trash.json` in place of `raw/items.json` after
-`python3 check.py`.
+trash in step 6, put `with-trash.json` in place of `raw/items.json` in
+the command that runs `check.py`.
 
 After the count the commands log bw out. They delete `$D` with every
 decrypted file and the npm CLI of step 3. Save the program as `check.py` in
@@ -661,11 +749,30 @@ print("the account: %d items, %d attachments" % count(account))
 print("the backup:  %d items, %d attachments" % count(backup))
 ```
 
+Linux, macOS, WSL (Bash):
+
 ```sh
 python3 check.py raw/items.json raw/archived.json
 bw logout
 cd ~ && rm -rf "$D" ${CLI:+"$CLI"}
 unset BW_SESSION BITWARDENCLI_APPDATA_DIR
+```
+
+Windows (PowerShell):
+
+```powershell
+py check.py raw/items.json raw/archived.json
+bw logout
+Set-Location ~ -ErrorAction Stop
+if ($D) {
+    Remove-Item -LiteralPath $D -Recurse -Force
+}
+if ($CLI) {
+    Remove-Item -LiteralPath $CLI -Recurse -Force
+    Remove-Item Alias:bw
+    $env:Path = $OriginalPath
+}
+Remove-Item Env:BW_SESSION, Env:BITWARDENCLI_APPDATA_DIR, Env:PYTHONUTF8 -ErrorAction SilentlyContinue
 ```
 
 Then log bwtidy in to the restored account. If the account changed, first use

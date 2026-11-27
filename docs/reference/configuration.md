@@ -236,7 +236,7 @@ Change log names the fields that each write changed.
 
 Decrypt a backup with `age -d -o backup.zip FILE`. Its passphrase is the
 master password bwtidy last logged in with, and
-[step 1 of the restore](../restore.md#1-decrypt-the-backup-on-a-tmpfs) says
+[step 1 of the restore](../restore.md#1-decrypt-the-backup) says
 when it is an earlier one. Every backup holds `RESTORE.md` with the steps
 that bring a lost vault back from it. The same steps are on the page
 [Restore a vault from a backup](../restore.md).

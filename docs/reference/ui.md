@@ -404,7 +404,7 @@ its backup. That backup is the vault as it was right before the write.
   it did) and then Items, Result and Backup.
 - The name on a backup's own row downloads the encrypted file. Decrypt it with
   `age -d` and the master password (see [step 1 of the
-  restore](../restore.md#1-decrypt-the-backup-on-a-tmpfs)).
+  restore](../restore.md#1-decrypt-the-backup)).
 - Restore on a row puts its items back as that backup holds them. A dialog
   first says what happens to each item. On a folder's row Restore gives the
   folder its old name back or creates a deleted folder again. On an attachment

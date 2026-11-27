@@ -279,6 +279,22 @@ def test_the_cards_and_boxes_draw_from_the_site_itself(page: Page):
     assert hosts == {urlsplit(page.url).netloc}
 
 
+def test_the_restore_shell_tabs_stay_in_sync_after_reload(page: Page):
+    page.goto("/docs/restore/")
+    groups = page.locator("article .tabbed-set")
+    assert groups.count() > 1
+    windows = groups.locator("label").filter(has_text=re.compile(r"^Windows \(PowerShell\)$"))
+    expect(windows).to_have_count(groups.count())
+    windows.first.click()
+    for reload in (False, True):
+        if reload:
+            page.reload()
+        for tab in windows.all():
+            target = tab.get_attribute("for")
+            assert target
+            expect(page.locator(f'input[id="{target}"]')).to_be_checked()
+
+
 ## pages with the header, the links out and the cards, whose requests must all stay on the site
 OWN_HOST_PAGES = ["/docs/", "/docs/tutorial/first-cleanup/", "/docs/contributing/"]
 
