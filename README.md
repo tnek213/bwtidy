@@ -149,7 +149,7 @@ export, made outside bwtidy, before you use it on a vault you care about.
 The container image includes the open source build of the Bitwarden CLI.
 Bitwarden, Inc. licenses it separately under GPL-3.0. The image builds it from
 Bitwarden's source (<https://github.com/bitwarden/clients>) at the tag
-`cli-v2026.10.0`. Bitwarden's npm package is not used because it includes code
+`cli-v2026.11.0`. Bitwarden's npm package is not used because it includes code
 under the Bitwarden License.
 
 The About page (About bwtidy in the app bar's menu, More actions) shows the

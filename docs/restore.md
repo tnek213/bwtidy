@@ -197,7 +197,7 @@ the version that bwtidy uses.
 
 ```sh
 CLI=$(mktemp -d)
-npm install --prefix "$CLI" --no-fund --no-audit @bitwarden/cli@2026.10.0
+npm install --prefix "$CLI" --no-fund --no-audit @bitwarden/cli@2026.11.0
 export PATH="$CLI/node_modules/.bin:$PATH"
 ```
 
