@@ -137,5 +137,7 @@ def test_a_word_that_starts_a_list_never_starts_a_line(mcp_reference):
 
 def test_the_page_follows_the_markdownlint_rules(tmp_path, page):
     shutil.copy(ROOT / ".markdownlint-cli2.jsonc", tmp_path)
+    rules = ROOT.joinpath("tools", "markdownlint", "rules")
+    shutil.copytree(rules, tmp_path / rules.relative_to(ROOT))
     (tmp_path / "mcp-tools.md").write_text(page)
     assert markdownlint.check(tmp_path) is None

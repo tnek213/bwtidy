@@ -38,6 +38,9 @@
       "combine": "merge"
     }
   ],
+  // the docs site (Python-Markdown) renders a wrapped line of a list item that starts with a list
+  // marker, such as "4. " in "bash\n  4. The", as a new item, while GitHub keeps it in the text
+  "customRules": ["tools/markdownlint/rules/wrapped-list-marker.mjs"],
   "globs": ["**/*.md"],
   // what is not the repo's own text: installed packages, caches and the site's build output
   "ignores": [

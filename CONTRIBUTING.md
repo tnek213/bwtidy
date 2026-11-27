@@ -45,6 +45,8 @@ allows it.
   `.markdownlint-cli2.jsonc`. Wrap text by hand at 80 characters outside code
   blocks, tables and headings. The VS Code extension markdownlint
   (`DavidAnson.vscode-markdownlint`) shows the same findings in the editor.
+  It runs the repo's own rule (BWT001) only once you trust the workspace, as
+  it runs no custom rule in an untrusted one.
 - `scripts/install-hooks`: run it once after cloning. It installs a pre-push
   hook that runs `scripts/ci` on what you push to main (to any other branch
   only `scripts/ci --quick`, the pull request's CI runs the rest) and, for a

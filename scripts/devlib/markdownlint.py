@@ -4,7 +4,7 @@ markdownlint-cli2 comes from its own npm folder, tools/markdownlint, installed w
 lock file the first time a check needs it and again after the lock file changed (the stamp of
 locks.npm_install_needed). It reads the rules, the files to lint (globs) and the files to leave out
 (ignores) from .markdownlint-cli2.jsonc in the directory it runs in, the file the VS Code extension
-markdownlint reads too.
+markdownlint reads too. The repo's own rules (customRules) are modules in tools/markdownlint/rules.
 """
 
 import subprocess
