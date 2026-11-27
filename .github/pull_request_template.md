@@ -1,6 +1,25 @@
-## What and why
+## Before
 
-What does this change do, and why?
+<!-- What the user experiences today. For a bug: how it affects the user. -->
+
+## After
+
+<!-- What the user experiences with this change. For a bug: how the fix shows
+up. -->
+
+## Solution
+
+<!-- Max 3 sentences and 100 words, in one paragraph. -->
+
+## How it was verified
+
+<!-- Tests run, manual checks, screenshots. -->
+
+## Details
+
+<!-- Optional. Design choices, trade-offs, follow-ups. Delete if not needed. -->
+
+<!-- When this closes an issue, add a line like: Closes #123 -->
 
 ## Checklist
 
