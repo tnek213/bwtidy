@@ -1,16 +1,23 @@
-import { Alert, Box, CircularProgress, useTheme } from '@mui/material'
+import { Alert, Box, CircularProgress, Typography, useTheme } from '@mui/material'
 import { useQueryClient } from '@tanstack/react-query'
 import type {
   BodyScrollEvent,
+  ColDef,
   ColumnResizedEvent,
   GridApi,
   GetRowIdParams,
   RowClassParams,
   RowSelectionOptions,
   SelectionColumnDef,
+  SuppressHeaderKeyboardEventParams,
 } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { VISUALLY_HIDDEN } from '../shared/visuallyHidden.ts'
+import { cellDescription } from './cellDescription.ts'
+import { FieldHeader } from './ColumnHeader.tsx'
+import { matchTooltip } from './matches.ts'
+import { type Revealers, RevealersContext, revealersOf } from './revealers.ts'
 import { markCellEditors } from '../shared/noPasswordManager.ts'
 import { useColorMode } from '../theme/colorMode.tsx'
 import { capAutosizedColumns } from './autosize.ts'
@@ -36,7 +43,7 @@ import SelectionBar from './SelectionBar.tsx'
 import type { NormalizeState } from './dialogs/index.tsx'
 import { useCellMarks } from './useCellMarks.ts'
 import { useGridFilters } from './useGridFilters.ts'
-import { useCellEvents } from './useCellEvents.ts'
+import { isMenuKey, useCellEvents } from './useCellEvents.ts'
 import {
   type GridColumn,
   type GridData,
@@ -61,7 +68,7 @@ import type { MergeColumnsOperation } from '../api/operations.ts'
 import { useWriter } from './writer.ts'
 import { buildOverlay, EMPTY_OVERLAY, shownCells, type ShownRow, shownRows, withExtraColumns } from './queued.ts'
 import { useHideToolNote, useRareFieldsMax } from './display.ts'
-import { orderedRareColumns, rareColumns } from './rareFields.ts'
+import { orderedRareColumns, RARE_FIELDS_COLUMN, rareColumns } from './rareFields.ts'
 import { useAutoCommit } from '../commit/autoCommit.ts'
 import { queueQueryKey, useQueue } from '../api/queue.ts'
 import { toggled } from '../shared/sets.ts'
@@ -79,6 +86,25 @@ const ROW_SELECTION: RowSelectionOptions<ShownRow> = {
   enableClickSelection: false,
   hideDisabledCheckboxes: true,
   isRowSelectable: ({ data }) => data !== undefined && !isToolNote(data),
+}
+
+// AG Grid's own names of the checkbox column and of a row's checkbox.
+const LOCALE_TEXT = { ariaHeaderSelection: 'Tick rows' }
+
+// The menu of a field, folder or Rare fields header opens with the cell menu's keys: a keyboard
+// cannot reach the button in the header.
+function headerMenuKey(openMenu: (columnId: string, anchor: HTMLElement) => void) {
+  return ({ column, event }: SuppressHeaderKeyboardEventParams<ShownRow>) => {
+    if (!('getColDef' in column) || column.getColDef().headerComponentParams?.innerHeaderComponent !== FieldHeader) {
+      return false
+    }
+    if (event.type !== 'keydown' || !isMenuKey(event)) {
+      return false
+    }
+    event.preventDefault()
+    openMenu(column.getColId(), event.target as HTMLElement)
+    return true
+  }
 }
 
 const SELECTION_COLUMN: SelectionColumnDef = {
@@ -106,6 +132,17 @@ export default function GridPage() {
   const [mergeSelection, setMergeSelection] = useState<Set<string>>(() => new Set())
   const nearDuplicateGroups = useNearDuplicates()
   const gridRef = useRef<AgGridReact<ShownRow>>(null)
+  // The same map for the whole life of the page, filled by the rendered cells.
+  const [revealers] = useState<Revealers>(() => new Map())
+  const gridBox = useRef<HTMLElement | null>(null)
+  const gridBoxRef = useCallback((element: HTMLElement) => {
+    gridBox.current = element
+    const stop = markCellEditors(element)
+    return () => {
+      gridBox.current = null
+      stop()
+    }
+  }, [])
   const queryClient = useQueryClient()
   const theme = useTheme()
   const { mode } = useColorMode()
@@ -254,6 +291,47 @@ export default function GridPage() {
     onApply: apply,
   })
 
+  // The focused cell's marks and tooltip as its description, which a screen reader reads after
+  // the value. Set again when the rows or their marks change, as the grid keeps the focus.
+  const describedCell = useRef<Element | null>(null)
+  function describeFocusedCell() {
+    const api = gridRef.current?.api
+    const focused = api?.getFocusedCell()
+    const data = focused ? api?.getDisplayedRowAtIndex(focused.rowIndex)?.data : undefined
+    const columnId = focused?.column.getColId()
+    const element =
+      focused && columnId
+        ? gridBox.current?.querySelector(`.ag-row[row-index="${focused.rowIndex}"] .ag-cell[col-id="${CSS.escape(columnId)}"]`)
+        : null
+    if (describedCell.current && describedCell.current !== element) {
+      describedCell.current.removeAttribute('aria-description')
+    }
+    describedCell.current = element ?? null
+    if (!element || !data || !columnId) {
+      return
+    }
+    const column = columnsById.get(columnId)
+    let text: string | undefined
+    if (columnId === TEMPLATE_COLUMN) {
+      const type = data.cells.type
+      text = matchTooltip(matches.data?.[data.id], typeof type === 'string' ? type : undefined, templates, isSecretColumn)
+    } else if (column && columnId !== RARE_FIELDS_COLUMN) {
+      text = cellDescription(column, data, marks)
+    }
+    if (text) {
+      element.setAttribute('aria-description', text)
+    } else {
+      element.removeAttribute('aria-description')
+    }
+  }
+  useEffect(describeFocusedCell)
+
+  const headerKeyDown = useMemo(() => headerMenuKey((columnId, anchor) => setHeaderMenu({ columnId, anchor })), [])
+  const defaultColDef = useMemo<ColDef<ShownRow>>(
+    () => ({ initialWidth: 160, resizable: true, sortable: true, suppressHeaderKeyboardEvent: headerKeyDown }),
+    [headerKeyDown],
+  )
+
   const getRowStyle = ({ data }: RowClassParams<ShownRow>) =>
     data && isToolNote(data) ? { backgroundColor: theme.palette.grey[mode === 'dark' ? 800 : 200] } : undefined
 
@@ -307,6 +385,10 @@ export default function GridPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0 }}>
+      {/* Every other page starts with its name as a heading. */}
+      <Typography variant="h5" component="h2" sx={VISUALLY_HIDDEN}>
+        Vault
+      </Typography>
       <RenamedNoteAlert doc={templatesDoc.data} onFeedback={setFeedback} />
       <GridToolbar
         selected={mergeSelection}
@@ -321,9 +403,10 @@ export default function GridPage() {
         templateNames={templates.map((template) => template.name)}
         onNewItem={() => setOpenDialog({ kind: 'create' })}
       />
-      <Box ref={markCellEditors} sx={{ flexGrow: 1, minHeight: 300, ...gridCellStyles(theme) }}>
+      <Box ref={gridBoxRef} sx={{ flexGrow: 1, minHeight: 300, ...gridCellStyles(theme) }}>
         <HeaderContext value={headerActions}>
           <NameSuffixContext value={suffixState}>
+            <RevealersContext value={revealers}>
             <AgGridReact<ShownRow>
               ref={gridRef}
               theme={mode === 'dark' ? GRID_THEME_DARK : GRID_THEME_LIGHT}
@@ -337,7 +420,7 @@ export default function GridPage() {
               }
               rowClassRules={rowClassRules}
               getRowStyle={getRowStyle}
-              defaultColDef={{ initialWidth: 160, resizable: true, sortable: true }}
+              defaultColDef={defaultColDef}
               // About 70 columns: rendering them all keeps horizontal scrolling smooth
               // and every column reachable in tests (jsdom has no layout).
               suppressColumnVirtualisation
@@ -352,9 +435,15 @@ export default function GridPage() {
               onGridSizeChanged={({ api }) => updateOutOfView(api)}
               onBodyScroll={handleBodyScroll}
               {...gridEvents}
+              // Tab leaves the grid instead of going through its thousands of cells, the arrow keys move in it.
+              tabToNextCell={() => false}
+              tabToNextHeader={() => false}
               preventDefaultOnContextMenu
               stopEditingWhenCellsLoseFocus
+              onCellFocused={describeFocusedCell}
+              localeText={LOCALE_TEXT}
             />
+            </RevealersContext>
           </NameSuffixContext>
         </HeaderContext>
       </Box>
@@ -380,6 +469,7 @@ export default function GridPage() {
         onRenameAttachments={(row) => setOpenDialog({ kind: 'attachments', row })}
         toFillAction={(column, row) => toFillAction(column, row, toFill)}
         onToFill={(row, column, mark) => void changeToFill(row, column, mark)}
+        revealers={(row, columnId) => revealersOf(revealers, row.id, columnId)}
       />
       <HeaderMenu
         state={headerMenu}

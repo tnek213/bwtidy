@@ -31,7 +31,14 @@ export default function AppBar({ account, page, onPageChange }: AppBarProps) {
   const version = useVersion()
 
   return (
-  <MuiAppBar position="static" sx={(theme) => mcpBarSx(theme, mcpOn)}>
+  <MuiAppBar
+    position="static"
+    sx={(theme) => ({
+      ...mcpBarSx(theme, mcpOn),
+      // The buttons take the bar's text color, so their focus ring stands out from the bar as the text does.
+      '& .MuiButton-root.Mui-focusVisible, & .MuiIconButton-root.Mui-focusVisible': { outlineColor: 'currentColor' },
+    })}
+  >
     <Toolbar variant={layout === 'compact' ? 'dense' : 'regular'}>
       <Typography variant="h6" component="h1" sx={{ mr: 3 }}>
         <ButtonBase

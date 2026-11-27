@@ -5,7 +5,7 @@ import { jsonResponse, mockFetch, renderWithQuery, typeDay } from '../test-utils
 import { formatTime } from '../shared/format.ts'
 import { operationLabel } from '../shared/operationLabels.ts'
 import { createTheme } from '@mui/material/styles'
-import ChangeLogPage, { faded } from './ChangeLogPage.tsx'
+import ChangeLogPage from './ChangeLogPage.tsx'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -46,6 +46,7 @@ test('the change log is reachable from the app bar and names known items', async
   expect(row).toHaveTextContent('setLeaf')
   expect(row).toHaveTextContent('Code forge, gone-item')
   expect(row).toHaveTextContent('20261026T120000Z.zip.age')
+  expect(within(table).getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
 })
 
 test('entries are sorted newest first', async () => {
@@ -265,11 +266,9 @@ test('rows that follow a row with the same backup show their backup and Restore 
   expect(second.restore).not.toBe(first.restore)
   expect(third).toEqual(second)
   expect(other).toEqual(first)
-})
-
-test('a repeated backup is mixed 43% toward the background, so 57% of the color is kept', () => {
-  const theme = createTheme()
-  expect(faded('#ffffff', theme)).toBe(`color-mix(in srgb, #ffffff 57%, ${theme.palette.background.default})`)
+  // Fainter, yet in the secondary text color, which keeps the 4.5:1 contrast of WCAG AA
+  const secondary = createTheme().palette.text.secondary
+  expect(second).toEqual({ backup: secondary, restore: secondary })
 })
 
 async function openRestore() {
@@ -420,6 +419,8 @@ test('a change row whose backup is gone keeps the name struck through without Re
   const name = within(gone).getByText(OLD_BACKUP)
   expect(name).toHaveStyle({ textDecoration: 'line-through' })
   expect(name).toHaveAttribute('title', 'This backup was deleted')
+  // The strike-through is not read out, a hidden word says it
+  expect(name.parentElement).toHaveTextContent(`${OLD_BACKUP} (deleted)`)
   expect(within(gone).queryByRole('button', { name: 'Restore' })).toBeNull()
   // A row whose backup exists is not struck through.
   const kept = within(table).getByRole('row', { name: /Code forge, gone-item/ })

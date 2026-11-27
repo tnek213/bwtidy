@@ -148,7 +148,7 @@ test.each([
   [
     'both',
     [uiEntry(7, usernameEdit), mcpEntry(8)],
-    'Queue, 1 unsaved edits, 1 MCP proposals to review',
+    'Queue, 2 pending: 1 unsaved edits, 1 MCP proposals to review',
     /^1 unsaved edits\. Saved automatically in [0-9] s\.1 MCP proposals to review\.$/,
   ],
   ['nothing', [], 'Queue, nothing pending', /^Nothing pending\.$/],
