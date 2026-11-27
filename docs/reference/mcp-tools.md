@@ -34,8 +34,8 @@ and the answers they give.
 
 A read tool.
 
-List the items of the vault, all of them or only those that match every filter
-given.
+List the items of the vault that are not archived, all of them or only those
+that match every filter given.
 
 Each item has:
 
