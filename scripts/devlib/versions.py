@@ -98,6 +98,10 @@ METADATA = re.compile(
     r"(?P<date>\S+) · \[GitHub release\]\((?P<release>[^()\s]+)\)"
     r"(?: · \[All changes\]\((?P<compare>[^()\s]+)\))?"
 )
+WITHDRAWN = re.compile(
+    r"(?P<date>\S+) · Withdrawn on (?P<withdrawn>\S+), "
+    r"see \[(?P<by>[^\[\]]+)\]\(#(?P<anchor>[^()\s]+)\)"
+)
 PULL_LINK = r"\[#(\d+)\]\(" + re.escape(REPO_URL) + r"/pull/(\d+)\)"
 PULL_GROUP = re.compile(rf"\(({PULL_LINK}(?:, {PULL_LINK})*)\)$")
 
@@ -219,6 +223,23 @@ def _parse(lines: list[str]) -> tuple[list[tuple[int, str]], list[Section]]:
 def sections(text: str) -> list[Section]:
     """The ## sections of the release notes in text, in blocks."""
     return _parse(text.splitlines())[1]
+
+
+def anchor(title: str) -> str:
+    """The anchor of a ## heading on the docs site: Python-Markdown's default slug."""
+    slug = re.sub(r"[^\w\s-]", "", title).strip().lower()
+    return re.sub(r"[-\s]+", "-", slug)
+
+
+def withdrawn(section: Section) -> bool:
+    """Whether the metadata line of a version says it was withdrawn after its release."""
+    first = _metadata_block(section)
+    return first is not None and WITHDRAWN.fullmatch(first.text) is not None
+
+
+def withdrawn_versions(text: str) -> set[str]:
+    """The versions of the release notes in text that were withdrawn."""
+    return {section.title for section in sections(text) if withdrawn(section)}
 
 
 def metadata_date(section: Section) -> str | None:
@@ -360,8 +381,8 @@ def _metadata_problems(
 ) -> list[tuple[int, str]]:
     """What breaks the rules of a version's metadata line, against its tag when tags is not None.
 
-    previous is the next older version in the file, None for the oldest. tags is None when the
-    checkout has none to compare with.
+    previous is the next older version in the file that was not withdrawn, None when there is
+    none. tags is None when the checkout has none to compare with.
     """
     version = section.title
     tag = f"v{version}"
@@ -402,15 +423,53 @@ def _metadata_problems(
     if release != wanted:
         problems.append((first.line, f"the GitHub release link is {wanted}"))
     if previous is None and compare is not None:
-        problems.append((first.line, "the oldest version has no All changes link"))
+        problems.append((first.line, "the oldest version not withdrawn has no All changes link"))
     elif previous is not None:
         wanted = f"{REPO_URL}/compare/v{previous}...{tag}"
         if compare is None:
             problems.append((first.line, f"the metadata line ends with [All changes]({wanted})"))
         elif compare != wanted:
             problems.append(
-                (first.line, f"the All changes link is {wanted}, from the version below")
+                (
+                    first.line,
+                    f"the All changes link is {wanted}, from the next older version not withdrawn",
+                )
             )
+    return problems
+
+
+def _date_problem(line: int, date: str) -> tuple[int, str] | None:
+    try:
+        datetime.date.fromisoformat(date)
+        valid = bool(DATE.fullmatch(date))
+    except ValueError:
+        valid = False
+    return None if valid else (line, f"{date} is no date as YYYY-MM-DD")
+
+
+def _withdrawn_problems(section: Section, newer: list[str]) -> list[tuple[int, str]]:
+    """What breaks the rules of a withdrawn version's metadata line.
+
+    newer holds the versions above it in the file. A withdrawn version needs no tag.
+    """
+    first = _metadata_block(section)
+    assert first is not None
+    match = WITHDRAWN.fullmatch(first.text)
+    assert match is not None
+    date, gone, by, target = match.group("date", "withdrawn", "by", "anchor")
+    problems = [
+        problem
+        for problem in (_date_problem(first.line, date), _date_problem(first.line, gone))
+        if problem is not None
+    ]
+    if not problems and gone < date:
+        problems.append(
+            (first.line, f"the withdrawal on {gone} comes before the release on {date}")
+        )
+    if by not in newer:
+        problems.append((first.line, f"{by} is no version above {section.title} in the file"))
+    elif target != anchor(by):
+        problems.append((first.line, f"the link to {by} is #{anchor(by)}"))
     return problems
 
 
@@ -487,7 +546,10 @@ def release_notes_problems(version: str) -> list[str]:
         )
 
     tags: dict[str, str] | None = tag_dates(ROOT)
-    needs_tags = len(entries) > 1 or any(_metadata_block(entry) for entry in entries[:1])
+    gone = {entry.title for entry in entries if withdrawn(entry)}
+    needs_tags = any(entry.title not in gone for entry in entries[1:]) or (
+        len(entries) == 1 and _metadata_block(entries[0]) is not None
+    )
     if not tags:
         tags = None
         if needs_tags:
@@ -499,8 +561,12 @@ def release_notes_problems(version: str) -> list[str]:
                 )
             )
     for index, entry in enumerate(entries):
-        previous = entries[index + 1].title if index + 1 < len(entries) else None
-        problems.extend(_metadata_problems(entry, previous, tags, newest=index == 0))
+        if entry.title in gone:
+            problems.extend(_withdrawn_problems(entry, [e.title for e in entries[:index]]))
+        else:
+            older = [e.title for e in entries[index + 1 :] if e.title not in gone]
+            previous = older[0] if older else None
+            problems.extend(_metadata_problems(entry, previous, tags, newest=index == 0))
         changes = entry.blocks[1:] if _metadata_block(entry) else entry.blocks
         problems.extend(_changes_problems(changes, paragraphs=True))
 

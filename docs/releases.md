@@ -13,7 +13,6 @@ Nothing yet.
 ## 1.0.0-beta.3
 
 2026-11-27 · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/v1.0.0-beta.3)
-· [All changes](https://github.com/tnek213/bwtidy/compare/v1.0.0-beta.1...v1.0.0-beta.3)
 
 No stored format changed since 1.0.0-beta.1. 1.0.0-beta.2 was never
 published, and its changes are in this release. Act on the breaking changes
@@ -24,8 +23,11 @@ below, then pull the new image and start it.
 - Pull `1.0.0-beta.3` or `latest` if you run an earlier image. Every earlier
   image is withdrawn from Docker Hub: 0.1.0-alpha.1, 1.0.0-beta.1 and each
   `main` and commit tag from before this release. They carried Bitwarden's npm
-  build of the Bitwarden CLI, which includes code under the Bitwarden License
-  ([#195](https://github.com/tnek213/bwtidy/pull/195), [#197](https://github.com/tnek213/bwtidy/pull/197))
+  build of the Bitwarden CLI, which includes code under the Bitwarden License.
+  The GitHub releases and tags of 0.1.0-alpha.1 and 1.0.0-beta.1 are withdrawn
+  too, and their entries below stay as a record
+  ([#195](https://github.com/tnek213/bwtidy/pull/195), [#197](https://github.com/tnek213/bwtidy/pull/197),
+  [#231](https://github.com/tnek213/bwtidy/pull/231))
 - Check `BWTIDY_MAX_PENDING`, `BWTIDY_MAX_WORKERS` and `BWTIDY_UID_BASE` in
   `.env` before you start the new image. The gateway now refuses to start when
   a number setting is not a whole number in its range, and the error names the
@@ -88,8 +90,8 @@ below, then pull the new image and start it.
 
 ## 1.0.0-beta.1
 
-2026-11-26 · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/v1.0.0-beta.1)
-· [All changes](https://github.com/tnek213/bwtidy/compare/v0.1.0-alpha.1...v1.0.0-beta.1)
+2026-11-26 · Withdrawn on 2026-11-27, see
+[1.0.0-beta.3](#100-beta3)
 
 bwtidy is feature complete for 1.0 and enters its beta. From this version on,
 a stored format changes only with a migration. [Road to
@@ -116,7 +118,8 @@ bwtidy works for you, say so in the
 
 ## 0.1.0-alpha.1
 
-2026-11-25 · [GitHub release](https://github.com/tnek213/bwtidy/releases/tag/v0.1.0-alpha.1)
+2026-11-25 · Withdrawn on 2026-11-27, see
+[1.0.0-beta.3](#100-beta3)
 
 The first release is a web UI and MCP server for a Bitwarden or Vaultwarden
 vault. It shows the vault as one grid, normalizes field names and applies

@@ -14,6 +14,7 @@ from tests.support.release_notes import (
     FakeRepo,
     metadata,
     pull,
+    withdrawn,
 )
 
 
@@ -312,7 +313,11 @@ def test_a_compare_link_on_the_oldest_fails(repo):
     )
     repo.tagged(text)
     found = versions.release_notes_problems(SEMVER)
-    only(found, line_of(text, "v0.0.1...v0.0.2"), "the oldest version has no All changes link")
+    only(
+        found,
+        line_of(text, "v0.0.1...v0.0.2"),
+        "the oldest version not withdrawn has no All changes link",
+    )
 
 
 def test_a_wrong_previous_fails(repo):
@@ -329,6 +334,73 @@ def test_a_missing_compare_link_fails(repo):
     repo.tagged(text)
     found = versions.release_notes_problems(SEMVER)
     only(found, line_of(text, f"tag/v{SEMVER})"), "ends with [All changes]")
+
+
+## 0.0.2 withdrawn when SEMVER replaced it, so SEMVER has no All changes link
+GONE_0_0_2 = TAGGED.replace(
+    metadata(SEMVER, "2026-03-05", "0.0.2"), metadata(SEMVER, "2026-03-05", None)
+).replace(metadata("0.0.2", "2026-02-03", None), withdrawn("2026-02-03", "2026-03-06", SEMVER))
+
+
+def test_a_withdrawn_version_needs_no_tag(repo):
+    repo.tag(SEMVER, TAGS[SEMVER])
+    assert problems(repo, GONE_0_0_2) == []
+
+
+def test_an_untagged_newest_above_withdrawn_versions_needs_no_tags(repo):
+    assert problems(repo, GONE_0_0_2) == []
+
+
+def test_a_withdrawn_version_whose_tag_is_still_there_passes(repo):
+    repo.tagged(GONE_0_0_2)
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_a_compare_link_to_a_withdrawn_version_fails(repo):
+    text = GONE_0_0_2.replace(
+        metadata(SEMVER, "2026-03-05", None), metadata(SEMVER, "2026-03-05", "0.0.2")
+    )
+    found = problems(repo, text)
+    only(found, line_of(text, "compare/v0.0.2"), "not withdrawn has no All changes link")
+
+
+def test_the_compare_link_skips_a_withdrawn_version(repo):
+    gone = f"## 0.0.3\n\n{withdrawn('2026-02-10', '2026-03-06', SEMVER)}\n\n- Try it {pull(2)}\n\n"
+    text = TAGGED.replace("## 0.0.2", gone + "## 0.0.2")
+    repo.tagged(text)
+    assert versions.release_notes_problems(SEMVER) == []
+    wrong = text.replace("compare/v0.0.2...", "compare/v0.0.3...")
+    found = problems(repo, wrong)
+    only(found, line_of(wrong, "compare/v0.0.3"), f"{REPO}/compare/v0.0.2...v{SEMVER}")
+
+
+def test_a_withdrawn_version_replaced_by_no_newer_version_fails(repo):
+    text = GONE_0_0_2.replace(f"see [{SEMVER}]", "see [0.2.0]")
+    found = problems(repo, text)
+    only(found, line_of(text, "Withdrawn on"), "0.2.0 is no version above 0.0.2")
+
+
+def test_a_withdrawn_version_with_a_wrong_anchor_fails(repo):
+    text = GONE_0_0_2.replace("(#010-alpha1)", "(#0.1.0-alpha.1)")
+    found = problems(repo, text)
+    only(found, line_of(text, "Withdrawn on"), f"the link to {SEMVER} is #010-alpha1")
+
+
+def test_a_withdrawal_before_the_release_fails(repo):
+    text = GONE_0_0_2.replace("Withdrawn on 2026-03-06", "Withdrawn on 2026-01-06")
+    found = problems(repo, text)
+    only(found, line_of(text, "Withdrawn on"), "comes before the release on 2026-02-03")
+
+
+def test_a_withdrawal_date_that_is_no_date_fails(repo):
+    text = GONE_0_0_2.replace("Withdrawn on 2026-03-06", "Withdrawn on 2026-02-30")
+    found = problems(repo, text)
+    only(found, line_of(text, "Withdrawn on"), "2026-02-30 is no date")
+
+
+def test_the_anchor_is_the_docs_sites_slug():
+    assert versions.anchor("1.0.0-beta.3") == "100-beta3"
+    assert versions.anchor(SEMVER) == "010-alpha1"
 
 
 def plain(text: str) -> str:

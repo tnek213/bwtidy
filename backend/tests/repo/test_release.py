@@ -20,6 +20,7 @@ from tests.support.release_notes import (
     FakeRepo,
     metadata,
     pull,
+    withdrawn,
 )
 
 NEW = "0.1.0-alpha.2"
@@ -173,6 +174,41 @@ def test_prepare_again_writes_todays_date_over_the_older_one(repo):
     )
 
 
+def test_prepare_again_links_no_withdrawn_version(repo):
+    gone = f"## 0.0.2\n\n{withdrawn('2026-02-03', '2026-03-01', SEMVER)}\n\n- Begin {pull(1)}\n"
+    entry = f"- Start bwtidy {pull(2)}\n\n"
+    repo.release_notes(
+        INTRO + UNRELEASED + f"## {SEMVER}\n\n{metadata(SEMVER, '2026-03-01', None)}\n\n"
+        f"{entry}{gone}"
+    )
+    release.prepare(SEMVER, TODAY, repo.root, no_refresh)
+    assert notes_of(repo) == (
+        INTRO + UNRELEASED + f"## {SEMVER}\n\n{metadata(SEMVER, '2026-03-09', None)}\n\n"
+        f"{entry}{gone}"
+    )
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_prepare_of_a_new_version_skips_a_withdrawn_newest(repo):
+    repo.tag("0.0.2", TAGS["0.0.2"])
+    line = withdrawn("2026-03-01", "2026-03-08", NEW)
+    gone = f"## {SEMVER}\n\n{line}\n\n- Start bwtidy {pull(2)}\n\n"
+    repo.release_notes(INTRO + unreleased(f"- Sort the grid {pull(12)}") + gone + OLDER)
+
+    def refresh(root):
+        repo.uv_lock("0.1.0a2")
+        repo.package_lock(NEW, NEW)
+
+    release.prepare(NEW, TODAY, repo.root, refresh)
+    assert notes_of(repo) == (
+        INTRO
+        + UNRELEASED
+        + f"## {NEW}\n\n{wrapped(NEW, '2026-03-09', '0.0.2')}\n\n- Sort the grid {pull(12)}\n\n"
+        + gone
+        + OLDER
+    )
+
+
 def test_prepare_puts_the_bullets_under_the_headings_of_the_format(repo):
     repo.tag("0.0.2", TAGS["0.0.2"])
     repo.release_notes(
@@ -293,13 +329,38 @@ def test_notes_are_the_entry_without_heading_and_metadata_with_absolute_links(re
         + f"## {SEMVER}\n\n- Start {pull(1)}\n"
     )
     assert release.notes(NEW, repo.root) == (
-        f"Read [Road to\n1.0]({SITE}explanation/road-to-1.0/) first.\n\n"
+        f"Read [Road to 1.0]({SITE}explanation/road-to-1.0/) first.\n\n"
         f"- Turn on [usage stats]({SITE}reference/configuration/#usage-stats) {pull(4)}\n"
         f"- Start at [the home page]({SITE}) or [here]({SITE}releases/#unreleased) {pull(5)}\n"
         f"- See [the code]({REPO}/blob/main/README.md) and ![a grid]({SITE}images/grid.png)"
         f" {pull(6)}\n"
     )
     assert release.notes(SEMVER, repo.root) == f"- Start {pull(1)}\n"
+
+
+def test_notes_put_each_paragraph_and_bullet_on_one_line(repo):
+    repo.release_notes(
+        INTRO
+        + UNRELEASED
+        + f"## {NEW}\n\n{wrapped(NEW, '2026-03-09', SEMVER)}\n\n"
+        + "A first paragraph\nthat wraps.\n\n"
+        + "### Breaking changes\n\n"
+        + f"- Run the migration\n  before you start {pull(7)}\n"
+        + f"- Update now {pull(8)}\n\n"
+        + "### Other changes\n\n"
+        + f"- Find the grid, a long line\n  that wraps\n  twice {pull(3, 4)}\n\n"
+        + "```sh\ndocker compose pull\ndocker compose up -d\n```\n\n"
+        + f"## {SEMVER}\n\n- Start {pull(1)}\n"
+    )
+    assert release.notes(NEW, repo.root) == (
+        "A first paragraph that wraps.\n\n"
+        "### Breaking changes\n\n"
+        f"- Run the migration before you start {pull(7)}\n"
+        f"- Update now {pull(8)}\n\n"
+        "### Other changes\n\n"
+        f"- Find the grid, a long line that wraps twice {pull(3, 4)}\n\n"
+        "```sh\ndocker compose pull\ndocker compose up -d\n```\n"
+    )
 
 
 def test_notes_of_a_version_without_an_entry_fail(repo):

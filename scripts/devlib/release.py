@@ -273,6 +273,7 @@ def prepare(
         raise fail(f"## {versions.UNRELEASED} holds more than bullets, run scripts/ci first")
     entries = [title for title in titles if versions.VERSION.fullmatch(title)]
     newest = entries[0] if entries else None
+    gone = versions.withdrawn_versions(path.read_text())
     tag = f"v{version}"
     if tag_exists(tag, root):
         raise fail(f"the tag {tag} exists, {version} is released already")
@@ -282,7 +283,8 @@ def prepare(
             raise fail(f"## {version} is not the newest entry of {NOTES}")
         index = titles.index(version)
         old = Entry(found[index][1][1:])
-        previous = entries[1] if len(entries) > 1 else None
+        older = [title for title in entries[1:] if title not in gone]
+        previous = older[0] if older else None
         groups = merged(old, unreleased)
         found[index] = (
             version,
@@ -294,7 +296,7 @@ def prepare(
             raise fail(f"{NOTES} has an entry for {version} already, but the version is {current}")
         if newest is not None and versions.version_key(version) <= versions.version_key(newest):
             raise fail(f"{version} is not newer than {newest}, the newest entry of {NOTES}")
-        if newest is not None and not tag_exists(f"v{newest}", root):
+        if newest is not None and newest not in gone and not tag_exists(f"v{newest}", root):
             raise fail(
                 f"{newest} has no tag yet, release it first with scripts/release tag {newest} "
                 f"or prepare it again with scripts/release prepare {newest}"
@@ -304,8 +306,10 @@ def prepare(
                 f"## {versions.UNRELEASED} says '{versions.NOTHING_YET}', so {version} would have "
                 "no changes to name"
             )
+        released = [title for title in entries if title not in gone]
+        previous = released[0] if released else None
         lines = entry_lines(
-            version, metadata_lines(version, today, newest), [], merged(Entry([]), unreleased)
+            version, metadata_lines(version, today, previous), [], merged(Entry([]), unreleased)
         )
         found.insert(titles.index(versions.UNRELEASED) + 1, (version, lines))
         bump(version, root)
@@ -431,9 +435,39 @@ def absolute(target: str) -> str:
     return f"{SITE_URL}{path}{hash_mark}{anchor}"
 
 
+def unwrap(text: str) -> str:
+    """text with each paragraph and each bullet on one line, code blocks as they are.
+
+    GitHub shows every line break of a release body, so the wrapping at 80 characters of
+    docs/releases.md would break its lines in the middle.
+    """
+    lines: list[str] = []
+    fenced = False
+    for line in text.splitlines():
+        if FENCE.match(line):
+            fenced = not fenced
+            lines.append(line)
+            continue
+        joins = bool(
+            not fenced
+            and line.strip()
+            and lines
+            and lines[-1].strip()
+            and not lines[-1].lstrip().startswith("#")
+            and not FENCE.match(lines[-1])
+            and not line.lstrip().startswith("#")
+            and not BULLET_START.match(line.lstrip())
+        )
+        if joins:
+            lines[-1] = f"{lines[-1].rstrip()} {line.strip()}"
+        else:
+            lines.append(line)
+    return "\n".join(lines)
+
+
 def notes(version: str, root: Path = ROOT) -> str:
     """The body of the GitHub release of version: its entry without its heading and metadata
-    line, every link absolute."""
+    line, every paragraph and bullet on one line and every link absolute."""
     check_version(version)
     for title, lines in split_sections((root / NOTES).read_text().splitlines())[1]:
         if title != version:
@@ -444,7 +478,7 @@ def notes(version: str, root: Path = ROOT) -> str:
             first = paragraphs[0]
             start = body.index(first[0])
             body = body[start + len(first) :]
-        text = "\n".join(body).strip("\n")
+        text = unwrap("\n".join(body).strip("\n"))
         return LINK.sub(lambda m: m.group(1) + absolute(m.group(2)) + m.group(3), text) + "\n"
     raise fail(f"{NOTES} has no ## {version}")
 
