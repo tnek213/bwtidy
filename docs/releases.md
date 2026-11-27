@@ -11,6 +11,9 @@ Changes on main that are not yet in a versioned Docker image.
 - Refuse an email or a server too long for an account's directory name with
   a clear message, where the first login failed with an error before
   ([#227](https://github.com/tnek213/bwtidy/pull/227))
+- Find the archived items of an account without premium, with their
+  attachments, in every backup
+  ([#224](https://github.com/tnek213/bwtidy/pull/224))
 - Restore a change of an item you archived since, which then stays archived,
   and keep a folder that still holds archived items from being deleted
   ([#220](https://github.com/tnek213/bwtidy/pull/220))

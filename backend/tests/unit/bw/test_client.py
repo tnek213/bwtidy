@@ -74,6 +74,21 @@ def test_lists(method_name: str, path: str):
     assert rec.requests == [("GET", path, None)]
 
 
+@pytest.mark.parametrize(
+    ("trash", "path"),
+    [
+        (False, "/list/object/items?archived=true"),
+        (True, "/list/object/items?archived=true&trash=true"),
+    ],
+)
+def test_list_archived_keeps_only_the_archived_items(trash: bool, path: str):
+    """Without premium bw drops archived=true and lists the items that are not archived."""
+    archived = {"id": "a", "archivedDate": "2026-10-21T10:00:00.000Z"}
+    rec = Recorder({"object": "list", "data": [{"id": "b"}, archived]})
+    assert run(rec.client().list_archived(trash=trash)) == [archived]
+    assert rec.requests == [("GET", path, None)]
+
+
 def test_get_item():
     rec = Recorder({"id": "abc"})
     assert run(rec.client().get_item("abc")) == {"id": "abc"}

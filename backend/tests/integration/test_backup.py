@@ -7,6 +7,7 @@ directory is not mounted in the app container). Nothing here prints an item.
 import base64
 import io
 import json
+import os
 import zipfile
 from pathlib import Path
 
@@ -14,7 +15,14 @@ import pytest
 from support.app import App, Elsewhere
 from support.cli import PASSWORD, BwCli
 
-from bwtidy.backups.collect import encrypted_size
+from bwtidy.backups.collect import (
+    encrypted_size,
+    exported_ids,
+    get_unlisted,
+    ids,
+    list_vault,
+    run_bw,
+)
 from bwtidy.backups.crypto import decrypt_backup
 from bwtidy.vault.cache import list_items_settled
 from bwtidy.vault.tool_note import TOOL_NOTE_NAME
@@ -223,6 +231,52 @@ def test_an_archived_item_and_its_attachment_are_backed_up(
         ## bw export leaves out the trash only, so the import brings the archived item back
         assert shelved in exported and binned not in exported
     finally:
+        elsewhere.clean_up()
+
+
+def set_premium(premium: bool) -> None:
+    """Give the CLI state the premium flags of an account with or without premium.
+
+    Vaultwarden gives every account premium, and a sync only fetches the profile when the
+    vault changed on the server. So the flags stay as set here until the next change.
+    """
+    state = Path(os.environ["BITWARDENCLI_APPDATA_DIR"]) / "data.json"
+    data = json.loads(state.read_text())
+    [key] = [k for k in data if k.endswith("_billing_accountProfile")]
+    data[key] = {"hasPremiumPersonally": premium, "hasPremiumFromAnyOrganization": False}
+    state.write_text(json.dumps(data))
+
+
+def test_an_archived_item_of_an_account_without_premium_is_found_through_the_export(
+    app: App, bw_cli: BwCli, tmp_path: Path, created: dict
+):
+    """bw lists no archived item for an account without premium, but the export holds it and
+    bw serve answers it by id. Without premium bw also refuses to download the attachments
+    of personal items, which the seeded vault has, so this checks the steps that find the
+    item and not a whole backup."""
+    elsewhere = Elsewhere(app, bw_cli, tmp_path)
+    assert app.client.portal is not None
+    portal, client = app.client.portal, app.session.client
+    try:
+        shelved = elsewhere.note_with_attachment("Shelved unpaid", "unpaid.txt", b"no premium\n")
+        elsewhere.archive(shelved)
+        bw_cli.run("sync", session=elsewhere.key)
+        set_premium(False)
+        portal.call(client.sync)
+        vault = portal.call(list_vault, client)
+        assert vault.archived == [], "bw still lists archived items"
+        assert shelved not in ids(vault.items)
+        personal = portal.call(
+            run_bw, "bw", ["--raw", "export", "--format", "zip"], elsewhere.key, "personal export"
+        )
+        unlisted = exported_ids(personal, []) - ids(vault.items)
+        assert unlisted == {shelved}
+        [found] = portal.call(get_unlisted, client, unlisted)
+        assert found["archivedDate"] and not found.get("deletedDate")
+        assert [a["fileName"] for a in found["attachments"]] == ["unpaid.txt"]
+    finally:
+        set_premium(True)
+        bw_cli.run("sync", "--force", session=elsewhere.key)
         elsewhere.clean_up()
 
 
