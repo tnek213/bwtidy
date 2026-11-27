@@ -55,3 +55,20 @@ test('a pattern compares by its text ignoring case, never equal to a field of th
   expect(draftProblem(pattern('E', '**'), [])).toBe('A pattern needs a * and some other character.')
   expect(draftProblem(pattern('F', 'user'), [])).toBe('A pattern needs a * and some other character.')
 })
+
+test('a name another template has ignoring case and surrounding spaces is taken', () => {
+  const named = (name: string): Template => ({ ...computer, name })
+  expect(draftProblem(named('work'), [named('Work')])).toBe('There is already a template named Work.')
+  expect(draftProblem(named('STRASSE'), [named('Straße')])).toBe('There is already a template named Straße.')
+  expect(draftProblem(named('Work '), [named('Work')])).toBe('There is already a template named Work.')
+  expect(draftProblem(named('work'), [named(' Work ')])).toBe('There is already a template named Work.')
+  expect(draftProblem(named('Workshop'), [named('Work')])).toBeNull()
+})
+
+test('a template keeps its own name in another case, as the editor compares it with the others only', () => {
+  const work: Template = { ...computer, name: 'Work' }
+  const home: Template = { ...computer, name: 'Home' }
+  const templates = [work, home]
+  const others = templates.filter((template) => template !== work)
+  expect(draftProblem({ ...work, name: 'WORK' }, others)).toBeNull()
+})
