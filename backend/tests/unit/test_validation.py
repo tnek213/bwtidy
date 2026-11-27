@@ -2,8 +2,6 @@
 
 import json
 import re
-import shutil
-import tempfile
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -19,6 +17,7 @@ from bwtidy.validation import FIXED_MESSAGE, OWN_TYPE, refusal, safe_message
 from tests.support.app_env import AppEnv
 from tests.support.gateway_env import make_env as make_gateway_env
 from tests.support.section_changes import add_template, changes
+from tests.support.sockets import short_tmp_path
 
 SENTINEL = "sentinel-value-that-must-not-come-back"
 
@@ -189,12 +188,8 @@ def test_no_worker_route_quotes_a_refused_value(tmp_path: Path):
 
 @pytest.fixture
 def short_tmp() -> Iterator[Path]:
-    """A short path: a unix socket path has a limit of about 100 bytes."""
-    path = Path(tempfile.mkdtemp(prefix="gw"))
-    try:
-        yield path
-    finally:
-        shutil.rmtree(path, ignore_errors=True)
+    """A tmp_path whose end removes the gateway's socket directories too."""
+    yield from short_tmp_path("gw")
 
 
 def test_no_gateway_route_quotes_a_refused_value(short_tmp: Path):

@@ -74,6 +74,9 @@ modules of `backend/tests/support/` that help them:
   `sections_helpers.py`, `section_changes.py`, `datatypes_helpers.py`,
   `normalize_data.py` and `ssh_keys.py` for the tests of their theme.
 - `quiet.py`, see [Vault values in a failure](#vault-values-in-a-failure).
+- `sockets.py`, short directories under `/tmp` for a test's Unix sockets.
+  A socket path holds at most 107 bytes and `TMPDIR` can be deep, so no test
+  puts a socket under its `tmp_path`.
 - `hooks.py`, hooks that do nothing, for a test that builds an object such as
   `VaultCache` or `BwServeProcess` without the app around it.
 - `git_repo.py`, a clone with a bare origin and `commit`, for the tests of a
@@ -254,8 +257,8 @@ same for any command) with `uv run --locked --no-sync`, so uv never touches the
 container's venv, which belongs to uid 1000, and without bytecode or the
 pytest cache, so nothing root-owned is left in the mounted worktree. Run a
 plain `scripts/integration` once before, it creates that venv. The test makes
-the account directories under `/tmp` in the container (short socket paths,
-and the workers' uids can enter them) and deletes them at the end. Root in
+the account directories under `/tmp` in the container (the workers' uids can
+enter them) and deletes them at the end. Root in
 the container has no `CAP_SYS_PTRACE`, so the test finds a worker through
 its bw serve's command line, never through `/proc/PID/environ`.
 

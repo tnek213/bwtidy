@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import tomllib
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
@@ -36,6 +37,7 @@ from tests.support.fake_bw import FakeBwServe
 from tests.support.hooks import nothing_async
 from tests.support.login_env import BOUND, IDLE_EXIT, make_env, queue_an_edit, stop_answering
 from tests.support.sample_vault import LOGIN
+from tests.support.sockets import socket_dir
 
 
 @pytest.mark.parametrize("secure", [True, False])
@@ -89,11 +91,16 @@ UnixStreamServer(path, Handler).serve_forever()
 """
 
 
-def test_bw_serve_listens_on_the_socket_and_a_stale_one_is_removed(tmp_path: Path):
+@pytest.fixture
+def sockets() -> Iterator[Path]:
+    yield from socket_dir()
+
+
+def test_bw_serve_listens_on_the_socket_and_a_stale_one_is_removed(tmp_path: Path, sockets: Path):
     bw_bin = tmp_path / "bw"
     bw_bin.write_text(FAKE_SOCKET_BW)
     bw_bin.chmod(0o755)
-    path = tmp_path / "bw.sock"
+    path = sockets / "bw.sock"
     ## what a killed bw serve leaves behind: the socket file without a listener
     stale = socket.socket(socket.AF_UNIX)
     stale.bind(str(path))
@@ -170,11 +177,11 @@ def test_a_stop_gives_up_on_a_commit_that_gets_no_answer(tmp_path: Path):
 
 
 def test_an_exit_cancels_the_requests_still_running_after_the_grace(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, sockets: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """uvicorn waits for every running request before the lifespan's end, without a limit."""
     monkeypatch.setattr(main, "SHUTDOWN_GRACE", 1, raising=False)
-    path = tmp_path / "app.sock"
+    path = sockets / "app.sock"
     env = AppEnv(tmp_path / "data", bw=FakeBwServe(), fake_backups=False, socket=path)
     app = env.app
     started = threading.Event()

@@ -39,8 +39,8 @@ Bitwarden.
 ## `bw serve` for reads and writes
 
 Each account's worker starts its own `bw serve`, which is the CLI's local REST
-API. It listens on a unix socket in the account's directory and never on a
-network port. `bw serve` has no login of its own, so whoever reaches it can
+API. It listens on a unix socket in a directory of the account's own and never
+on a network port. `bw serve` has no login of its own, so whoever reaches it can
 use the unlocked vault.
 
 Through `bw serve` bwtidy does all of this:
