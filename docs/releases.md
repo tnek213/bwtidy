@@ -8,6 +8,9 @@ The versions of bwtidy follow [Semantic Versioning](https://semver.org) with
 
 Changes on main that are not yet in a versioned Docker image.
 
+- Restore a change of an item you archived since, which then stays archived,
+  and keep a folder that still holds archived items from being deleted
+  ([#220](https://github.com/tnek213/bwtidy/pull/220))
 - Find archived items and their attachments in every backup, those in the
   trash too. A restore brings their attachments back
   ([#201](https://github.com/tnek213/bwtidy/pull/201))
