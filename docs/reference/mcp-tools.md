@@ -623,7 +623,7 @@ Parameters:
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
 | `item_id` | string | required | The item id from list_items |
-| `type` | string | required | The new type: login, secureNote, card, identity or sshKey |
+| `type` | string | required | The new type: login, note, card, identity or sshKey |
 | `mapping` | object of string or null | `null` | {target column: the item's column}, default none |
 | `reason` | string or null | `null` | Why the change helps, shown to the user with the proposal |
 
@@ -745,7 +745,7 @@ Parameters:
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
 | `name` | string | required | The new item's name |
-| `type` | string or null | `null` | login, secureNote, card or identity, when no template |
+| `type` | string or null | `null` | login, note, card or identity, when no template |
 | `template` | string or null | `null` | Template name from list_templates, when no type |
 | `folder` | string | `""` | Folder name, created when missing, empty for none |
 | `organization` | string | `""` | Organization name, empty for the personal vault |
