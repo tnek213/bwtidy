@@ -81,9 +81,10 @@ modules of `backend/tests/support/` that help them:
   `VaultCache` or `BwServeProcess` without the app around it.
 - `git_repo.py`, a clone with a bare origin and `commit`, for the tests of a
   script that reads git (the pre-push hook's).
-- `restore_doc.py`, the Python of `docs/restore.md` (its program `attach.py`
-  and its `python3 -c` commands), which `tests/repo/test_restore_doc.py`
-  parses as Python 3.8 and the integration test `test_backup_import.py` runs.
+- `restore_doc.py`, the Python of `docs/restore.md` (its programs, each a
+  `python` block titled with its file name), which
+  `tests/repo/test_restore_doc.py` parses as Python 3.8 and the integration
+  test `test_backup_import.py` runs.
 
 The tests of `tests/scripts` load a script by name with the fixture
 `load_script` (`load_script("dev-vault")`), and `backend/tests/conftest.py`

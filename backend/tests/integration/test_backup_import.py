@@ -5,10 +5,11 @@ backup: import the personal export and every organization export (each into the 
 of the same name), then find each backup item's imported item by its content and upload its
 attachments. This test does those steps with the CLI as restore@bwtidy.test (a CLI state of
 its own, so the app's login stays as it is): the imports itself, the attachments by running
-the document's program attach.py as it stands in the worktree (/app/docs/restore.md). Then it
-finds each backup item's imported item with a matching of its own and compares what arrived
-with the backup's raw/items.json. The restore account is emptied again before and after, so
-the test runs again on the same stack.
+the document's program attach.py as it stands in the worktree (/app/docs/restore.md), and
+the trash and the counts by its trash.py and check.py. Then it finds each backup item's
+imported item with a matching of its own and compares what arrived with the backup's
+raw/items.json. The restore account is emptied again before and after, so the test runs
+again on the same stack.
 
 Two personal notes named Twin, each with an attachment same.txt of other bytes, two notes
 named Org twin equal in every compared leaf, one in Family's collection Shared and one in
@@ -43,7 +44,7 @@ from support.cli import BW_TIMEOUT, PASSWORD, BwCli
 
 from bwtidy.backups.collect import RESTORE_DOC, attachment_members
 from bwtidy.backups.crypto import decrypt_backup
-from tests.support.restore_doc import attach_program
+from tests.support.restore_doc import programs
 
 pytestmark = pytest.mark.integration
 
@@ -417,11 +418,10 @@ def trashed(backup: Backup) -> list[Item]:
 BACKUP_ITEMS = ("raw/items.json", "raw/archived.json")
 
 
-def attach(backup: Backup, restore: Restore, *items: str) -> list[str]:
-    """Run docs/restore.md's attach.py on the backup items of the files items, as the document
-    does it in the unpacked backup. Returns the lines it printed, which name only ids."""
-    program = backup.root / "attach.py"
-    program.write_text(attach_program(RESTORE_DOC.read_text()))
+def run_program(backup: Backup, restore: Restore, name: str, *args: str) -> list[str]:
+    """Run the program name of docs/restore.md with args in the unpacked backup, as the
+    document does it, with the restore account's CLI. Returns the lines it printed."""
+    (backup.root / name).write_text(programs(RESTORE_DOC.read_text())[name])
     assert restore.cli.appdata is not None
     env = {
         **os.environ,
@@ -429,7 +429,7 @@ def attach(backup: Backup, restore: Restore, *items: str) -> list[str]:
         "BITWARDENCLI_APPDATA_DIR": restore.cli.appdata,
     }
     result = subprocess.run(
-        ["python3", "attach.py", *items],
+        ["python3", name, *args],
         cwd=backup.root,
         env=env,
         stdin=subprocess.DEVNULL,
@@ -439,8 +439,15 @@ def attach(backup: Backup, restore: Restore, *items: str) -> list[str]:
     )
     ## stderr only holds bw's errors and a traceback, never an item
     assert result.returncode == 0, result.stderr
-    assert not (backup.root / "upload").exists()
     return result.stdout.splitlines()
+
+
+def attach(backup: Backup, restore: Restore, *items: str) -> list[str]:
+    """Run docs/restore.md's attach.py on the backup items of the files items. Returns the
+    lines it printed, which name only ids."""
+    lines = run_program(backup, restore, "attach.py", *items)
+    assert not (backup.root / "upload").exists()
+    return lines
 
 
 @pytest.fixture(scope="module")
@@ -777,6 +784,27 @@ def test_a_folder_name_the_account_lacks_leaves_the_item_in_its_folder(
     assert restore.json("get", "item", in_folder)["folderId"] == clients["id"]
 
 
+def test_check_counts_as_many_items_and_attachments_as_the_backup(
+    backup: Backup, restore: Restore, raw: dict, imported: dict
+):
+    """docs/restore.md, step 7: the two lines of check.py show the same numbers."""
+    lines = run_program(backup, restore, "check.py", *BACKUP_ITEMS)
+    attachments = sum(len(item.get("attachments") or []) for item in raw.values())
+    numbers = f"{len(raw)} items, {attachments} attachments"
+    assert lines == [f"the account: {numbers}", f"the backup:  {numbers}"]
+
+
+def test_trash_writes_the_files_of_step_6(backup: Backup, restore: Restore):
+    """docs/restore.md, step 6: trash.py drops what bw import refuses or would take over."""
+    assert run_program(backup, restore, "trash.py") == []
+    trash = trashed(backup)
+    items = [{k: v for k, v in i.items() if k not in TRASH_DROPPED} for i in trash]
+    assert backup.json("trash-import.json") == {"encrypted": False, "items": items}
+    ## the trashed items keep their ids, so attach.py finds their files
+    moved = [{k: v for k, v in i.items() if k == "id" or k not in TRASH_DROPPED} for i in trash]
+    assert backup.json("with-trash.json") == backup.json("raw/items.json") + moved
+
+
 def test_the_trash_imports_as_docs_restore_says(backup: Backup, restore: Restore, imported):
     """Runs last: it adds the trash items to the restore account, then their attachments."""
     trash = trashed(backup)
@@ -786,13 +814,8 @@ def test_the_trash_imports_as_docs_restore_says(backup: Backup, restore: Restore
         "Binned",
         "Shelved and binned",
     }
-    items = [{k: v for k, v in i.items() if k not in TRASH_DROPPED} for i in trash]
-    path = backup.root / "trash-import.json"
-    path.write_text(json.dumps({"encrypted": False, "items": items}))
-    restore.run("import", "bitwardenjson", str(path))
-    ## with-trash.json of step 6: the trashed items keep their ids, so attach.py finds their files
-    moved = [{k: v for k, v in i.items() if k == "id" or k not in TRASH_DROPPED} for i in trash]
-    (backup.root / "with-trash.json").write_text(json.dumps(backup.json("raw/items.json") + moved))
+    assert run_program(backup, restore, "trash.py") == []
+    restore.run("import", "bitwardenjson", str(backup.root / "trash-import.json"))
     lines = attach(backup, restore, "with-trash.json", "raw/archived.json")
     assert sum(UPLOADED in line for line in lines) == 2
     assert len(lines) == 2, lines
