@@ -46,8 +46,8 @@ these four tools are installed. To check them, run `age --version` and
   from [nodejs.org](https://nodejs.org/) or Homebrew. You can also take the
   [standalone build](https://bitwarden.com/download/). Homebrew's
   `bitwarden-cli` works too, although it is not Bitwarden's own package.
-- bash. The system's bash 3.2 is enough because no command here needs bash
-  4. The default shell of Terminal is zsh, so run `bash` first. You can also
+- bash. The system's bash 3.2 is enough because no command here needs bash 4.
+  The default shell of Terminal is zsh, so run `bash` first. You can also
   paste the commands into zsh, which takes them as they are.
 
 ### Windows

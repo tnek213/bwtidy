@@ -67,3 +67,9 @@ def test_every_markdown_file_of_the_repo_is_linted():
     folders = [pattern.removesuffix("/**").removeprefix("**/") for pattern in ignores]
     hit = [path for path in tracked for folder in folders if f"/{folder}/" in f"/{path}"]
     assert hit == []
+
+
+def test_the_custom_rule_of_the_docs_site_lists_is_loaded():
+    ## a relative path is resolved from the config file, the repo root
+    assert settings()["customRules"] == ["tools/markdownlint/rules/wrapped-list-marker.mjs"]
+    assert (ROOT / settings()["customRules"][0]).is_file()

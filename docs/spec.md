@@ -693,10 +693,10 @@ A unit test sends markers in all of these and finds none in the file.
   file makes at its first open. So the same account counts as one without its
   email. `create_gateway_app(stats_account=...)` lets a wrapper of the gateway
   (the demo) store its own label instead.
-- An exception that a worker did not handle reaches the gateway only as a
-  500. A worker that the gateway started with the stats on (it sets
-  `BWTIDY_STATS_REPORT=1`) adds the header `X-Bwtidy-Stats-Error` to that
-  500. The header holds the exception's type and its frames inside the bwtidy
+- An exception that a worker did not handle reaches the gateway only as a 500.
+  A worker that the gateway started with the stats on (it sets
+  `BWTIDY_STATS_REPORT=1`) adds the header `X-Bwtidy-Stats-Error` to that 500.
+  The header holds the exception's type and its frames inside the bwtidy
   package. A frame is its path relative to the package with the function and
   the line. The header never holds the exception's text, arguments or locals
   and never a log line.
@@ -2703,8 +2703,8 @@ menu](reference/ui.md#cell-menu) say how a user renames and merges.
   keep B's entries and get A's entries added instead of being replaced. B's
   URIs come first and then A's URIs that B lacks, each with its own match
   setting.
-- A column in `append` that is not a list column or not in the mapping is a
-  422. The UI appends by default, while the MCP tool `propose_merge_items`
+- A column in `append` that is not a list column or not in the mapping is
+  a 422. The UI appends by default, while the MCP tool `propose_merge_items`
   always replaces.
 - The secret rule applies, so no merge may move a secret into a non-secret
   coordinate. A new field made by a move gets the type of its source, so a

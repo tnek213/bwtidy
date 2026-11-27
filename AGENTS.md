@@ -22,7 +22,8 @@ spec changes.
   one-liner is clearer. The package `scripts/devlib/` is what they share, each
   script a command line over it (`scripts/docs-site` imports none of it).
 - `tools/markdownlint/` the npm folder of markdownlint-cli2, a tool of the
-  repo that bwtidy does not ship (Writing docs).
+  repo that bwtidy does not ship, and its custom rules in `rules/` (Writing
+  docs).
 - `docs/` the user docs, from `docs/index.md` into four folders:
   `tutorial/`, `how-to/`, `reference/` and `explanation/`. Beside them
   `docs/spec.md` (the rules and reasons the user docs do not state),
@@ -123,7 +124,13 @@ markdownlint checks every Markdown file of the repo against the settings in
 it can. Text is wrapped by hand at 80 characters outside code blocks, tables
 and headings, as markdownlint wraps nothing. The VS Code extension markdownlint
 (`DavidAnson.vscode-markdownlint`) reads the same file and shows the same
-findings in the editor.
+findings in the editor, the custom rule only in a trusted workspace.
+
+The custom rule BWT001 (wrapped-line-list-marker) reports a wrapped line in
+the first paragraph of a list item when the line starts with a number and a
+period (or `-`, `*` or `+`) and a space. The docs site starts a new item there
+and drops the marker while GitHub keeps the line in the text. Move the line
+break so the marker ends the line before.
 
 Write without semicolons. A colon only introduces a list block. A sentence has
 at most one comma and a paragraph at most two.
