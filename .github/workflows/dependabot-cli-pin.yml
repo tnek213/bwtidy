@@ -1,9 +1,10 @@
 # Adds the commit that a bump of the Bitwarden CLI needs to Dependabot's pull request: main's
-# scripts/update-deps --cli-pin writes source.json and the docs that name the version from the
-# pull request's docker/bitwarden-cli/package.json (dev/release.md, The CLI pin of Dependabot's
-# pull requests). It runs main's workflow and main's script with a token that can write, so it
-# never runs anything from the pull request: that checkout is only data the script reads and
-# writes. By hand it takes the number of such a pull request.
+# scripts/update-deps --cli-pin writes source.json, the docs that name the version from the
+# pull request's docker/bitwarden-cli/package.json and the pull request's bullet in the release
+# notes (dev/release.md, The CLI pin of Dependabot's pull requests). It runs main's workflow and
+# main's script with a token that can write, so it never runs anything from the pull request:
+# that checkout is only data the script reads and writes. By hand it takes the number of such a
+# pull request.
 name: Dependabot CLI pin
 
 on:
@@ -71,6 +72,8 @@ jobs:
           persist-credentials: false
       - name: Write the CLI pin
         id: pin
+        env:
+          NUMBER: ${{ github.event.pull_request.number || inputs.pull_request }}
         run: |
           version=$(jq -r '.dependencies["@bitwarden/cli"]' head/docker/bitwarden-cli/package.json)
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -78,7 +81,7 @@ jobs:
             exit 1
           fi
           echo "version=$version" >>"$GITHUB_OUTPUT"
-          python3 main/scripts/update-deps --cli-pin --root head
+          python3 main/scripts/update-deps --cli-pin --root head --pr "$NUMBER"
       # through the API, as GitHub signs a commit it makes there (Protect main requires signed
       # commits) and git push would sign nothing
       - name: Commit the CLI pin

@@ -260,7 +260,16 @@ def test_create_makes_the_layout_with_the_pending_marker(env: GatewayEnv):
     assert path.parent.stat().st_mode & 0o777 == 0o711
     assert env.root.stat().st_mode & 0o777 == 0o711
     assert (path / WORKER_LOG).is_file()
-    assert (path / "run" / "app.sock").is_socket()
+    assert not (path / "run").exists()
+
+
+def test_the_socket_root_is_no_host_directory(env: GatewayEnv):
+    """By default the socket directories lie in the accounts directory, as .run/NAME."""
+    env.started()
+    (env.root / ".run" / "0123456789abcdef").mkdir(parents=True)
+    accounts = env.gateway.accounts
+    assert accounts.host_directories() == [env.root / "vaultwarden"]
+    assert accounts.account_directories() == [env.directory()]
 
 
 def test_uid_allocation_takes_the_highest_owner_plus_one(

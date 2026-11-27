@@ -29,9 +29,9 @@ GONE_WITHIN = HEARTBEAT_TIMEOUT + 10 + 60 + 10 + 30 + 10 + 5 + 25
 ## long enough that nothing commits on its own while the test runs
 NEVER = 3600
 
-## the account's worker and its bw serve, found in /proc like scripts/devlib/gateway.py does. The
-## worker runs as the account directory's uid (another uid's environ needs a ptrace right root
-## lacks in the container).
+## the account's worker and its bw serve, found in /proc like scripts/devlib/gateway.py does. Both
+## run as the account directory's uid (another uid's environ needs a ptrace right root lacks in
+## the container).
 PROCESSES = """
 import os, sys
 account = sys.argv[1].encode()
@@ -44,7 +44,7 @@ for pid in filter(str.isdigit, os.listdir("/proc")):
         continue
     if b"/home/app/venv/bin/bwtidy" in args and owner == uid:
         print("worker", pid)
-    elif b"serve" in args and any(a.startswith(b"unix://" + account + b"/") for a in args):
+    elif b"serve" in args and owner == uid and any(a.startswith(b"unix://") for a in args):
         print("bwserve", pid)
 """
 ## a process that is gone already is no error

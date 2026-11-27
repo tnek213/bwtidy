@@ -26,7 +26,14 @@ from bwtidy.gateway.backups import BackupsError
 from bwtidy.gateway.proxy import ProxyMiddleware
 from bwtidy.gateway.settings import GatewaySettings
 from bwtidy.gateway.stats import AccountLabel, StatsMiddleware
-from bwtidy.gateway.workers import EXIT_WAIT, Worker, Workers, WorkerStartError
+from bwtidy.gateway.workers import (
+    EXIT_WAIT,
+    MAX_SOCKET_PATH,
+    Worker,
+    Workers,
+    WorkerStartError,
+    longest_socket_path,
+)
 from bwtidy.logs import setup_logging, uvicorn_log_config
 from bwtidy.mcp_token import Check, token_refusal, utc_now
 from bwtidy.protocol import ACCOUNT_COOKIE
@@ -304,6 +311,18 @@ def stats_outside_accounts(settings: GatewaySettings) -> None:
             raise SettingsError(f"BWTIDY_STATS_DB must be outside {name}")
 
 
+def sockets_fit(settings: GatewaySettings) -> None:
+    """Every worker's socket path fits into a Unix socket path, else no worker could start."""
+    longest = longest_socket_path(settings)
+    if longest > MAX_SOCKET_PATH:
+        room = len(os.fsencode(settings.accounts_dir)) - (longest - MAX_SOCKET_PATH)
+        raise SettingsError(
+            f"BWTIDY_ACCOUNTS_DIR is too long for the workers' sockets in {settings.run_path}: "
+            f"a Unix socket path holds at most {MAX_SOCKET_PATH} bytes. "
+            f"Shorten BWTIDY_ACCOUNTS_DIR to at most {room} bytes."
+        )
+
+
 def overlap(first: Path, second: Path) -> bool:
     """Whether one directory is the other or inside it, symlinks resolved."""
     a, b = first.resolve(), second.resolve()
@@ -347,12 +366,14 @@ def create_gateway_app(
         )
     if settings.stats:
         stats_outside_accounts(settings)
+    sockets_fit(settings)
     gateway = Gateway(settings, on_worker_exit, stats_extra)
     recorder = gateway.recorder
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         gateway.accounts.prepare()
+        gateway.workers.prepare()
         gateway.accounts.sweep_pending()
         ## logged now, so an operator sees a directory no login can use before anyone tries
         gateway.accounts.unusable_directories()

@@ -37,6 +37,19 @@ def semver(version: str) -> str:
     return str(_version_module().semver(version))
 
 
+def python_version(version: str) -> str:
+    """The version as Python spells it, the inverse of semver: 0.1.0-alpha.1 is 0.1.0a1."""
+    match = VERSION.fullmatch(version)
+    if match is None:
+        raise ValueError(
+            f"{version!r} is no version as X.Y.Z, optionally -alpha.N, -beta.N or -rc.N"
+        )
+    major, minor, patch, pre, number = match.groups()
+    release = f"{major}.{minor}.{patch}"
+    letters = {name: letter for letter, name in _version_module().PRE_RELEASES.items()}
+    return release if pre is None else f"{release}{letters[pre]}{number}"
+
+
 def pyproject_version() -> str:
     """The version in backend/pyproject.toml, the one place it is written."""
     pyproject = tomllib.loads((ROOT / "backend" / "pyproject.toml").read_text())
@@ -201,6 +214,18 @@ def _parse(lines: list[str]) -> tuple[list[tuple[int, str]], list[Section]]:
         blank = False
     close()
     return preamble, sections
+
+
+def sections(text: str) -> list[Section]:
+    """The ## sections of the release notes in text, in blocks."""
+    return _parse(text.splitlines())[1]
+
+
+def metadata_date(section: Section) -> str | None:
+    """The date of a version's metadata line, None when it has no such line."""
+    first = _metadata_block(section)
+    match = METADATA.fullmatch(first.text) if first is not None else None
+    return match.group("date") if match is not None else None
 
 
 def _changes_problems(blocks: list[Block], paragraphs: bool) -> list[tuple[int, str]]:

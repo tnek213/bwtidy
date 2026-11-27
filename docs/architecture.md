@@ -35,14 +35,15 @@ can wrap the gateway without bwtidy knowing about it
 
 A worker (`main.py`, entry point `bwtidy`) serves one account for one
 session. It runs as the account's own uid on a unix socket in the account's
-directory. It starts its own `bw serve` as a child on a second socket and
-holds the unlocked vault in RAM. It exits when the session ends. Only bw talks
-to the Bitwarden server.
+socket directory. It starts its own `bw serve` as a child on a second socket
+and holds the unlocked vault in RAM. It exits when the session ends. Only bw
+talks to the Bitwarden server.
 
 [How bwtidy fits together](explanation/overview.md) draws these processes for
 two accounts. The gateway listens on port 8000 in the container. A worker
-answers on `run/app.sock` in its account's directory and its `bw serve` on
-`run/bw.sock`.
+answers on `app.sock` in its account's socket directory under
+`/data/accounts/.run/` and its `bw serve` on `bw.sock` beside it
+([spec.md, Socket directories](spec.md#socket-directories)).
 
 The worker's code lies in fifteen layers under `backend/src/bwtidy`. A module
 imports from its own layer and the layers below it but never from a layer
@@ -747,7 +748,9 @@ The other ways in:
   directory](spec.md#account-directory)) is made at the account's first
   Bitwarden login. It holds `app/` with the SQLite file and `mcp-token.sha256`
   as well as `bw-login-state` and the delete marker. Next to it lie the CLI
-  state `bw/` and the sockets in `run/` as well as `home/` and `worker.log`.
+  state `bw/` as well as `home/` and `worker.log`. The sockets lie in the
+  account's socket directory under `/data/accounts/.run/`, which the gateway
+  empties at its start.
 - The backups `*.zip.age` live under the backups root in
   `/backups/HOST/EMAIL/` with `compose.yaml`. Otherwise they live in
   `app/backups/` of the account directory, or where `BWTIDY_BACKUPS_DIR`

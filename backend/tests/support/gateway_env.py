@@ -17,6 +17,7 @@ from bwtidy.mcp.auth import McpToken
 from bwtidy.mcp_token import UNAUTHORIZED, utc_now
 from bwtidy.protocol import ACCOUNT_COOKIE as COOKIE
 from bwtidy.protocol import SUBDIRS
+from tests.support.sockets import run_root
 
 ALLOWED = "https://vaultwarden"
 EXITING = "exiting"
@@ -205,6 +206,7 @@ def settings(tmp_path: Path, **extra: Any) -> GatewaySettings:
         "switch_uid": False,
         "worker_bin": worker,
         "start_timeout": 15.0,
+        "run_dir": run_root(tmp_path),
         **extra,
     }
     return GatewaySettings(**options)

@@ -1,10 +1,13 @@
-# Runs scripts/ci on every push to main, every pull request and on demand.
+# Runs scripts/ci on every push to main, every pull request and on demand. On a pull request it
+# also checks that a change a user sees has its release note (scripts/release check-pr), which a
+# new label can settle, so a change of the labels runs it again.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
 permissions:
@@ -38,3 +41,11 @@ jobs:
       # runner has none
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-dejavu-core
       - run: scripts/ci
+      # after scripts/ci and whatever it said, so a pull request learns both at once
+      - name: Check the release note
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: scripts/release check-pr "$BASE" "$HEAD" "$LABELS"

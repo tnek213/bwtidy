@@ -7,6 +7,7 @@ or below the base or by another account's uid is refused.
 """
 
 import asyncio
+import hashlib
 import hmac
 import ipaddress
 import logging
@@ -41,6 +42,8 @@ EMAIL_RE = re.compile(r"^[a-z0-9_%+-][a-z0-9._%+-]*@[a-z0-9.-]+[.][a-z]{2,}$")
 ## a host name as it can be a directory name: labels of letters, digits and hyphens
 HOST_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?([.][a-z0-9]([a-z0-9-]*[a-z0-9])?)*$")
 MAX_HOST = 253
+## hex digits of the name of an account's socket directory: 64 bits, no two accounts share one
+RUN_NAME_LENGTH = 16
 ## a token file holds 64 hex digits, an expiry and a creation time, anything longer is none
 MAX_TOKEN_FILE = 256
 ## the delete marker is an empty file: anything longer is not the worker's own marker
@@ -87,6 +90,11 @@ class AccountKey:
 
     def path(self, accounts_dir: Path) -> Path:
         return accounts_dir / self.host_dir / self.email
+
+    @property
+    def run_name(self) -> str:
+        """The name of the account's socket directory, as short for every host and email."""
+        return hashlib.sha256(self.label.encode()).hexdigest()[:RUN_NAME_LENGTH]
 
 
 def normalize_server(server: str) -> tuple[str, str]:
@@ -334,10 +342,17 @@ class Accounts:
         return found
 
     def host_directories(self) -> list[Path]:
-        """Every directory directly at root/HOST, symlinks left out."""
+        """Every directory directly at root/HOST, symlinks and dotted names left out.
+
+        No host name starts with a dot, the workers' socket directories (.run) do.
+        """
         if not self.root.is_dir():
             return []
-        return [p for p in sorted(self.root.iterdir()) if not p.is_symlink() and p.is_dir()]
+        return [
+            p
+            for p in sorted(self.root.iterdir())
+            if not p.is_symlink() and p.is_dir() and not p.name.startswith(".")
+        ]
 
     def account_directories(self) -> list[Path]:
         """Every directory directly at root/HOST/EMAIL, symlinks and dotted names left out."""

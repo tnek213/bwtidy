@@ -1,6 +1,8 @@
 # Builds the image and pushes it to Docker Hub (docker.io/tnek213/bwtidy) on every push to main that changes
-# what the image holds and every published release, each with a signed provenance attestation.
-# The job skips while the repo is private, as the image is made public together with the repo.
+# what the image holds and for every release, each with a signed provenance attestation. A release
+# calls it from release.yml with its version, as a GitHub release that a workflow's GITHUB_TOKEN
+# creates starts no other workflow. The job skips while the repo is private, as the image is made
+# public together with the repo.
 name: Image
 
 on:
@@ -31,9 +33,16 @@ on:
       - .github/workflows/docker-readme.yml
       - .github/workflows/image-scan.yml
       - .github/workflows/prune-tags.yml
+      - .github/workflows/release.yml
       - scripts/prune-tags
-  release:
-    types: [published]
+      - scripts/release
+  # release.yml on a tag vVERSION, which tags the image VERSION and latest
+  workflow_call:
+    inputs:
+      version:
+        description: The version of the release, as frontend/package.json spells it
+        type: string
+        required: true
   workflow_dispatch:
 
 permissions:
@@ -60,7 +69,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           REF: ${{ github.ref }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           image=docker.io/tnek213/bwtidy
@@ -69,9 +78,9 @@ jobs:
           # cut, as git abbreviates a hash to more than 7 characters when 7 are ambiguous, and
           # scripts/prune-tags deletes only tags of exactly 7
           short="${revision::7}"
-          if [ "$EVENT_NAME" = release ]; then
-            if [ "$RELEASE_TAG" != "v$version" ]; then
-              echo "the release tag is $RELEASE_TAG but frontend/package.json has version $version, so the tag must be v$version" >&2
+          if [ -n "$RELEASE_VERSION" ]; then
+            if [ "$RELEASE_VERSION" != "$version" ] || [ "$REF" != "refs/tags/v$version" ]; then
+              echo "the release is $RELEASE_VERSION on $REF but frontend/package.json has version $version, so the tag must be v$version" >&2
               exit 1
             fi
             tags="$image:$version,$image:latest"

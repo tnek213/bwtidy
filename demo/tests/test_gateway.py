@@ -228,14 +228,20 @@ def quick(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(demo_gateway, "RELEASE_WAIT", 0.0)
 
 
+def run_root(tmp_path: Path) -> Path:
+    """The workers' sockets of the test whose tmp_path this is, in /tmp and never under
+    tmp_path: TMPDIR can be deep, and a Unix socket path holds at most 107 bytes."""
+    return Path("/tmp") / f"bwtidy-demo-run-{tmp_path.name}"
+
+
 @pytest.fixture
 def tmp_path() -> Iterator[Path]:
-    """A short one: a unix socket path has a limit of about 100 bytes."""
     path = Path(tempfile.mkdtemp(prefix="dg"))
     try:
         yield path
     finally:
         shutil.rmtree(path, ignore_errors=True)
+        shutil.rmtree(run_root(path), ignore_errors=True)
 
 
 def gateway_settings(tmp_path: Path, **extra: Any) -> GatewaySettings:
@@ -259,6 +265,7 @@ def gateway_settings(tmp_path: Path, **extra: Any) -> GatewaySettings:
         "worker_bin": worker,
         "start_timeout": 15.0,
         "static_dir": static,
+        "run_dir": run_root(tmp_path),
         **extra,
     }
     return GatewaySettings(**options)
