@@ -68,8 +68,10 @@ The image builds the Bitwarden CLI from Bitwarden's source, the commit that
 `bitwarden-cli-source`), and takes the packages it brings along from
 `docker/bitwarden-cli/package-lock.json`. To bump the CLI, set the version of
 `@bitwarden/cli` in `docker/bitwarden-cli/package.json`, run `npm install` there
-and then `scripts/update-deps`, which sets the tag `cli-vVERSION` and its commit
-in `source.json` (or set them by hand).
+and then `scripts/update-deps --cli-pin`, which sets the tag `cli-vVERSION` and
+its commit in `source.json` and the version in the docs that state it.
+Dependabot's pull request for the CLI gets that commit from the workflow
+`dependabot-cli-pin.yml` (dev/release.md).
 
 `scripts/e2e` runs the browser tests in `backend/tests/e2e` against a fresh
 dev vault (see dev/testing.md). A change to what the UI does comes with an e2e

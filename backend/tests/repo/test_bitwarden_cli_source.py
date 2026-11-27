@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-from devlib.paths import ROOT
+from devlib.paths import ROOT, load_script
 
 CLI = ROOT / "docker" / "bitwarden-cli"
 REPOSITORY = "https://github.com/bitwarden/clients"
@@ -22,12 +22,22 @@ def source_mismatch(cli: Path) -> str | None:
     if source.get("tag") != f"cli-v{version}":
         return (
             f"source.json names the tag {source.get('tag')!r} but package.json pins "
-            f"@bitwarden/cli {version}, run scripts/update-deps to set the tag cli-v{version} "
-            "and its commit"
+            f"@bitwarden/cli {version}, run scripts/update-deps --cli-pin to set the tag "
+            f"cli-v{version} and its commit"
         )
     if not re.fullmatch(r"[0-9a-f]{40}", str(source.get("commit"))):
         return f"source.json names the commit {source.get('commit')!r}, not 40 hex characters"
     return None
+
+
+def test_every_doc_that_states_the_cli_version_states_the_pinned_one():
+    """scripts/update-deps --cli-pin writes them, and a bump that leaves one behind fails here."""
+    deps = load_script("update-deps")
+    errors: list[str] = []
+    version = deps.pinned_cli_version(CLI, errors)
+    assert version is not None
+    assert deps.update_cli_docs(ROOT, version, True, errors) == []
+    assert errors == []
 
 
 def write_cli(root: Path, version: str, source: dict) -> Path:

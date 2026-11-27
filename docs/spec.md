@@ -49,9 +49,9 @@ for each account. [How bwtidy fits together](explanation/overview.md) and
 [architecture.md](architecture.md) describe them. These are the decisions
 behind them:
 
-- The Bitwarden CLI (`@bitwarden/cli`) is pinned to 2026.10.0 in
-  `docker/bitwarden-cli/`. Its lock file fixes every package the CLI brings
-  along.
+- The Bitwarden CLI (`@bitwarden/cli`) is pinned to one exact version in
+  `docker/bitwarden-cli/package.json`. Its lock file fixes every package the
+  CLI brings along.
 - The image ships the CLI's open source build, built from Bitwarden's source
   at the commit that `docker/bitwarden-cli/source.json` pins. That is the
   tag `cli-v` plus the pinned version. Bitwarden's npm package is their
