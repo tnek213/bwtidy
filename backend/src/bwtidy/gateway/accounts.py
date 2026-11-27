@@ -166,8 +166,8 @@ def directory_owner(path: Path) -> int:
 def account_file(path: Path, name: str, limit: int) -> bytes | None:
     """A file of the account directory's app/, None when there is none to trust.
 
-    Read as root: the file must be a regular file owned by the account's uid, reached without a
-    symlink, so a worker cannot point the gateway at another account's file or any other file.
+    Read as root: the file must be a regular file, not itself a symlink, owned by the account's
+    uid, so a worker cannot point the gateway at another account's file or any other file.
     A file longer than limit counts as none.
     """
     app = path / "app"
@@ -252,8 +252,8 @@ class Accounts:
     def delete_requested(self, path: Path) -> bool:
         """Whether the account's worker left the delete marker in app/ for the gateway to trust.
 
-        The rules of the MCP token file: a regular file owned by the account's uid, reached
-        without a symlink, and small, so a worker cannot ask the gateway to delete anything on
+        The rules of the MCP token file: a regular file, not itself a symlink, owned by the
+        account's uid, and small, so a worker cannot ask the gateway to delete anything on
         anything but its own marker (docs/spec.md, Gateway).
         """
         return account_file(path, DELETE_MARKER, MAX_DELETE_MARKER) is not None
