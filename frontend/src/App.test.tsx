@@ -41,6 +41,15 @@ test('shows the login page when locked', async () => {
   expect(await screen.findByLabelText(/Master password/)).toBeInTheDocument()
 })
 
+test('the login page is the main landmark', async () => {
+  mockFetch({ 'GET /api/session': () => jsonResponse(200, { state: 'locked', mcpEnabled: false }) })
+  renderWithQuery(<App />)
+  const password = await screen.findByLabelText(/Master password/)
+  const main = screen.getByRole('main')
+  expect(main).toContainElement(password)
+  expect(within(main).getByRole('heading', { name: 'bwtidy' })).toBeInTheDocument()
+})
+
 const unlockedRoutes = {
   'GET /api/session': () =>
     jsonResponse(200, {

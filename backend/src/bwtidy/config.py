@@ -22,6 +22,8 @@ KEEP_DAYS = 90
 KEEP_ALWAYS = 5
 ## a failed queue entry is deleted this many hours after it failed (BWTIDY_FAILED_KEEP_HOURS)
 FAILED_KEEP_HOURS = 30
+## the highest TCP port, for BWTIDY_PORT and BWTIDY_BW_SERVE_PORT
+MAX_PORT = 65535
 
 
 PREFIX = "BWTIDY_"
@@ -132,11 +134,11 @@ class Settings:
         data_dir = Path(os.environ.get("BWTIDY_DATA_DIR", "/data/app"))
         return cls(
             host=os.environ.get("BWTIDY_HOST", "127.0.0.1"),
-            port=int(os.environ.get("BWTIDY_PORT", "8000")),
+            port=env_count("BWTIDY_PORT", 8000, most=MAX_PORT),
             data_dir=data_dir,
             static_dir=Path(static) if static else None,
             bw_bin=os.environ.get("BWTIDY_BW_BIN", "bw"),
-            bw_serve_port=int(os.environ.get("BWTIDY_BW_SERVE_PORT", "8087")),
+            bw_serve_port=env_count("BWTIDY_BW_SERVE_PORT", 8087, most=MAX_PORT),
             backup_dir=env_path("BWTIDY_BACKUPS_DIR") or data_dir / "backups",
             version=version_text(env_text("BWTIDY_COMMIT")),
             socket=env_path("BWTIDY_SOCKET"),
@@ -144,7 +146,7 @@ class Settings:
             account_server=server,
             account_email=email,
             exit_after_session=env_flag("BWTIDY_EXIT_AFTER_SESSION"),
-            idle_exit=float(os.environ.get("BWTIDY_IDLE_EXIT") or DEFAULT_IDLE_EXIT),
+            idle_exit=env_seconds("BWTIDY_IDLE_EXIT", DEFAULT_IDLE_EXIT),
             pending_marker=env_path("BWTIDY_PENDING_MARKER"),
             secure_cookies=env_flag("BWTIDY_SECURE_COOKIES"),
             mcp_hosts=host_names(os.environ.get("BWTIDY_MCP_HOSTS", "")),
@@ -186,17 +188,22 @@ def env_seconds(name: str, default: float, least: float = 0.0) -> float:
     return seconds
 
 
-def env_count(name: str, default: int) -> int:
-    """The variable as a positive whole number, else the default."""
+def env_count(name: str, default: int, least: int = 1, most: int | None = None) -> int:
+    """The variable as a whole number from least to most, else the default."""
     value = env_text(name)
     if value is None:
         return default
+    expected = (
+        f"a whole number from {least} to {most}"
+        if most is not None
+        else f"a whole number of at least {least}"
+    )
     try:
         count = int(value)
     except ValueError:
-        count = 0
-    if count <= 0:
-        raise SettingsError(f"{name} must be a positive whole number")
+        raise SettingsError(f"{name} must be {expected}") from None
+    if count < least or (most is not None and count > most):
+        raise SettingsError(f"{name} must be {expected}")
     return count
 
 

@@ -3,12 +3,15 @@ import type { ReactElement } from 'react'
 import { canGenerate, editBlocker, removeOperation, TOOL_NOTE_BLOCKER } from './editing.ts'
 import { ATTACHMENTS_COLUMN, type GridColumn, type GridRow, isToolNote } from '../api/grid.ts'
 import type { Operation } from '../api/operations.ts'
+import { type Revealer, revealerText } from './revealers.ts'
 import type { ToFillAction } from './toFill.ts'
 
 export interface CellMenuState {
   row: GridRow
   // Null on a column that holds no value of the item to edit (the template and Rare fields columns): the menu has row actions only.
   column: GridColumn | null
+  // The grid column of the cell, also where column is null.
+  columnId: string
   rowIndex: number
   position: { top: number; left: number }
 }
@@ -28,14 +31,21 @@ interface CellMenuProps {
   onRenameAttachments: (row: GridRow) => void
   toFillAction: (column: GridColumn, row: GridRow) => ToFillAction | null
   onToFill: (row: GridRow, column: GridColumn, mark: boolean) => void
+  // The eyes the cell shows.
+  revealers: (row: GridRow, columnId: string) => Revealer[]
 }
 
 function cellEntries(state: CellMenuState, run: (action: () => void) => void, props: CellMenuProps): ReactElement[] {
   const { row, column, rowIndex } = state
+  const reveal = props.revealers(row, state.columnId).map((revealer) => (
+    <MenuItem key={`reveal:${revealer.label}`} onClick={() => run(revealer.toggle)}>
+      {revealerText(revealer)}
+    </MenuItem>
+  ))
   if (column === null) {
-    return []
+    return reveal
   }
-  const entries: ReactElement[] = []
+  const entries: ReactElement[] = [...reveal]
   if (editBlocker(column, row) === null) {
     entries.push(
       <MenuItem key="edit" onClick={() => run(() => props.onEdit(column, row, rowIndex))}>
@@ -124,10 +134,10 @@ export default function CellMenu(props: CellMenuProps) {
       anchorPosition={state?.position}
     >
       {state && isToolNote(state.row) && <MenuItem disabled>{TOOL_NOTE_BLOCKER}</MenuItem>}
-      {cell.length > 0 && <ListSubheader>Cell</ListSubheader>}
+      {cell.length > 0 && <ListSubheader role="presentation">Cell</ListSubheader>}
       {cell}
       {cell.length > 0 && row.length > 0 && <Divider />}
-      {row.length > 0 && <ListSubheader>Row</ListSubheader>}
+      {row.length > 0 && <ListSubheader role="presentation">Row</ListSubheader>}
       {row}
     </Menu>
   )

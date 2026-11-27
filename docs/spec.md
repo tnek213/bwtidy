@@ -260,6 +260,10 @@ behind some of them:
   display limits and the datatype pattern limits. A value that cannot be used
   stops the gateway and the app at the start with an error that names the
   variable.
+- Every number setting of the gateway, and `BWTIDY_IDLE_EXIT`, is checked at
+  the start against the values that Configuration names. Reason: a typo in
+  `.env` stops the gateway with an error that names the variable, not with a
+  traceback or a limit under which no account can open.
 - `BWTIDY_IDLE_EXIT` is passed on so that a test can shorten it.
   `BWTIDY_MCP_HOSTS` is passed on so that the public host name passes the
   worker's DNS rebinding check (see MCP and the queue).
@@ -2641,6 +2645,16 @@ describe the About page and the More actions menu.
     - the packages whose files the repo holds as they are, which no lock file
       names (`BUNDLED` in the script). That is IBM Plex Mono, the code font of
       the docs site, in `docs/assets/fonts/ibm-plex-mono/` with its license.
+    - `zensical-ui` from the dependency group `docs`, the theme of the docs
+      site that the image serves at `/docs/`
+    - the npm packages that the theme's script bundles and each of its icon
+      sets that the site draws
+- An icon set comes with `zensical-ui` as its ecosystem and the version of
+  `zensical-ui`. Its license comes from the script's table of the sets'
+  license files. The site draws a set when the theme's stylesheets or scripts
+  embed one of its icons or when `zensical.toml`, `overrides/` or a page names
+  one. The rest of the group `docs` (the Zensical builder and `resvg-py`)
+  only builds the site and is left out.
 - A PyPI package's license comes from the installed metadata. That is
   `License-Expression` or else a License classifier that names one license.
   For a package whose metadata names none it comes from the script's

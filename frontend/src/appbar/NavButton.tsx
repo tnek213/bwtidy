@@ -8,8 +8,6 @@ const BASE_SX = {
   alignSelf: 'stretch',
   borderRadius: 0,
   position: 'relative',
-  opacity: 0.8,
-  '&:hover': { opacity: 1 },
   // The mark is always there, transparent unless current, so a page change shifts nothing.
   '&::after': {
     content: '""',
@@ -23,7 +21,6 @@ const BASE_SX = {
     opacity: 0,
   },
   [`&.${CURRENT_NAV_CLASS}`]: {
-    opacity: 1,
     cursor: 'default',
     '&:hover': { backgroundColor: 'transparent' },
     '&::after': { opacity: 1 },

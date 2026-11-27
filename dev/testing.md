@@ -437,10 +437,48 @@ item through the second CLI state of
 wait an hour meanwhile (and set back at the end). Then one test dismisses
 the failed entry and one retries it over the change elsewhere.
 
+### Accessibility tests
+
+`test_accessibility.py` checks the web UI for a screen reader and a keyboard
+(docs/reference/ui.md, Keyboard):
+
+```sh
+scripts/e2e tests/e2e/test_accessibility.py              # the whole file on one stack
+scripts/e2e tests/e2e/test_accessibility.py -k pass_axe  # only the axe tests
+```
+
+- The axe tests open every page, menu and dialog that docs/reference/ui.md
+  names and run axe-core on each, in the light and the dark color mode
+  (`Axes.scan`, which emulates the color scheme and waits until the theme and
+  the animations have settled). They check the rules of WCAG 2.2 A and AA and
+  axe's best practices, and fail with every violation they found, each named by
+  view, mode, rule and element. `KEPT` lists the few violations bwtidy keeps,
+  each with its rule, the selector of its element and why.
+- The keyboard tests press keys only (`tab_to`, `press`, `arrow_to_column`)
+  and check after each one that the element with the focus shows a ring
+  (`expect_focus_ring`): log in, find and edit a cell, reveal and hide a
+  secret through the cell menu, the header menu, approve and reject proposals
+  on the Queue, restore from the Change log, and that a menu or dialog takes
+  the focus and gives it back on Escape.
+
+axe-core comes from axe-playwright-python, a test dependency of the backend
+(MPL-2.0, like axe-core it bundles). Nothing of it ships, so
+`scripts/third-party` does not list it. A new view or dialog gets its scan in
+the test of its page. A new violation is fixed, or kept in `KEPT` for its
+element alone with the reason above it.
+
+The frontend tests of the same fixes sit next to their components: the names
+and live regions (`WriteAnnouncer.test.tsx`, `QueueButton.test.tsx`,
+`Masked.test.tsx`), what a focused cell says (`cellDescription.test.ts`), the
+cell and header menus from the keyboard (`GridPage.test.tsx`) and the focus
+ring (`colorMode.test.tsx`).
+
 ### Playwright gotchas
 
-- The Queue button's label is `Queue, N pending` and it polls every 10
-  seconds, so wait at least 12 seconds for an MCP proposal to show.
+- The Queue button's label is `Queue, N unsaved edits`, `Queue, N MCP
+  proposals to review` or with both `Queue, N pending: ...` (N their sum), and
+  it polls every 10 seconds, so wait at least 12 seconds for an MCP proposal
+  to show.
 - On the Queue page each entry's checkbox has the entry's summary as its
   accessible name.
 - Approve all runs in the background: read the tabs after the Working spinner

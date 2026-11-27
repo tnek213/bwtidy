@@ -53,16 +53,21 @@ source to BWTIDY_KROKI_URL (https://kroki.io when unset or empty) as TYPE/svg, a
 with MERMAID_INIT as its first line unless it starts with an init directive of its own, and resvg
 (resvg-py of the group docs, run through uv) converts the SVG at ZOOM and DPI on BACKGROUND,
 drawing the text with the system's fonts (GENERIC_FONTS: the first installed one of each list
-stands in for serif, sans-serif and monospace). A diagram with a text that none of them draws
-(resvg would leave it out without a word) fails the build, naming the page, the line, the generic
-family and the fonts it tried. The PNG is named after a hash of the type, the source and the
-converter's settings, and kept under that hash in .cache/kroki/ at the repo root, so a later build
-finds it there and makes no request. resvg writes the PNGs into a temp directory inside that cache,
-so each one is renamed into place on the same filesystem and a failed conversion leaves nothing. A
-server that cannot be reached or answers with an error fails the build, naming the page, the line
-and the server's message. Docs without a diagram build without any request. `serve` shows a
-diagram as its code block, as zensical.toml has SuperFences take a fence whose info string holds
-an option it does not know (relaxed_headers).
+stands in for serif, sans-serif and monospace). Before resvg runs, a font-family list that names
+no generic family gets the one of its first font in NAMED_FONTS (Helvetica and Arial sans-serif,
+Times serif, Courier monospace), and of a font d2 embeds sans-serif or monospace with its weight
+and style, as resvg loads no font an SVG embeds and draws a missing font in the serif one. A
+generic family in another case is written in lower case, the only one resvg knows. A diagram with
+a text that none of them draws (resvg would leave it out without a word) fails the build, naming
+the page, the line, the generic family and the fonts it tried, and so does a text whose list
+names neither an installed font nor a generic family. The PNG is named after a hash of the type,
+the source and the converter's settings, and kept under that hash in .cache/kroki/ at the repo
+root, so a later build finds it there and makes no request. resvg writes the PNGs into a temp
+directory inside that cache, so each one is renamed into place on the same filesystem and a failed
+conversion leaves nothing. A server that cannot be reached or answers with an error fails the
+build, naming the page, the line and the server's message. Docs without a diagram build without
+any request. `serve` shows a diagram as its code block, as zensical.toml has SuperFences take a
+fence whose info string holds an option it does not know (relaxed_headers).
 """
 
 import hashlib
@@ -170,9 +175,38 @@ GENERIC_FONTS = {
     "sans_serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans", "Noto Sans"],
     "monospace": ["Courier New", "Liberation Mono", "DejaVu Sans Mono", "Noto Sans Mono"],
 }
-## run in the group docs with ZOOM, BACKGROUND, DPI, the JSON of GENERIC_FONTS and then pairs of
-## an SVG and a PNG path. It converts what it can and prints a line "SVG<tab>WHY" for each SVG it
-## cannot convert or whose text no installed font draws.
+## named fonts a diagram often asks for, by the generic family whose stand-in draws them where
+## they are missing. resvg draws a missing font in the serif one, so a font-family list that names
+## one of these and no generic family gets that family at its end, in any case of the name.
+NAMED_FONTS = {
+    "serif": ["Times", "Times New Roman", "Times-Roman", "Georgia", "Cambria", "Palatino"],
+    "sans_serif": [
+        "Arial",
+        "Helvetica",
+        "Helvetica Neue",
+        "Verdana",
+        "Tahoma",
+        "Trebuchet MS",
+        "Segoe UI",
+        "Calibri",
+        "Lucida Grande",
+        "Open Sans",
+        "Roboto",
+        "Source Sans Pro",
+    ],
+    "monospace": [
+        "Courier",
+        "Courier New",
+        "Consolas",
+        "Menlo",
+        "Monaco",
+        "Lucida Console",
+        "Source Code Pro",
+    ],
+}
+## run in the group docs with ZOOM, BACKGROUND, DPI, the JSON of GENERIC_FONTS and NAMED_FONTS and
+## then pairs of an SVG and a PNG path. It converts what it can and prints a line "SVG<tab>WHY"
+## for each SVG it cannot convert or whose text no installed font draws.
 CONVERT = """
 import html
 import json
@@ -188,7 +222,19 @@ PROBE = (
 ## so a probe with this as serif finds only the family it names.
 NOWHERE = "bwtidy no such font"
 CSS_FAMILY = re.compile(r"font-family\\s*:\\s*([^;}]+)")
+## an @font-face rule declares a font the SVG embeds, which resvg does not load
+FONT_FACE = re.compile(r"@font-face\\s*\\{[^}]*\\}")
+CSS_FONT = re.compile(r"(@font-face\\s*\\{[^}]*\\})|font-family\\s*:\\s*([^;}]+)")
+## d2 embeds its fonts (Source Sans Pro and Source Code Pro) by names like d2-123-font-bold
+D2_FONT = re.compile(r"d2-\\d+-font-([a-z-]+)")
 GENERIC_NAMES = {"serif": "serif", "sans-serif": "sans_serif", "monospace": "monospace"}
+CSS_GENERICS = {key: name for name, key in GENERIC_NAMES.items()}
+SVG_NS = "http://www.w3.org/2000/svg"
+XLINK_NS = "http://www.w3.org/1999/xlink"
+
+
+def local(tag):
+    return tag.rsplit("}", 1)[-1] if isinstance(tag, str) else ""
 
 
 def draws(render, family, fonts):
@@ -210,40 +256,140 @@ def generic_families(render, candidates):
     return chosen
 
 
-## the font-family lists of an SVG that holds text, "" for resvg's default, else none.
+## the CSS name of the generic family that stands in for each named font, by its name in lower case
+def named_generics(named):
+    return {
+        name.lower(): CSS_GENERICS[key] for key, names in named.items() for name in names
+    }
+
+
+## a font-family list as resvg draws it as meant, with the CSS a d2 font asks for besides.
+## resvg knows a generic family only unquoted in lower case, and draws a missing font in serif.
+def fitted(family, generics):
+    names = [name.strip() for name in family.split(",") if name.strip()]
+    lowered = [name.lower() if name.lower() in GENERIC_NAMES else name for name in names]
+    if lowered != names:
+        return ", ".join(lowered), {}
+    if any(name in GENERIC_NAMES for name in names):
+        return family, {}
+    for name in names:
+        bare = name.strip("'\\"")
+        d2 = D2_FONT.fullmatch(bare)
+        if d2:
+            parts = d2[1].split("-")
+            css = {}
+            if "bold" in parts:
+                css["font-weight"] = "bold"
+            elif "semibold" in parts:
+                css["font-weight"] = "600"
+            if "italic" in parts:
+                css["font-style"] = "italic"
+            generic = "monospace" if "mono" in parts else "sans-serif"
+            return ", ".join([*names, generic]), css
+        if bare.lower() in generics:
+            return ", ".join([*names, generics[bare.lower()]]), {}
+    return family, {}
+
+
+## the SVG with every font-family list fitted, the same bytes when none needed it
+def with_generic_families(svg, named):
+    try:
+        root = ElementTree.fromstring(svg)
+    except ElementTree.ParseError:
+        return svg
+    generics = named_generics(named)
+    changed = False
+
+    def fit_css(css):
+        def one(match):
+            nonlocal changed
+            if match[1]:
+                return match[0]
+            value = match[2].rstrip()
+            family, extra = fitted(value, generics)
+            if family == value and not extra:
+                return match[0]
+            changed = True
+            declarations = "".join(f"; {name}: {setting}" for name, setting in extra.items())
+            return f"font-family: {family}{declarations}{match[2][len(value):]}"
+
+        return CSS_FONT.sub(one, css)
+
+    for element in root.iter():
+        family = element.get("font-family")
+        if family:
+            new, extra = fitted(family, generics)
+            if new != family or extra:
+                changed = True
+                element.set("font-family", new)
+                for name, setting in extra.items():
+                    element.attrib.setdefault(name, setting)
+        if element.get("style"):
+            element.set("style", fit_css(element.get("style")))
+        if local(element.tag) == "style" and element.text:
+            element.text = fit_css(element.text)
+    if not changed:
+        return svg
+    ElementTree.register_namespace("", SVG_NS)
+    ElementTree.register_namespace("xlink", XLINK_NS)
+    return ElementTree.tostring(root)
+
+
+## the font-family lists of an SVG that holds text, "" for resvg's default, else none. The
+## families its @font-face rules declare, apart.
 def text_families(svg):
     try:
         root = ElementTree.fromstring(svg)
     except ElementTree.ParseError:
-        return []
+        return [], set()
     elements = list(root.iter())
-    texts = [e for e in elements if e.tag.rsplit("}", 1)[-1] == "text"]
+    texts = [e for e in elements if local(e.tag) == "text"]
     if not any("".join(text.itertext()).strip() for text in texts):
-        return []
+        return [], set()
     found = []
+    embedded = set()
     for element in elements:
         if element.get("font-family"):
             found.append(element.get("font-family"))
         css = element.get("style") or ""
-        if element.tag.rsplit("}", 1)[-1] == "style":
+        if local(element.tag) == "style":
             css += " " + "".join(element.itertext())
-        found += CSS_FAMILY.findall(css)
-    return list(dict.fromkeys(family.strip() for family in found)) or [""]
+        for face in FONT_FACE.findall(css):
+            embedded.update(f.strip().strip("'\\"") for f in CSS_FAMILY.findall(face))
+        found += CSS_FAMILY.findall(FONT_FACE.sub("", css))
+    families = list(dict.fromkeys(family.strip() for family in found)) or [""]
+    return families, embedded
 
 
-## the generic family a font-family list falls back on, serif as resvg's when it names none.
+## the generic family a font-family list falls back on, serif (resvg's default) for no list at
+## all and None for a list of named fonts alone
 def generic_of(family):
+    if not family.strip():
+        return "serif"
     for name in family.split(","):
-        name = name.strip().strip("'\\"").lower()
-        if name in GENERIC_NAMES:
-            return name
-    return "serif"
+        if name.strip() in GENERIC_NAMES:
+            return name.strip()
+    return None
 
 
-## why a text of the SVG would be left out for want of a font, or None when all draw.
+## why a text of the SVG would be left out or drawn in another font, or None when all draw.
 def missing_font(render, svg, fonts, candidates):
-    for family in text_families(svg):
+    families, embedded = text_families(svg)
+    for family in families:
         generic = generic_of(family)
+        if generic is None:
+            ## a font of the list itself has to draw, not resvg's serif fallback
+            if draws(render, family, {**fonts, "serif_family": NOWHERE}):
+                continue
+            names = [name.strip().strip("'\\"") for name in family.split(",")]
+            inside = [name for name in names if name in embedded]
+            why = ""
+            if inside:
+                why = f", {inside[0]} is a font the SVG embeds and resvg does not load"
+            return (
+                f"no installed font draws its text in {family}{why}, "
+                "and it names no generic family (serif, sans-serif or monospace) to fall back on"
+            )
         key = GENERIC_NAMES[generic]
         ## the text has to draw in a font of its own list, not in resvg's serif fallback
         probe = {**fonts, "serif_family": fonts.get(f"{key}_family", NOWHERE)}
@@ -256,14 +402,19 @@ def missing_font(render, svg, fonts, candidates):
 def main(args):
     import resvg_py
 
-    zoom, background, dpi, candidates, *paths = args
+    zoom, background, dpi, candidates, named, *paths = args
     candidates = json.loads(candidates)
+    named = json.loads(named)
     render = resvg_py.svg_to_bytes
     fonts = generic_families(render, candidates)
     failed = False
     for svg, png in zip(paths[::2], paths[1::2]):
         with open(svg, "rb") as file:
-            source = file.read()
+            original = file.read()
+        source = with_generic_families(original, named)
+        if source != original:
+            with open(svg, "wb") as file:
+                file.write(source)
         why = missing_font(render, source, fonts, candidates)
         if why:
             print(f"{svg}\\t{why}", file=sys.stderr)
@@ -645,7 +796,7 @@ def kroki_source(diagram: Diagram) -> str:
 
 def diagram_key(kind: str, source: str) -> str:
     """The hash a picture is named and cached by: its type, its source and the converter."""
-    settings = [CONVERTER, GENERIC_FONTS]
+    settings = [CONVERTER, GENERIC_FONTS, NAMED_FONTS]
     return hashlib.sha256(json.dumps([kind, source, settings]).encode()).hexdigest()
 
 
@@ -698,6 +849,7 @@ def convert(svgs: dict[str, bytes], cache: Path) -> dict[str, str]:
                 BACKGROUND,
                 str(DPI),
                 json.dumps(GENERIC_FONTS),
+                json.dumps(NAMED_FONTS),
                 *paths,
             ],
             capture_output=True,

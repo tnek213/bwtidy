@@ -6,10 +6,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from bwtidy.config import (
+    DEFAULT_IDLE_EXIT,
+    MAX_PORT,
     Policy,
-    SettingsError,
+    env_count,
     env_flag,
     env_path,
+    env_seconds,
     env_text,
     version_text,
 )
@@ -89,20 +92,18 @@ class GatewaySettings:
     def from_env(cls) -> "GatewaySettings":
         ## the workers read these, a bad value fails here at the start and not in each worker
         Policy.from_env()
+        env_seconds("BWTIDY_IDLE_EXIT", DEFAULT_IDLE_EXIT)
         static = env_text("BWTIDY_STATIC_DIR")
         allowed = env_text("BWTIDY_ALLOWED_SERVERS") or ""
-        uid_base = int(os.environ.get("BWTIDY_UID_BASE") or DEFAULT_UID_BASE)
-        ## every worker uid is above the base, so a base below 1 could hand root to a worker
-        if uid_base < 1:
-            raise SettingsError("BWTIDY_UID_BASE must be at least 1")
         return cls(
             host=os.environ.get("BWTIDY_HOST", "127.0.0.1"),
-            port=int(os.environ.get("BWTIDY_PORT", "8000")),
+            port=env_count("BWTIDY_PORT", 8000, most=MAX_PORT),
             accounts_dir=Path(
                 os.environ.get("BWTIDY_ACCOUNTS_DIR") or DEFAULT_ACCOUNTS_DIR
             ).absolute(),
             backups_root=env_path("BWTIDY_BACKUPS_ROOT"),
-            uid_base=uid_base,
+            ## every worker uid is above the base, so a base below 1 could hand root to a worker
+            uid_base=env_count("BWTIDY_UID_BASE", DEFAULT_UID_BASE),
             allowed_servers=frozenset(
                 normalize_server(server)[0] for server in allowed.split(",") if server.strip()
             ),
@@ -111,8 +112,8 @@ class GatewaySettings:
             docs_dir=env_path("BWTIDY_DOCS_DIR"),
             version=version_text(env_text("BWTIDY_COMMIT")),
             switch_uid=os.environ.get("BWTIDY_GATEWAY_SWITCH_UID", "1").strip() != "0",
-            max_pending=int(os.environ.get("BWTIDY_MAX_PENDING") or DEFAULT_MAX_PENDING),
-            max_workers=int(os.environ.get("BWTIDY_MAX_WORKERS") or DEFAULT_MAX_WORKERS),
+            max_pending=env_count("BWTIDY_MAX_PENDING", DEFAULT_MAX_PENDING),
+            max_workers=env_count("BWTIDY_MAX_WORKERS", DEFAULT_MAX_WORKERS),
             stats=env_flag("BWTIDY_STATS"),
             stats_db=env_path("BWTIDY_STATS_DB"),
         )

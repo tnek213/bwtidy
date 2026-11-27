@@ -24,9 +24,10 @@ import {
   Typography,
 } from '@mui/material'
 import { useQueryClient } from '@tanstack/react-query'
-import { type FormEvent, useId, useState } from 'react'
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { ApiError } from '../api/api.ts'
-import { isMasked, MASK } from '../shared/values.ts'
+import { isMasked } from '../shared/values.ts'
+import Masked from '../shared/Masked.tsx'
 import { NO_PASSWORD_MANAGER } from '../shared/noPasswordManager.ts'
 import { toggled } from '../shared/sets.ts'
 import { sessionQueryKey } from '../api/session.ts'
@@ -70,9 +71,7 @@ function DiffCell({ value }: { value: DiffValue }) {
   }
   if (isMasked(value)) {
     return (
-      <Box component="span" data-testid="masked-value" title="Secret value">
-        {MASK}
-      </Box>
+      <Masked data-testid="masked-value" title="Secret value" />
     )
   }
   if (Array.isArray(value)) {
@@ -290,6 +289,8 @@ function PendingTab() {
   const [error, setError] = useState<string | null>(null)
   const [decided, setDecided] = useState<Decided | null>(null)
   const [rejected, setRejected] = useState<number | null>(null)
+  const selectAll = useRef<HTMLInputElement>(null)
+  const [decidedNow, setDecidedNow] = useState(0)
 
   const entries = pending.data ?? []
   const pendingIds = entries.map((entry) => entry.id)
@@ -303,6 +304,18 @@ function PendingTab() {
   async function reload() {
     await queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== sessionQueryKey[0] })
   }
+
+  // A decision disables the button that had the focus, and an empty list takes the buttons away,
+  // which leaves a keyboard nowhere to go on from: the focus goes to Select all, else to the open tab.
+  useEffect(() => {
+    const active = document.activeElement
+    const lost = active === null || active === document.body || (active instanceof HTMLButtonElement && active.disabled)
+    if (decidedNow === 0 || !lost) {
+      return
+    }
+    const target = selectAll.current ?? document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+    target?.focus()
+  }, [decidedNow, entries.length])
 
   async function approve(ids: number[]) {
     setBusy(true)
@@ -322,6 +335,7 @@ function PendingTab() {
     } finally {
       setBusy(false)
       await reload()
+      setDecidedNow((count) => count + 1)
     }
   }
 
@@ -339,6 +353,7 @@ function PendingTab() {
     } finally {
       setBusy(false)
       await reload()
+      setDecidedNow((count) => count + 1)
     }
   }
 
@@ -370,6 +385,7 @@ function PendingTab() {
             <FormControlLabel
               control={
                 <Checkbox
+                  slotProps={{ input: { ref: selectAll } }}
                   checked={allChosen}
                   indeterminate={chosen.length > 0 && !allChosen}
                   onChange={() => setSelected(new Set(allChosen ? [] : pendingIds))}

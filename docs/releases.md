@@ -68,6 +68,8 @@ What changed since 0.1.0-alpha.1:
 - The image builds on Debian 13 (trixie) and holds neither npm nor pip, so it
   is smaller. Every image still has a signed provenance attestation, and the
   published images are scanned for known vulnerabilities every day.
+  Corrected: the scan covers the `latest` and `main` images, not every
+  published tag.
 
 ## 0.1.0-alpha.1
 

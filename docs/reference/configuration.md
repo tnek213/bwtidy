@@ -5,10 +5,11 @@ Compose reads that file by itself. `example.env` lists the variables you may
 set with a comment for each. An empty value means the default where the
 tables below give one.
 
-The gateway checks the two timeouts, the three backup retention values and
-the age of failed entries when it starts. A value that is not a positive
-number stops it with a message that names the variable. The retention values
-and the age must also be whole numbers.
+A time in seconds is a positive number such as `90` or `0.5`. Every other
+number the gateway reads is a whole number of at least 1, and a port is at
+most 65535. The gateway checks every value when it starts. A value that a
+setting cannot take stops it with a message that names the variable and what
+it takes.
 
 The variables reach the gateway and its workers along the path below.
 
@@ -62,7 +63,7 @@ and starts one worker for each open account (see
 | `BWTIDY_ALLOWED_SERVERS` | | Servers (comma separated URLs) that skip the check for a public address, like a Vaultwarden on your own network. |
 | `BWTIDY_MAX_PENDING` | `2` | The most new accounts that wait for their first login at once. |
 | `BWTIDY_MAX_WORKERS` | `8` | The most accounts open at once, with one worker each. |
-| `BWTIDY_UID_BASE` | `70000` | The uids of the account workers start above it. With the default the first account gets 70001 and each new account the next uid. The gateway refuses to start when it is below 1. |
+| `BWTIDY_UID_BASE` | `70000` | The uids of the account workers start above it. With the default the first account gets 70001 and each new account the next uid. |
 | `BWTIDY_HEARTBEAT_TIMEOUT` | `120` | Seconds without a heartbeat (all tabs closed) before the session ends. It is at least 60. |
 | `BWTIDY_SESSION_IDLE_TIMEOUT` | `7200` | Seconds without activity before the session ends. |
 | `BWTIDY_BACKUP_KEEP_NEWEST` | `40` | A backup past the newest this many is deleted. |
@@ -90,7 +91,7 @@ defaults. Leave them all as they are.
 | `BWTIDY_BACKUPS_ROOT` | | Where the backups are. `compose.yaml` sets `/backups`. When it is unset each account keeps its backups in its own `app/backups`. |
 | `BWTIDY_STATIC_DIR` | | The built web page, `/app/static` in the image. When it is unset no web page is served. |
 | `BWTIDY_DOCS_DIR` | | The built documentation site served at `/docs/`, `/app/site` in the image. When it is unset there is none. |
-| `BWTIDY_IDLE_EXIT` | `600` | Seconds a worker waits for its first session before it exits. The gateway passes it on to every worker. |
+| `BWTIDY_IDLE_EXIT` | `600` | Seconds a worker waits for its first session before it exits. The gateway checks it when it starts and passes it on to every worker. |
 | `BWTIDY_GATEWAY_SWITCH_UID` | `1` | `0` keeps every worker on the gateway's own uid. It is for the unit tests only. |
 
 ## Worker

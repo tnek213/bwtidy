@@ -413,6 +413,13 @@
     "direct": false
   },
   {
+    "name": "clipboard",
+    "version": "2.0.11",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
     "name": "clsx",
     "version": "2.1.1",
     "ecosystem": "npm",
@@ -483,6 +490,13 @@
     "direct": false
   },
   {
+    "name": "escape-html",
+    "version": "1.0.3",
+    "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
     "name": "escape-string-regexp",
     "version": "4.0.0",
     "ecosystem": "npm",
@@ -501,6 +515,20 @@
     "version": "1.1.0",
     "ecosystem": "npm",
     "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "focus-visible",
+    "version": "5.2.1",
+    "ecosystem": "npm",
+    "license": "W3C",
+    "direct": false
+  },
+  {
+    "name": "fontawesome",
+    "version": "0.0.42",
+    "ecosystem": "zensical-ui",
+    "license": "CC-BY-4.0",
     "direct": false
   },
   {
@@ -623,6 +651,20 @@
     "direct": false
   },
   {
+    "name": "lucide",
+    "version": "0.0.42",
+    "ecosystem": "zensical-ui",
+    "license": "ISC AND MIT",
+    "direct": false
+  },
+  {
+    "name": "material",
+    "version": "0.0.42",
+    "ecosystem": "zensical-ui",
+    "license": "Apache-2.0",
+    "direct": false
+  },
+  {
     "name": "mcp",
     "version": "2.3.0",
     "ecosystem": "PyPI",
@@ -647,6 +689,13 @@
     "name": "object-assign",
     "version": "4.1.1",
     "ecosystem": "npm",
+    "license": "MIT",
+    "direct": false
+  },
+  {
+    "name": "octicons",
+    "version": "0.0.42",
+    "ecosystem": "zensical-ui",
     "license": "MIT",
     "direct": false
   },
@@ -812,6 +861,13 @@
     "direct": false
   },
   {
+    "name": "rxjs",
+    "version": "7.8.2",
+    "ecosystem": "npm",
+    "license": "Apache-2.0",
+    "direct": false
+  },
+  {
     "name": "scheduler",
     "version": "0.28.0",
     "ecosystem": "npm",
@@ -893,6 +949,13 @@
     "version": "1.10.3",
     "ecosystem": "npm",
     "license": "ISC",
+    "direct": false
+  },
+  {
+    "name": "zensical-ui",
+    "version": "0.0.42",
+    "ecosystem": "PyPI",
+    "license": "MIT",
     "direct": false
   }
 ]

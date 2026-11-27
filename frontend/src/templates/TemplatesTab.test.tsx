@@ -240,6 +240,8 @@ test('the table shows the description of a template after its name, empty withou
   const table = await screen.findByRole('table', { name: 'Templates' })
   const headers = within(table).getAllByRole('columnheader').map((header) => header.textContent)
   expect(headers.slice(0, 3)).toEqual(['Name', 'Description', 'Type'])
+  // The column of Edit and Delete is named for a screen reader.
+  expect(within(table).getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
   const [, first, second] = within(table).getAllByRole('row')
   expect(within(first).getAllByRole('cell')[1]).toHaveTextContent('A laptop or desktop')
   expect(within(second).getAllByRole('cell')[1]).toBeEmptyDOMElement()

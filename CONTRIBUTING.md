@@ -114,6 +114,11 @@ Open an issue and pick a form: "Bug report" or "Feature request". Never paste
 vault contents, secrets, tokens or backups into an issue, describe them
 instead.
 
+## Reporting an accessibility barrier
+
+A barrier for a keyboard or a screen reader user is a bug: open a "Bug report"
+issue. [ACCESSIBILITY.md](ACCESSIBILITY.md) lists what is known.
+
 ## Reporting a security issue
 
 Do not open an issue. Follow [SECURITY.md](SECURITY.md).

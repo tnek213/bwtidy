@@ -3,6 +3,7 @@
 This page describes every page, menu and button of bwtidy. It follows the
 app bar from Vault through Types and Queue to the Change log. The pages that
 open from elsewhere come next and the app bar itself comes last.
+[Keyboard](#keyboard) at the end lists the keys.
 
 The pictures show bwtidy's test vault as the app looks now. The docs tests
 take them (see the developer guide `dev/testing.md` in the repository). A
@@ -135,6 +136,9 @@ bwtidy note every entry is disabled.
 
 ![The cell menu of a login's password cell, with Cell and Row parts](../images/reference-cell-menu.png)
 
+- Reveal value and Hide value do what the eye of a secret cell does. On a
+  Rare fields cell they name the secret they show. They are the way to reveal
+  a value without a mouse.
 - Edit value edits the cell like a double click.
 - Remove value removes the value from the item.
 - Mark to fill in puts an empty secret cell on your To fill in list. Unmark
@@ -159,8 +163,8 @@ bwtidy note every entry is disabled.
 
 ### Header menu
 
-The three dots in a column header open its menu. This is the menu of a field
-column.
+The three dots in a column header open its menu, and so do the context menu
+key and Shift+F10 on the header. This is the menu of a field column.
 
 ![The header menu of the custom field column Password](../images/reference-header-menu.png)
 
@@ -403,7 +407,8 @@ its backup. That backup is the vault as it was right before the write.
   backup NAME and links to the change it undid while that change is on the
   page.
 - A change whose backup is gone (deleted or past the retention) shows the
-  backup's name struck through and has no Restore.
+  backup's name struck through and has no Restore. A screen reader reads the
+  name with "(deleted)" after it.
 - Changes next to each other that share one backup show it in full on the
   topmost row and fainter on the rows under it. Restore works on each.
 - A small restore icon marks a change that a later restore undid. Its tooltip
@@ -567,3 +572,28 @@ tries to write the edits that wait, ends the session and takes you back to the
 account form. About bwtidy opens the [About](#about) page.
 
 ![The open More actions menu with About bwtidy outlined and numbered 2](../images/more-menu-open.png)
+
+## Keyboard
+
+Everything works without a mouse. Tab and Shift+Tab move between the
+controls and every control shows a ring while it has the focus. Escape closes
+a menu or a dialog and the focus goes back to what opened it.
+
+The grid is one stop for Tab. Inside it the arrow keys move from cell to cell
+and from the headers down into the rows. Tab leaves the grid.
+
+| Key | In the grid |
+| --- | --- |
+| Arrow keys | Move to the next cell or header |
+| Enter or typing | Edit the cell (see [Cells](#cells)) |
+| Enter on a header | Sort by the column |
+| Space | Tick the row for the [selection bar](#selection-bar) |
+| Context menu key or Shift+F10 on a cell | Open the [cell menu](#cell-menu) |
+| Context menu key or Shift+F10 on a header | Open the [header menu](#header-menu) |
+| Escape | Stop editing and keep the old value |
+
+A screen reader hears the marks a cell shows in color once the cell has the
+focus, such as a change waiting in the queue or a field on your To fill in
+list. It hears a revealed value and Hidden in place of the dots of a masked
+one. A write that starts or ends is said aloud, and so are new proposals from
+an agent.

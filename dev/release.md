@@ -116,6 +116,18 @@ sans-serif and monospace it takes the first installed font of the lists in
 Courier New) are missing on many Linux systems and resvg leaves out a label
 whose font it cannot find.
 
+A label in a font that is not installed would be drawn in the serif font, so
+before resvg runs the build gives each font-family list without a generic
+family the one that `NAMED_FONTS` of the script lists for its font.
+Helvetica, Arial and their kin get sans-serif. Times and Georgia get serif,
+Courier and Consolas monospace. A font that d2 embeds in its SVG (resvg loads
+no embedded font) gets sans-serif, or monospace for its code font, with the
+bold or italic its name holds. Graphviz writes `sans-Serif` after Helvetica,
+and the build writes such a generic family in lower case (the only case resvg
+knows). Name a generic family after any other font, as in
+`fontname="Inter, sans-serif"`. Where that font is not installed, a list
+without one fails the build, which names the page, the line and the font.
+
 Building docs with a diagram therefore needs one of those fonts for each
 generic family its text uses, and DejaVu covers all three. Without one the
 build fails before it writes the picture and names the page, the line, the

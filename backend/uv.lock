@@ -47,6 +47,18 @@ wheels = [
 ]
 
 [[package]]
+name = "axe-playwright-python"
+version = "0.1.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "playwright" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/1f/dc08ac324d83ac92015b8658b9d4b3f0e9cd956bead24a0fb1e458a52656/axe_playwright_python-0.1.9.tar.gz", hash = "sha256:eb5feb0111dd55c69932a61def7029aa84e414af6245f84165b2d349bd1184c1", size = 223654, upload-time = "2026-11-23T15:44:07.838Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e4/de/1c3d7b1fbc3c50b97eb9ef3853444599643a621849b06dce6285410e8a89/axe_playwright_python-0.1.9-py3-none-any.whl", hash = "sha256:101d3a69fd9e4e064164250aeb375eb31c37a749ff81aff9915c12ac430497ac", size = 189476, upload-time = "2026-11-23T15:44:06.17Z" },
+]
+
+[[package]]
 name = "bwtidy"
 version = "1.0.0b1"
 source = { editable = "." }
@@ -61,6 +73,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "axe-playwright-python" },
     { name = "import-linter" },
     { name = "playwright" },
     { name = "pytest" },
@@ -87,6 +100,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "axe-playwright-python", specifier = ">=0.1.9,<0.2" },
     { name = "import-linter", specifier = ">=2.17,<3" },
     { name = "playwright", specifier = ">=1.64.1,<2" },
     { name = "pytest", specifier = ">=9.0,<10" },
