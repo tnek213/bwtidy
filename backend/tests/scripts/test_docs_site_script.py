@@ -238,6 +238,31 @@ def test_serve_hands_zensical_the_same_extra(repo, monkeypatch, docs_site):
     assert not (repo / docs_site.SERVE_CONFIG).exists()
 
 
+def test_serve_shows_a_diagram_as_a_code_block_apart_from_what_follows(
+    repo, monkeypatch, docs_site
+):
+    text = (REAL_ROOT / "zensical.toml").read_text()
+    extensions = text[text.index("[project.markdown_extensions]") :]
+    extensions = re.split(r"\n(?=\[)", extensions)[0]
+    nav = '["index.md", "how-to/run.md", "restore.md"]'
+    write(repo, "zensical.toml", f'[project]\nsite_name = "bwtidy"\nnav = {nav}\n\n{extensions}\n')
+    page = '# Run\n\n```mermaid alt="A to B"\nflowchart LR\n  a --> b\n```\n\nThen run it.\n'
+    write(repo, "docs/how-to/run.md", page)
+    real = subprocess.run
+
+    ## Zensical's build in place of its serve, on the same config, renders what serve would show
+    def run(cmd, cwd):
+        return real([*cmd[: cmd.index("serve")], "build", *cmd[cmd.index("serve") + 1 :]], cwd=cwd)
+
+    monkeypatch.setattr(docs_site.subprocess, "run", run)
+    assert docs_site.serve([]) == 0
+    html = (repo / "site" / "how-to" / "run" / "index.html").read_text()
+    code = re.search(r"<pre\b.*?</pre>", html, re.DOTALL)
+    assert code, html
+    assert "flowchart" in code[0] and "alt=" not in code[0] and "Then run it" not in code[0]
+    assert re.search(r"</pre>.*<p>Then run it\.</p>", html, re.DOTALL)
+
+
 def test_build_fails_when_the_restore_page_lacks_the_line(repo, monkeypatch, capsys, docs_site):
     write(repo, "docs/restore.md", "# Restore\n\nWritten for bwtidy.\n")
     fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)

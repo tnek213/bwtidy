@@ -98,7 +98,10 @@ any request. To use a Kroki server of your own, set `BWTIDY_KROKI_URL`: the
 Dockerfile's docs stage takes it as a build arg, and `scripts/dev-vault up`,
 `compose.dev.yaml` and `compose.build.yaml` pass on the one of the
 environment. `serve` shows a diagram as its code block, an editor's Kroki
-preview or a build shows the picture.
+preview or a build shows the picture. That takes `relaxed_headers` of
+SuperFences in `zensical.toml`: SuperFences refuses a fence whose info string
+holds an option it does not know (such as `alt`) and leaves it as text, so
+its closing fence would open a code block of what follows.
 
 The theme overrides are in `overrides/` (outside `docs/`, so they are not
 built as pages). Its `main.html` fills the theme's `announce` block with the

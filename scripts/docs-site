@@ -59,7 +59,8 @@ family and the fonts it tried. The PNG is named after a hash of the type, the so
 converter's settings, and kept under that hash in .cache/kroki/ at the repo root, so a later build
 finds it there and makes no request. A server that cannot be reached or answers with an error fails
 the build, naming the page, the line and the server's message. Docs without a diagram build without
-any request. `serve` shows a diagram as its code block.
+any request. `serve` shows a diagram as its code block, as zensical.toml has SuperFences take a
+fence whose info string holds an option it does not know (relaxed_headers).
 """
 
 import hashlib
