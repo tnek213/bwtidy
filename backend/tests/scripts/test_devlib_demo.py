@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -43,6 +44,7 @@ def test_the_environment_sets_the_stacks_own_values_and_passes_the_settings_on()
         "DEMO_BIND": "0.0.0.0",
         "DEMO_PORT": "80",
         "DEMO_BUILD_CONTEXT": "https://example.test/repo.git",
+        "DEMO_PUBLIC_BRIDGE": "br-bwtidy-demo",
     }
     assert demo.environment(ROOT, 4321, caller) == {
         "PATH": "/bin",
@@ -53,7 +55,15 @@ def test_the_environment_sets_the_stacks_own_values_and_passes_the_settings_on()
         "DEMO_IMAGE": f"{PROJECT}:local",
         "DEMO_BIND": "127.0.0.1",
         "DEMO_PORT": "4321",
+        "DEMO_PUBLIC_BRIDGE": demo.public_bridge(ROOT),
     }
+
+
+def test_the_public_bridge_is_the_worktrees_own_and_a_valid_interface_name():
+    bridge = demo.public_bridge(ROOT)
+    assert re.fullmatch(r"bwd-[0-9a-f]{10}", bridge)
+    assert bridge == demo.public_bridge(Path("/elsewhere/My Tree.1"))
+    assert bridge != demo.public_bridge(Path("/work/other"))
 
 
 @pytest.mark.parametrize(

@@ -62,9 +62,11 @@ a text that none of them draws (resvg would leave it out without a word) fails t
 the page, the line, the generic family and the fonts it tried, and so does a text whose list
 names neither an installed font nor a generic family. The PNG is named after a hash of the type,
 the source and the converter's settings, and kept under that hash in .cache/kroki/ at the repo
-root, so a later build finds it there and makes no request. A server that cannot be reached or
-answers with an error fails the build, naming the page, the line and the server's message. Docs
-without a diagram build without any request. `serve` shows a diagram as its code block.
+root, so a later build finds it there and makes no request. resvg writes the PNGs into a temp
+directory inside that cache, so each one is renamed into place on the same filesystem and a failed
+conversion leaves nothing. A server that cannot be reached or answers with an error fails the
+build, naming the page, the line and the server's message. Docs without a diagram build without
+any request. `serve` shows a diagram as its code block.
 """
 
 import hashlib
@@ -830,7 +832,8 @@ def fetch_svg(kind: str, source: str) -> bytes:
 def convert(svgs: dict[str, bytes], cache: Path) -> dict[str, str]:
     """Convert each SVG to a PNG in the cache under its key, why for each key that failed."""
     cache.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="bwtidy-kroki-") as temp:
+    ## inside the cache, as os.replace cannot move a file to another filesystem
+    with tempfile.TemporaryDirectory(prefix=".convert-", dir=cache) as temp:
         paths = []
         for key, svg in svgs.items():
             (Path(temp) / f"{key}.svg").write_bytes(svg)

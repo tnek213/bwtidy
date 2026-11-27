@@ -1,11 +1,13 @@
-# Copies README.md to the Overview of docker.io/tnek213/bwtidy and the repo's description to its
-# short description, so Docker Hub says what GitHub says. Runs when either changes on main.
+# Copies docker/hub-overview.md to the Overview of docker.io/tnek213/bwtidy and the repo's
+# description to its short description. Runs when the overview or this workflow changes on main.
+# The overview is a file of its own because Docker Hub readers look for the tags and how to run the
+# image, and Docker Hub shows a GitHub alert box without its formatting (dev/release.md).
 name: Docker Hub README
 
 on:
   push:
     branches: [main]
-    paths: [README.md, .github/workflows/docker-readme.yml]
+    paths: [docker/hub-overview.md, .github/workflows/docker-readme.yml]
   workflow_dispatch:
 
 permissions:
@@ -37,6 +39,5 @@ jobs:
           password: ${{ secrets.DOCKERHUB_README_TOKEN }}
           repository: tnek213/bwtidy
           short-description: ${{ github.event.repository.description }}
-          readme-filepath: README.md
-          # the README's relative links and images become links into the GitHub repo
-          enable-url-completion: true
+          # every link in it is absolute (test_docker_hub_overview.py), so no URL completion
+          readme-filepath: docker/hub-overview.md

@@ -144,3 +144,13 @@ def test_stale_names_names_what_differs():
 def test_the_committed_list_is_up_to_date():
     committed = json.loads(third_party.OUTPUT.read_text())
     assert third_party.stale_names(committed, third_party.collect()) == []
+
+
+def test_the_bundled_font_is_listed_and_ships_with_its_license():
+    names = {(p["name"], p["version"]) for p in third_party.collect()}
+    for package in third_party.BUNDLED:
+        assert (package["name"], package["version"]) in names
+    files = {path.name for path in third_party.BUNDLED_FONT.iterdir()}
+    assert files == {"IBMPlexMono-Regular.woff2", "IBMPlexMono-Bold.woff2", "LICENSE.txt"}
+    license = (third_party.BUNDLED_FONT / "LICENSE.txt").read_text()
+    assert "SIL Open Font License, Version 1.1" in license

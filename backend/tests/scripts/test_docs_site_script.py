@@ -1,3 +1,5 @@
+import errno
+import os
 import re
 import shutil
 import socket
@@ -831,6 +833,25 @@ def test_a_second_build_takes_the_diagram_from_the_cache(
     assert (first / "how-to" / "run.md").read_text() == (second / "how-to" / "run.md").read_text()
     [png] = (second / "how-to").glob("diagram-*.png")
     assert png.read_bytes() == next((first / "how-to").glob("diagram-*.png")).read_bytes()
+
+
+def test_a_cache_on_another_filesystem_than_the_temp_directory_gets_the_png(
+    repo, monkeypatch, tmp_path, kroki, docs_site
+):
+    cache = repo / ".cache" / "kroki"
+    real = os.replace
+
+    def replace(src, dst) -> None:
+        ## the cache stands for a filesystem of its own, a rename into or out of it fails
+        if (cache in Path(src).parents) != (cache in Path(dst).parents):
+            raise OSError(errno.EXDEV, "Invalid cross-device link", str(src), None, str(dst))
+        real(src, dst)
+
+    monkeypatch.setattr(docs_site.os, "replace", replace)
+    kept = build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, GRAPHVIZ_PAGE)
+    [png] = cache.glob("*.png")
+    assert png.read_bytes() == next((kept / "how-to").glob("diagram-*.png")).read_bytes()
+    assert list(cache.iterdir()) == [png]
 
 
 def test_kroki_answering_an_error_fails_the_build(repo, monkeypatch, capsys, kroki, docs_site):
