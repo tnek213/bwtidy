@@ -353,6 +353,13 @@ in `apps/cli`). It fails when the tag no longer names that commit or when the
 build bundles a module under `bitwarden_license/`, and `bitwarden-cli` puts its
 `apps/cli/build` in place of the npm package's build, with a `SOURCE` file that
 names the repository, the tag and the commit and the GPL-3.0 text beside it.
+The build also bundles Bitwarden's SDK `@bitwarden/sdk-internal` (GPL-3.0),
+whose npm package holds only its compiled WebAssembly. So `SOURCE` names the
+SDK's repository and the commit from the package's `VERSION` too, and the
+folder `sdk-internal` beside it keeps the package's `package.json`, `VERSION`
+and `LICENSE` with the sha256 of its WebAssembly. The stage fails when
+`VERSION` is not a commit or when the build holds a WebAssembly file that is
+not the SDK's, as `SOURCE` would not name its source.
 npm, git, uv, uv's cache, the monorepo and the backend's sources stay in the
 build stages. The app stage
 also removes pip, which comes with the base image: nothing in the image runs it,

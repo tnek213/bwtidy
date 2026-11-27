@@ -707,7 +707,9 @@ that commit by itself and can be merged once ci passes on it
 ([Releasing](release.md#the-cli-pin-of-dependabots-pull-requests)).
 `tests/integration/test_bw_cli_build.py` checks the image: its bw is that
 version, its build bundles no module under `bitwarden_license/` and its
-`SOURCE` file names the pinned commit.
+`SOURCE` file names the pinned commit. It also checks that `SOURCE` names the
+commit of the bundled SDK and that every WebAssembly file of the build is the
+SDK's.
 
 After a change to the dependencies (`npm install` in `frontend/`, `uv add` or
 `uv lock` in `backend/`), run `scripts/third-party` and commit the
