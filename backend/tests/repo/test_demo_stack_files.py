@@ -148,3 +148,18 @@ def test_the_normal_image_holds_no_demo_code():
     assert "demo" not in DOCKERFILE.lower()
     sources = (ROOT / "backend" / "src").rglob("*.py")
     assert [str(path) for path in sources if "bwtidy_demo" in path.read_text()] == []
+
+
+def test_every_service_has_a_memory_and_a_process_limit_from_a_documented_setting():
+    docs = (ROOT / "dev" / "demo.md").read_text()
+    for name, block in blocks(COMPOSE, "services").items():
+        upper = name.upper()
+        memory = re.search(r"^    mem_limit: \$\{(DEMO_MEM_\w+):-([^}]+)\}$", block, re.MULTILINE)
+        swap = re.search(r"^    memswap_limit: \$\{(DEMO_MEM_\w+):-([^}]+)\}$", block, re.MULTILINE)
+        pids = re.search(r"^    pids_limit: \$\{(DEMO_PIDS_\w+):-(\d+)\}$", block, re.MULTILINE)
+        assert memory and swap and pids, name
+        assert memory[1] == f"DEMO_MEM_{upper}", name
+        assert pids[1] == f"DEMO_PIDS_{upper}", name
+        assert swap.groups() == memory.groups(), name
+        for variable in (memory[1], pids[1]):
+            assert f"`{variable}`" in docs, variable

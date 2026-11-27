@@ -1,11 +1,13 @@
 # Quick reference
 
 - **Maintained by**: [the bwtidy project on GitHub](https://github.com/tnek213/bwtidy)
-- **Documentation**: [tnek213.github.io/bwtidy](https://tnek213.github.io/bwtidy/), also
-  served by every running bwtidy at `/docs/`
+- **Documentation**:
+  [tnek213.github.io/bwtidy](https://tnek213.github.io/bwtidy/), also served by
+  every running bwtidy at `/docs/`
 - **Where to get help**: [GitHub Discussions](https://github.com/tnek213/bwtidy/discussions)
-- **Where to file issues**: [GitHub issues](https://github.com/tnek213/bwtidy/issues), or
-  privately for a security issue as
+- **Where to file issues**: [GitHub
+  issues](https://github.com/tnek213/bwtidy/issues), or privately for a security
+  issue as
   [SECURITY.md](https://github.com/tnek213/bwtidy/blob/main/SECURITY.md#reporting-a-vulnerability)
   says
 - **Supported architectures**: `amd64`
@@ -33,7 +35,8 @@ lists every tag.
 
 # What is bwtidy?
 
-<!-- intro: the same text in README.md, docs/index.md and docker/hub-overview.md -->
+<!-- intro: the same text in README.md, docs/index.md and
+docker/hub-overview.md -->
 
 Password vaults get inconsistent over time. Some items use `Password` while
 others use `password`. Some web addresses include a protocol prefix and others
@@ -51,9 +54,10 @@ secret values. You review each proposal and decide whether to accept it. Only
 accepted proposals are written to your vault.
 
 Before each write of your changes bwtidy saves a backup of the whole vault.
-The backup is an age-encrypted ZIP stored in bwtidy's backups volume. You can restore it with
-standard tools. Your vault stays on your Bitwarden or Vaultwarden server.
-bwtidy reads and writes vault data through Bitwarden's official CLI.
+The backup is an age-encrypted ZIP stored in bwtidy's backups volume. You can
+restore it with standard tools. Your vault stays on your Bitwarden or
+Vaultwarden server. bwtidy reads and writes vault data through Bitwarden's
+official CLI.
 
 bwtidy is for people who want their Bitwarden or Vaultwarden vault to follow
 standards they define themselves. It helps them apply those standards
@@ -63,7 +67,8 @@ consistently across the vault.
 
 ![The bwtidy grid with the vault's items as rows and their fields as columns](https://raw.githubusercontent.com/tnek213/bwtidy/main/docs/images/vault-grid.png)
 
-<!-- the warning box of README.md without its [!WARNING] line, as Docker Hub shows the text of a GitHub alert without its formatting -->
+<!-- the warning box of README.md without its [!WARNING] line, as Docker Hub
+shows the text of a GitHub alert without its formatting -->
 
 > **Made with AI.** AI coding agents wrote all of bwtidy under the author's
 > guidance. Claude Fable, Opus and Sonnet built it in many small steps. Codex
@@ -93,10 +98,10 @@ an empty directory. Then copy `example.env` to `.env` (your settings file) and
 start the container.
 
 ```console
-$ curl -fsSLO https://raw.githubusercontent.com/tnek213/bwtidy/main/compose.yaml
-$ curl -fsSLO https://raw.githubusercontent.com/tnek213/bwtidy/main/example.env
-$ cp example.env .env
-$ docker compose up -d
+curl -fsSLO https://raw.githubusercontent.com/tnek213/bwtidy/main/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/tnek213/bwtidy/main/example.env
+cp example.env .env
+docker compose up -d
 ```
 
 Before `docker compose up -d` you may set `BWTIDY_VERSION` in `.env` to pin a
@@ -104,7 +109,7 @@ version. A Vaultwarden on your own network also needs its URL in
 `BWTIDY_ALLOWED_SERVERS`, as bwtidy refuses a server on a private address
 otherwise.
 
-Open http://127.0.0.1:8765 on the host and log in with your Bitwarden or
+Open <http://127.0.0.1:8765> on the host and log in with your Bitwarden or
 Vaultwarden account. [Run bwtidy](https://tnek213.github.io/bwtidy/how-to/run/)
 goes through the first login and covers a build of your own.
 [Update, stop and logs](https://tnek213.github.io/bwtidy/how-to/run/#update-stop-and-logs)
@@ -174,7 +179,7 @@ commit of the GitHub repository that GitHub Actions built the image from.
 Check it with the GitHub CLI.
 
 ```console
-$ gh attestation verify oci://docker.io/tnek213/bwtidy:latest --owner tnek213
+gh attestation verify oci://docker.io/tnek213/bwtidy:latest --owner tnek213
 ```
 
 # License
