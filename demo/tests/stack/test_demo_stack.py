@@ -553,6 +553,15 @@ def test_the_stats_show_the_start_the_operation_and_the_mcp_tool(first: Visitor,
     assert "demo vaults used" in page
 
 
+def test_bwtidy_stats_in_the_demo_container_prints_them(first: Visitor):
+    ## the operator's command of dev/demo.md (Usage stats), after the test above saw the grid
+    usage = json.loads(in_container("demo", "bwtidy", "stats", "--json").stdout)
+    done = {(op["channel"], op["operation"]) for op in usage["operations"] if op["ok"]}
+    assert ("ui", "GET /api/grid") in done
+    text = in_container("demo", "bwtidy", "stats").stdout
+    assert "GET /api/grid" in text
+
+
 def test_the_stats_database_holds_no_password(first: Visitor, mcp_token: str):
     dump = python_in("demo", DUMP)
     ## the events carry the vault id, so the dump is the real one
