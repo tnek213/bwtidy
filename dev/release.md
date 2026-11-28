@@ -558,17 +558,19 @@ docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12
 
 ## Publishing the image
 
-The workflow "Image" (`.github/workflows/image.yml`) builds the Dockerfile's target
-`app` and pushes it to `docker.io/tnek213/bwtidy` on Docker Hub. It runs on every
-push to main, for every release (pre-releases too), when the workflow "Release"
-calls it with the version (`workflow_call`), and by hand on main. The image is
-built for `linux/amd64` with the OCI labels `source`, `version`, `revision` and
-`licenses`. The tags depend on the trigger:
+The workflow "Image" (`.github/workflows/image.yml`) builds the Dockerfile's
+target `app` and pushes it to `docker.io/tnek213/bwtidy` on Docker Hub. It runs
+only for a release (pre-releases too), when the workflow "Release" calls it
+with the version (`workflow_call`). It tags the image with the version as
+`frontend/package.json` spells it (`1.0.0-beta.1`) and with `latest`. The image
+is built for `linux/amd64` with the OCI labels `source`, `version`, `revision`
+and `licenses`.
 
-| Trigger | Tags |
-| --- | --- |
-| Push to main | `main` and the short commit (the first 7 characters of its hash) |
-| Release (a call from "Release") | the version as `frontend/package.json` spells it (`1.0.0-beta.1`) and `latest` |
+A push to main publishes nothing. Docker Hub keeps the image of a deleted tag
+until someone deletes it by hand, so an image for every push would pile up there.
+Nobody needs one either. A server runs a release, and whoever wants main early
+builds it from the checkout
+([Build the image yourself](../docs/how-to/run.md#build-the-image-yourself)).
 
 The image builds on Debian 13 (trixie): `python:3.13-slim-trixie` is the base of
 the final stage, `node:26-trixie-slim` of the build stages. The stages
@@ -594,16 +596,13 @@ build stages. The app stage
 also removes pip, which comes with the base image: nothing in the image runs it,
 and a scanner would report on its vendored packages.
 
-A push to main that changes only files the image never copies (the
-`paths-ignore` list in the workflow: `README.md`, the other top-level docs, the
-Docker Hub overview, the compose files, `dev/`, the tests, the other workflows,
-`scripts/prune-tags`, `scripts/release`) builds nothing. Keep that list in step
-with the Dockerfile's `COPY` lines: a file the image copies must never be on it.
-A push to main never moves `latest`. The workflow fails, saying why, when the
-version of a release or its tag is not the version in `frontend/package.json`
-(or `v` plus it), when it is run by hand on another branch, or when the
-repository secret `DOCKERHUB_TOKEN` is missing. The job skips while the
-repository is private.
+The workflow fails, saying why, when the version of a release or its tag is not
+the version in `frontend/package.json` (or `v` plus it), or when the repository
+secret `DOCKERHUB_TOKEN` is missing. The job skips while the repository is
+private. It has no "Run workflow" button. When the image of a release fails, fix
+the cause and run the failed jobs of that run of "Release" again ("Re-run failed
+jobs"). That publishes the image of the version, unless Docker Hub has its tag
+already, as a version tag is immutable there.
 
 Set it up once:
 
@@ -611,6 +610,9 @@ Set it up once:
   a repository that does not exist yet as public when you push to it.
 - Make a Docker Hub personal access token with Read and Write and store it as the
   repository secret: `gh secret set DOCKERHUB_TOKEN --repo tnek213/bwtidy`.
+- Make the version tags immutable in the repository's settings on Docker Hub,
+  with the regex `^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$`. A version then never moves to
+  another image, while `latest` moves with each release.
 
 A release pushes `VERSION` and `latest` once its tag is pushed
 ([To release](#to-release)).
@@ -628,17 +630,16 @@ Check a change to the workflow with actionlint, as for the docs workflow above.
 
 ## Scanning the published images
 
-The workflow "Image scan" (`.github/workflows/image-scan.yml`) scans
-`docker.io/tnek213/bwtidy:latest` and `:main` with Docker Scout every day at
-04:17 UTC, after every successful run of "Image" on main, on a pull request that
-changes the workflow and by hand ("Run workflow"). It uploads the results as
-SARIF to code scanning, so the alerts show under the repository's Security tab,
-"Code scanning", one category per tag (`image-latest` and `image-main`). It
-reports only the vulnerabilities that a newer version of the package fixes
-(`only-fixed`): those are the ones a rebuild or an update can act on, and an
-alert closes when a scan no longer finds it. The data is the same as the Scout
-view on Docker Hub, which also lists the unfixed ones. The job skips while the
-repository is private.
+The workflow "Image scan" (`.github/workflows/image-scan.yml`) scans the newest
+release, `docker.io/tnek213/bwtidy:latest`, with Docker Scout every day at
+04:17 UTC, on a pull request that changes the workflow and by hand ("Run
+workflow"). It uploads the results as SARIF to code scanning, so the alerts
+show under the repository's Security tab, "Code scanning", in the category
+`image-latest`. It reports only the vulnerabilities that a newer version of the
+package fixes (`only-fixed`): those are the ones a rebuild or an update can act
+on, and an alert closes when a scan no longer finds it. The data is the same as
+the Scout view on Docker Hub, which also lists the unfixed ones. The job skips
+while the repository is private.
 
 Scout needs a Docker Hub login even for a public image, so the workflow has a
 secret of its own that can only read. Set it up once: make a Docker Hub personal
@@ -650,46 +651,6 @@ gets no repository secrets, so its scan fails and the next scheduled run checks
 the change.
 
 Check a change to the workflow with actionlint, as for the docs workflow above.
-
-## Pruning the short-commit tags
-
-Every push to main that changes the image adds a short-commit tag, so the workflow
-"Prune image tags" (`.github/workflows/prune-tags.yml`) deletes the old ones with
-`scripts/prune-tags` every Sunday at 03:41 UTC. The script lists every tag of the
-repository through Docker Hub's API and keeps:
-
-- every tag that is not exactly 7 lowercase hex characters: the versions, `latest`,
-  `main` and any other name. The version tags are immutable on Docker Hub anyway
-  (a repository setting with the regex `^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$`).
-- the 10 newest short-commit tags by last push, so a recent build can still be run
-  or compared.
-- the short commit of every commit a git tag `v*` points to, as a server may run
-  a release by its commit tag. The workflow checks out the full history with its
-  tags, and the script stops without deleting anything when Docker Hub has a
-  version tag but the checkout has no tag `v*`.
-- every short-commit tag with the same digest as `main` or `latest`.
-
-It deletes the rest, prints why it keeps each tag it keeps, and stops with an error,
-deleting nothing, when the listing fails or finds no tags. A failed delete is
-reported, the others go on and the run fails.
-
-The workflow also runs by hand ("Run workflow"), as a dry run unless `dry_run` is
-unticked, and as a dry run on every pull request that changes the workflow or the
-script. A dry run prints what it would delete and deletes nothing. Run one by hand
-from a checkout with its tags (`git fetch --tags`):
-
-```sh
-scripts/prune-tags              # a dry run, anonymous as the repository is public
-scripts/prune-tags --delete     # deletes, needs the token in DOCKERHUB_PAT
-```
-
-With `DOCKERHUB_PAT` set, the dry run logs in too, which checks the token. Deleting
-a tag needs a personal access token with Read, Write, Delete, so the workflow uses
-the secret `DOCKERHUB_README_TOKEN` of the Docker Hub overview below. The script
-logs in at `/v2/auth/token` (`/v2/users/login` is deprecated) and never prints
-the token. A pull request from Dependabot or a fork gets no repository secrets,
-so its dry run fails and the next scheduled run checks the change. Check a
-change to the workflow with actionlint, as for the docs workflow above.
 
 ## The Docker Hub overview
 
@@ -718,14 +679,11 @@ The overview shares the introduction, the caution and the trademark note with
 `README.md`. AGENTS.md (Writing docs) says which texts must stay the same, and
 `backend/tests/repo/test_docker_hub_overview.py` checks them. It also checks the
 links, the size and that every variable the overview names is in the
-configuration reference. The workflow "Image" ignores a push that changes only
-the overview.
+configuration reference.
 
 The description API refuses a token with only Read and Write, so this workflow
-has a secret of its own, which it shares with the pruning of the short-commit
-tags ([Pruning the short-commit tags](#pruning-the-short-commit-tags)), as
-deleting a tag needs the same scope: make a Docker Hub personal access token
-with Read, Write, Delete and store it with
-`gh secret set DOCKERHUB_README_TOKEN --repo tnek213/bwtidy`. Both workflows
-fail, saying why, when the secret is missing. `DOCKERHUB_TOKEN` (Read and Write)
+has a secret of its own: make a Docker Hub personal access token with Read,
+Write, Delete and store it with
+`gh secret set DOCKERHUB_README_TOKEN --repo tnek213/bwtidy`. The workflow
+fails, saying why, when the secret is missing. `DOCKERHUB_TOKEN` (Read and Write)
 stays the one the image is pushed with.

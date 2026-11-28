@@ -8,7 +8,12 @@ The versions of bwtidy follow [Semantic Versioning](https://semver.org) with
 
 Changes on main that are not yet in a versioned Docker image.
 
-Nothing yet.
+### Breaking changes
+
+- Run a version or `latest` if you pulled the image as `main` or by a commit
+  tag. Docker Hub now gets the image only for a release, as its version and
+  `latest`, and the tag `main` and the commit tags are removed
+  ([#246](https://github.com/tnek213/bwtidy/pull/246))
 
 ## 1.0.0-beta.3
 

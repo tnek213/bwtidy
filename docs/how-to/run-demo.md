@@ -19,9 +19,10 @@ starting points.
   6 visitors at once needs a machine with 4 GB of memory, as
   [Memory](https://github.com/tnek213/bwtidy/blob/main/dev/demo.md#memory)
   shows. A bigger machine allows more visitors.
-- A pinned bwtidy. Set `BWTIDY_IMAGE` to a short-commit tag or a release and
-  point `DEMO_BUILD_CONTEXT` at the same commit or tag, so the demo runs a
-  bwtidy that somebody chose. To update, set the new values and run
+- A pinned release of bwtidy. Set `BWTIDY_IMAGE` to a version and build
+  from the git tag of that same version (`v` and the version), with a
+  checkout of the tag or with `DEMO_BUILD_CONTEXT`. The demo code then
+  matches the bwtidy under it. To update, set the new values and run
   `docker compose -f compose.demo.yaml up -d --build` again. Every running
   demo ends then and the ledger stays. See
   [Run it](https://github.com/tnek213/bwtidy/blob/main/dev/demo.md#run-it).

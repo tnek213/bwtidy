@@ -19,14 +19,13 @@
 # Supported tags
 
 GitHub Actions builds every tag from the
-[GitHub repository](https://github.com/tnek213/bwtidy) for `linux/amd64`.
+[GitHub repository](https://github.com/tnek213/bwtidy) for `linux/amd64`,
+and only for a release.
 
 | Tag | What it is |
 | --- | --- |
-| `latest` | The newest release, betas and release candidates included. A push to main never moves it. |
-| A version such as `1.0.0-beta.1` | One release. Its tag never moves to another image. |
-| `main` | The newest build of the main branch. Every push to main that changes the image moves it. |
-| A short commit (7 hex characters) | The build of that commit of main. A weekly cleanup keeps the 10 newest by push and those of a release. |
+| `latest` | The newest release, betas and release candidates included. |
+| A version such as `1.0.0-beta.3` | One release. Its tag never moves to another image. |
 
 Pin a version on a server so that an update is your decision. The
 [release notes](https://tnek213.github.io/bwtidy/releases/) say what each

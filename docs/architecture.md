@@ -301,7 +301,7 @@ table says why.
 container `bwtidy`. `BWTIDY_IMAGE` and `BWTIDY_VERSION` name the image in the
 `.env` made from `example.env`. The published image is
 `docker.io/tnek213/bwtidy`, which the GitHub Actions workflow "Image" builds
-and pushes on every push to main and every release. `compose.build.yaml`
+and pushes for every release. `compose.build.yaml`
 builds it from the checkout as `bwtidy:local` instead, and [Run
 bwtidy](how-to/run.md) says how to run it.
 

@@ -3,20 +3,21 @@
 bwtidy runs as one Docker container with the official Bitwarden CLI inside.
 You need Docker with Compose. The usual way is the ready-made image
 `docker.io/tnek213/bwtidy` from Docker Hub. `compose.yaml` pulls it, so you
-have nothing to build. The image has two kinds of tags:
+have nothing to build. Every tag of the image is a release:
 
-- `latest` and the versions (like `0.1.0-alpha.1`) are releases. The
-  [Release notes](../releases.md) say what each one brings.
-- `main` and the short commits follow every push to main that changes the
-  image. Older short commits are deleted after a while, except those of a
-  release.
+- `latest` is the newest release, betas and release candidates included.
+- A version (like `1.0.0-beta.3`) is one release and never moves to another
+  image.
+
+The [Release notes](../releases.md) say what each one brings. Docker Hub
+has no image of main between releases. To run unreleased code,
+[build the image yourself](#build-the-image-yourself).
 
 GitHub Actions builds every published image from this repository. It signs
 a provenance attestation for each one, which shows the commit the image was
 built from.
 [Verifying the image in SECURITY.md](https://github.com/tnek213/bwtidy/blob/main/SECURITY.md#verifying-the-image)
-shows how to check it. You can also
-[build the image yourself](#build-the-image-yourself).
+shows how to check it.
 
 ## Start it
 
