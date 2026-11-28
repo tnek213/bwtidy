@@ -9,7 +9,7 @@ license = "AGPL-3.0-only"
 requires-python = ">=3.13"
 dependencies = [
     "cryptography>=50.0.2,<51",
-    "fastapi>=0.162,<0.166",
+    "fastapi>=0.165,<0.166",
     "httpx2>=2.16,<3",
     "mcp>=2.3.0,<3",
     "pyrage>=1.4.0,<2",

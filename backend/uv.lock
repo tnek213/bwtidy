@@ -91,7 +91,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=50.0.2,<51" },
-    { name = "fastapi", specifier = ">=0.162,<0.166" },
+    { name = "fastapi", specifier = ">=0.165,<0.166" },
     { name = "httpx2", specifier = ">=2.16,<3" },
     { name = "mcp", specifier = ">=2.3.0,<3" },
     { name = "pyrage", specifier = ">=1.4.0,<2" },
