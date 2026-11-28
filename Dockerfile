@@ -155,6 +155,10 @@ FROM python AS app
 RUN rm -rf /usr/local/lib/python3.13/site-packages/pip /usr/local/lib/python3.13/site-packages/pip-*.dist-info \
     /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.13
 
+## node links libatomic.so.1, which the node image has and the Python image lacks
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libatomic1 \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=bitwarden-cli /usr/local/bin/node /usr/local/bin/node
 COPY --from=bitwarden-cli /usr/local/lib/bitwarden-cli/node_modules /usr/local/lib/bitwarden-cli/node_modules
 

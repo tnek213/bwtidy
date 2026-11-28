@@ -571,7 +571,7 @@ built for `linux/amd64` with the OCI labels `source`, `version`, `revision` and
 | Release (a call from "Release") | the version as `frontend/package.json` spells it (`1.0.0-beta.1`) and `latest` |
 
 The image builds on Debian 13 (trixie): `python:3.13-slim-trixie` is the base of
-the final stage, `node:24-trixie-slim` of the build stages. The stages
+the final stage, `node:26-trixie-slim` of the build stages. The stages
 `frontend`, `docs`, `bitwarden-cli` (`npm ci` in `docker/bitwarden-cli/`) and
 `backend` (the venv) build what the final stage `app` copies: the node binary,
 the CLI's `node_modules`, the venv, the static files and the docs site. The
