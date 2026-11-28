@@ -79,11 +79,12 @@ async def change_log(
 
 def restore_operation(entry: dict[str, Any], state: AppState) -> RestoreItems:
     """The restoreItems for a change log row: its items and the ones it created, with the
-    revisionDate of every one that is active now."""
+    revisionDate of every one that is active now (an archived one counts as active)."""
     item_ids = list(dict.fromkeys([*entry["itemIds"], *entry["createdItemIds"]]))
+    cache = state.cache
     active: dict[str, str] = {
         item_id: i["revisionDate"]
-        for item_id, i in state.cache.items_by_id().items()
+        for item_id, i in {**cache.archived_by_id(), **cache.items_by_id()}.items()
         if isinstance(i.get("revisionDate"), str)
     }
     revision_dates = {i: active[i] for i in item_ids if i in active}

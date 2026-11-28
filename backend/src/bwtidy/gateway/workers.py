@@ -4,6 +4,7 @@ import asyncio
 import errno
 import logging
 import os
+import shutil
 import signal
 import stat
 import time
@@ -13,7 +14,7 @@ from typing import Any, NoReturn
 
 import httpx2 as httpx
 
-from bwtidy.gateway.accounts import AccountKey, LimitError
+from bwtidy.gateway.accounts import RUN_NAME_LENGTH, AccountKey, LimitError
 from bwtidy.gateway.settings import GatewaySettings
 from bwtidy.protocol import PENDING_MARKER, STATS_REPORT_ENV, WORKER_LOG
 
@@ -31,6 +32,11 @@ TOO_MANY_WORKERS = "Too many accounts are open at once. Try again later."
 ## what a planted worker.log fails its open with: a link (ELOOP), a FIFO or a socket (ENXIO),
 ## a directory (EISDIR)
 PLANTED_ERRNOS = frozenset({errno.ELOOP, errno.ENXIO, errno.EISDIR})
+## the sockets of a worker and of its bw serve, in the account's socket directory
+APP_SOCKET = "app.sock"
+BW_SOCKET = "bw.sock"
+## the bytes a Unix socket path holds on Linux: sun_path is 108 with its NUL
+MAX_SOCKET_PATH = 107
 
 
 class WorkerStartError(Exception):
@@ -48,14 +54,21 @@ class Unanswered(Exception):
 
 class Worker:
     def __init__(
-        self, key: AccountKey, path: Path, uid: int, proc: asyncio.subprocess.Process
+        self,
+        key: AccountKey,
+        path: Path,
+        uid: int,
+        proc: asyncio.subprocess.Process,
+        run: Path,
     ) -> None:
         self.key = key
         self.path = path
         self.uid = uid
         self.proc = proc
+        ## the socket directory, outside the account directory (run_directory)
+        self.run = run
         self.started = time.monotonic()
-        self.socket = path / "run" / "app.sock"
+        self.socket = run / APP_SOCKET
         ## the transport alone, never a client: a client keeps a cookie jar and default headers,
         ## which would carry one browser's session cookie into another browser's requests.
         ## No idle connection is kept: the worker's uvicorn closes one after 5 s, and a request
@@ -118,8 +131,32 @@ class Worker:
         return f"pid {self.pid}, started {age:.1f} s ago, {state}"
 
 
+def run_directory(settings: GatewaySettings, key: AccountKey) -> Path:
+    """The account's socket directory: its path is as long for every host and email."""
+    return settings.run_path / key.run_name
+
+
+def longest_socket_path(settings: GatewaySettings) -> int:
+    """The bytes of the longest socket path a worker gets, the same for every account."""
+    run = settings.run_path / ("0" * RUN_NAME_LENGTH)
+    return max(len(os.fsencode(run / name)) for name in (APP_SOCKET, BW_SOCKET))
+
+
+def remove_entry(path: Path) -> None:
+    """Remove a directory with what it holds, anything else (a symlink too) as itself."""
+    try:
+        mode = os.lstat(path).st_mode
+    except FileNotFoundError:
+        return
+    if stat.S_ISDIR(mode):
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
 def worker_env(settings: GatewaySettings, key: AccountKey, path: Path) -> dict[str, str]:
     """The worker's environment, built from scratch."""
+    run = run_directory(settings, key)
     backups = {}
     if settings.backups_root is not None:
         backups["BWTIDY_BACKUPS_DIR"] = str(settings.backups_root / key.host_dir / key.email)
@@ -128,8 +165,8 @@ def worker_env(settings: GatewaySettings, key: AccountKey, path: Path) -> dict[s
     return {
         **settings.passed_on,
         "HOME": str(path / "home"),
-        "BWTIDY_SOCKET": str(path / "run" / "app.sock"),
-        "BWTIDY_BW_SOCKET": str(path / "run" / "bw.sock"),
+        "BWTIDY_SOCKET": str(run / APP_SOCKET),
+        "BWTIDY_BW_SOCKET": str(run / BW_SOCKET),
         "BWTIDY_DATA_DIR": str(path / "app"),
         "BITWARDENCLI_APPDATA_DIR": str(path / "bw"),
         "BWTIDY_ACCOUNT_SERVER": key.server,
@@ -203,6 +240,40 @@ class Workers:
         ## the starts refused with TOO_MANY_WORKERS since the usage stats last took the count
         self._turned_away = 0
 
+    def prepare(self) -> None:
+        """The root of the socket directories, emptied: what is left in it serves no worker.
+
+        Mode 0711 like the accounts directory, so a worker enters it to reach its own.
+        """
+        root = self._settings.run_path
+        remove_entry(root)
+        root.mkdir(mode=0o711, parents=True)
+        root.chmod(0o711)
+
+    def make_run(self, key: AccountKey, uid: int) -> Path:
+        """The account's socket directory made anew, owned by its uid with mode 0700.
+
+        Whatever was there goes first, as a former worker (or an account deleted and made
+        again with a new uid) may have left it.
+        """
+        run = run_directory(self._settings, key)
+        remove_entry(run)
+        run.mkdir(mode=0o700)
+        run.chmod(0o700)
+        if self._settings.switch_uid:
+            os.chown(run, uid, uid)
+        return run
+
+    def remove_run(self, key: AccountKey) -> None:
+        """Remove the account's socket directory, unless another worker of it starts or runs."""
+        if key in self._workers or key in self._starting:
+            return
+        try:
+            remove_entry(run_directory(self._settings, key))
+        except OSError as error:
+            reason = error.strerror or type(error).__name__
+            log.warning("The socket directory of %s could not be removed: %s", key.label, reason)
+
     def get(self, key: AccountKey) -> Worker | None:
         worker = self._workers.get(key)
         return worker if worker is not None and worker.running else None
@@ -247,13 +318,15 @@ class Workers:
             proc = await self._spawn(key, path, uid)
         except OSError as error:
             self.release(key)
+            self.remove_run(key)
             reason = error.strerror or type(error).__name__
             log.warning("The worker for %s could not start: %s", key.label, reason)
             raise WorkerStartError("The worker could not start.") from None
         except BaseException:
             self.release(key)
+            self.remove_run(key)
             raise
-        worker = Worker(key, path, uid, proc)
+        worker = Worker(key, path, uid, proc, run_directory(self._settings, key))
         ## from the reservation to the running worker without an await, so it is counted once
         self.release(key)
         self._workers[key] = worker
@@ -271,6 +344,8 @@ class Workers:
     async def _spawn(self, key: AccountKey, path: Path, uid: int) -> asyncio.subprocess.Process:
         """Start the worker's process with the account's worker.log as its stdout and stderr.
 
+        Its socket directory is made anew right before.
+
         The log is opened without following a link and must be the account's regular file: the
         account's uid owns the directory, so a worker could otherwise point root at any file.
         A worker never runs as root or below, whatever uid the account directory says.
@@ -281,6 +356,7 @@ class Workers:
             raise WorkerStartError("The worker's uid is not usable.")
         log_fd = open_log(path / WORKER_LOG, uid if switch else None)
         try:
+            self.make_run(key, uid)
             return await asyncio.create_subprocess_exec(
                 str(self._settings.worker_bin),
                 stdin=asyncio.subprocess.DEVNULL,
@@ -315,6 +391,8 @@ class Workers:
             log.info("The worker for %s exited with code %s", worker.key.label, code)
             if self._workers.get(worker.key) is worker:
                 del self._workers[worker.key]
+            ## before any await: a new worker of the account that starts after it keeps its own
+            self.remove_run(worker.key)
             await worker.transport.aclose()
             try:
                 await self._on_exit(worker)

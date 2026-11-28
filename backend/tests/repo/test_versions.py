@@ -1,54 +1,21 @@
-import json
-from pathlib import Path
-
 import pytest
 from devlib import health, versions
 
-PYTHON = "0.1.0a1"
-SEMVER = "0.1.0-alpha.1"
-DRIFTED = "0.1.0-alpha.2"
-
-
-class FakeRepo:
-    """The four files that carry the version and the release notes, under a root of their
-    own, all in agreement."""
-
-    def __init__(self, root: Path) -> None:
-        self.root = root
-        (root / "backend").mkdir()
-        (root / "frontend").mkdir()
-        (root / "docs").mkdir()
-        self.release_notes(f"# Release notes\n\n## {SEMVER}\n\nThe first.\n")
-        (root / "backend" / "pyproject.toml").write_text(
-            f'[project]\nname = "bwtidy"\nversion = "{PYTHON}"\n'
-        )
-        self.uv_lock(PYTHON)
-        self.package_json(SEMVER)
-        self.package_lock(SEMVER, SEMVER)
-
-    def uv_lock(self, version: str) -> None:
-        (self.root / "backend" / "uv.lock").write_text(
-            "version = 1\n\n"
-            '[[package]]\nname = "anyio"\nversion = "4.11.0"\n\n'
-            f'[[package]]\nname = "bwtidy"\nversion = "{version}"\n'
-        )
-
-    def release_notes(self, text: str) -> None:
-        (self.root / "docs" / "releases.md").write_text(text)
-
-    def package_json(self, version: str) -> None:
-        (self.root / "frontend" / "package.json").write_text(
-            json.dumps({"name": "bwtidy-frontend", "version": version})
-        )
-
-    def package_lock(self, top: str, root_package: str) -> None:
-        lock = {
-            "name": "bwtidy-frontend",
-            "version": top,
-            "lockfileVersion": 3,
-            "packages": {"": {"name": "bwtidy-frontend", "version": root_package}},
-        }
-        (self.root / "frontend" / "package-lock.json").write_text(json.dumps(lock))
+from tests.support.release_notes import (
+    DRIFTED,
+    INTRO,
+    PYTHON,
+    REPO,
+    RULES,
+    SEMVER,
+    TAGGED,
+    TAGS,
+    UNRELEASED,
+    FakeRepo,
+    metadata,
+    pull,
+    withdrawn,
+)
 
 
 @pytest.fixture
@@ -116,30 +83,471 @@ def test_ci_names_a_uv_lock_without_bwtidy(repo):
     assert "backend/uv.lock has no package bwtidy" in mismatch
 
 
-def test_ci_names_release_notes_without_the_version(repo):
-    repo.release_notes("# Release notes\n\n## 0.0.9\n\nOlder.\n")
-    assert versions.version_mismatch() == (
-        f"docs/releases.md has no heading for {SEMVER}, the version as frontend/package.json "
-        f"spells it: write its release notes under '## {SEMVER}' "
-        "(dev/release.md, The release notes)"
+def problems(repo: FakeRepo, text: str) -> list[str]:
+    repo.release_notes(text)
+    return versions.release_notes_problems(SEMVER)
+
+
+def line_of(text: str, needle: str, after: int = 0) -> int:
+    """The number of the first line (from 1) below line after that holds needle."""
+    for number, line in enumerate(text.splitlines(), start=1):
+        if number > after and needle in line:
+            return number
+    raise AssertionError(f"{needle!r} not in the text")
+
+
+def only(found: list[str], line: int, says: str) -> None:
+    """found is the one problem on line, which says says and points to the rules."""
+    assert len(found) == 1, found
+    assert found[0].startswith(f"docs/releases.md:{line}: "), found
+    assert says in found[0]
+    assert found[0].endswith(RULES)
+
+
+def test_tagged_notes_with_every_heading_pass(repo):
+    repo.tagged()
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_the_date_is_the_swedish_date_of_the_tagged_commit(repo):
+    repo.tagged(TAGGED.replace("2026-03-05", "2026-03-04"))
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(TAGGED, "2026-03-05"), "is not 2026-03-05, the date (Swedish time)")
+
+
+def test_a_commit_after_midnight_in_sweden_is_of_the_next_day(repo):
+    ## 23:30 UTC on 2026-03-04 is 00:30 on 2026-03-05 in Stockholm
+    repo.tag("0.0.2", TAGS["0.0.2"])
+    repo.tag(SEMVER, "2026-03-04T23:30:00+00:00")
+    assert problems(repo, TAGGED) == []
+
+
+def test_the_day_of_a_unix_time_is_swedish():
+    ## 2026-07-01 22:30 UTC is 00:30 on 2026-07-02 in Stockholm, in summer time
+    assert versions.day_of(1782945000) == "2026-07-02"
+
+
+def test_a_date_that_differs_from_the_tag_fails(repo):
+    text = TAGGED.replace("2026-02-03 ·", "2026-02-04 ·")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "2026-02-04"), "the date 2026-02-04 is not 2026-02-03")
+
+
+def test_a_wrong_h1_fails(repo):
+    text = INTRO.replace("# Release notes", "# Changelog") + UNRELEASED + f"## {SEMVER}\n"
+    only(problems(repo, text), 1, "starts with the heading '# Release notes'")
+
+
+def test_unreleased_missing_fails(repo):
+    text = INTRO + f"## {SEMVER}\n\n- Start bwtidy {pull(1)}\n"
+    only(problems(repo, text), line_of(text, f"## {SEMVER}"), "no ## Unreleased")
+
+
+def test_unreleased_below_a_version_fails(repo):
+    text = INTRO + f"## {SEMVER}\n\n- Start bwtidy {pull(1)}\n\n" + UNRELEASED
+    only(problems(repo, text), line_of(text, "## Unreleased"), "is the first ## heading")
+
+
+def test_unreleased_without_its_sentence_fails(repo):
+    text = INTRO + "## Unreleased\n\nNothing yet.\n\n" + f"## {SEMVER}\n"
+    only(problems(repo, text), line_of(text, "Nothing yet."), "starts with the line")
+
+
+def test_unreleased_with_bullets_passes(repo):
+    text = TAGGED.replace("Nothing yet.", f"- Sort the grid by any column {pull(12)}")
+    repo.tagged(text)
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_unreleased_with_a_warning_heading_passes(repo):
+    text = TAGGED.replace(
+        "Nothing yet.",
+        f"### Breaking changes\n\n- Set the new key {pull(12)}\n\n"
+        f"### Other changes\n\n- Sort the grid {pull(13)}",
     )
+    repo.tagged(text)
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_nothing_yet_with_bullets_fails(repo):
+    text = TAGGED.replace("Nothing yet.", f"Nothing yet.\n\n- Sort the grid {pull(12)}")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "- Sort the grid"), "'Nothing yet.' stands alone")
+
+
+def test_unreleased_without_bullets_or_nothing_yet_fails(repo):
+    text = TAGGED.replace("Nothing yet.\n\n", "")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "## Unreleased"), "has bullets or the line 'Nothing yet.'")
+
+
+def test_a_paragraph_under_unreleased_fails(repo):
+    text = TAGGED.replace("Nothing yet.", f"More to come.\n\n- Sort the grid {pull(12)}")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "More to come."), "holds only bullets")
+
+
+def test_a_dated_version_heading_fails(repo):
+    text = TAGGED.replace("## 0.0.2\n", "## 0.0.2 (2026-01-01)\n")
+    repo.tagged(text)
+    line = line_of(text, "## 0.0.2 (")
+    found = [p for p in versions.release_notes_problems(SEMVER) if f":{line}: " in p]
+    assert found == [
+        f"docs/releases.md:{line}: a version heading holds the version alone: ## 0.0.2 {RULES}"
+    ]
+
+
+def test_a_heading_that_is_no_version_fails(repo):
+    text = INTRO + UNRELEASED + f"## Road to 1.0\n\nThe plan.\n\n## {SEMVER}\n\n- A {pull(1)}\n"
+    only(problems(repo, text), line_of(text, "## Road to 1.0"), "## Road to 1.0 is no version")
+
+
+def test_versions_out_of_order_fail(repo):
+    text = (
+        INTRO
+        + UNRELEASED
+        + f"## 0.0.2\n\n- B {pull(2)}\n\n"
+        + f"## {SEMVER}\n\n- A {pull(1)}\n\n"
+        + f"## 0.0.1\n\n- C {pull(3)}\n"
+    )
+    found = [p for p in problems(repo, text) if "newer than" in p]
+    only(found, line_of(text, f"## {SEMVER}"), f"## {SEMVER} is newer than ## 0.0.2 above it")
+
+
+def test_a_pre_release_is_older_than_its_release(repo):
+    text = INTRO + UNRELEASED + f"## 0.1.0\n\n- B {pull(2)}\n\n## {SEMVER}\n\n- A {pull(1)}\n"
+    assert not [p for p in problems(repo, text) if "newer than" in p]
+    text = (
+        INTRO + UNRELEASED + f"## {SEMVER}\n\n- A {pull(1)}\n\n## 0.1.0-beta.1\n\n- B {pull(2)}\n"
+    )
+    found = [p for p in problems(repo, text) if "newer than" in p]
+    only(found, line_of(text, "## 0.1.0-beta.1"), "newer than")
+
+
+def test_a_version_twice_fails(repo):
+    text = INTRO + UNRELEASED + f"## {SEMVER}\n\n- A {pull(1)}\n\n## {SEMVER}\n\n- B {pull(2)}\n"
+    found = [p for p in problems(repo, text) if "twice" in p]
+    first = line_of(text, f"## {SEMVER}")
+    only(found, line_of(text, f"## {SEMVER}", after=first), f"first on line {first}")
+
+
+def test_the_current_version_missing_fails(repo):
+    text = INTRO + UNRELEASED + f"## 0.0.9\n\n- Older {pull(1)}\n"
+    only(problems(repo, text), line_of(text, "## 0.0.9"), f"no ## {SEMVER}, the current version")
 
 
 def test_a_longer_version_is_not_the_version(repo):
-    repo.release_notes(f"# Release notes\n\n## {SEMVER}0\n\nThe tenth alpha.\n")
-    mismatch = versions.version_mismatch()
-    assert mismatch is not None
-    assert mismatch.startswith(f"docs/releases.md has no heading for {SEMVER},")
+    text = INTRO + UNRELEASED + f"## {SEMVER}0\n\n- The tenth alpha {pull(1)}\n"
+    only(problems(repo, text), line_of(text, f"## {SEMVER}0"), f"no ## {SEMVER},")
 
 
 def test_the_version_in_prose_is_no_heading(repo):
-    repo.release_notes(f"# Release notes\n\nSince {SEMVER} it can do more.\n")
-    assert versions.version_mismatch() is not None
+    text = INTRO + UNRELEASED + f"Since {SEMVER} it can do more.\n"
+    assert any(f"no ## {SEMVER}," in p for p in problems(repo, text))
 
 
-def test_a_heading_with_more_after_the_version_counts(repo):
-    repo.release_notes(f"# Release notes\n\n### {SEMVER} (2026-11-25)\n\nThe first.\n")
-    assert versions.version_mismatch() is None
+def test_a_tagged_version_without_metadata_fails(repo):
+    text = TAGGED.replace(metadata("0.0.2", "2026-02-03", None) + "\n\n", "")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "## 0.0.2"), "## 0.0.2 has no metadata line")
+
+
+def test_the_newest_tagged_version_without_metadata_fails(repo):
+    text = TAGGED.replace(metadata(SEMVER, "2026-03-05", "0.0.2") + "\n\n", "")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, f"## {SEMVER}"), f"## {SEMVER} has no metadata line")
+
+
+def test_the_newest_untagged_version_without_metadata_passes(repo):
+    repo.tag("0.0.2", TAGS["0.0.2"])
+    text = TAGGED.replace(metadata(SEMVER, "2026-03-05", "0.0.2") + "\n\n", "")
+    assert problems(repo, text) == []
+
+
+def test_the_newest_untagged_version_with_metadata_passes(repo):
+    repo.tag("0.0.2", TAGS["0.0.2"])
+    assert problems(repo, TAGGED) == []
+
+
+def test_an_older_version_without_a_tag_fails(repo):
+    repo.tag(SEMVER, TAGS[SEMVER])
+    found = problems(repo, TAGGED)
+    only(found, line_of(TAGGED, "## 0.0.2"), "no tag v0.0.2")
+
+
+def test_no_tags_at_all_is_one_problem(repo):
+    found = problems(repo, TAGGED)
+    only(found, line_of(TAGGED, f"## {SEMVER}"), "git fetch --tags")
+
+
+def test_one_untagged_version_needs_no_tags(repo):
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_a_wrapped_metadata_line_passes(repo):
+    text = TAGGED.replace(" · [All changes]", "\n· [All changes]")
+    repo.tagged(text)
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_a_malformed_metadata_line_fails(repo):
+    text = TAGGED.replace("2026-02-03 · [GitHub release]", "2026-02-03, [GitHub release]")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "2026-02-03,"), "the metadata line reads YYYY-MM-DD")
+
+
+def test_a_date_that_is_no_date_fails(repo):
+    text = TAGGED.replace("2026-02-03 ·", "2026-02-30 ·")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "2026-02-30"), "2026-02-30 is no date")
+
+
+def test_a_wrong_release_link_fails(repo):
+    text = TAGGED.replace("releases/tag/v0.0.2", "releases/tag/v0.0.3")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(
+        found, line_of(text, "tag/v0.0.3"), f"the GitHub release link is {REPO}/releases/tag/v0.0.2"
+    )
+
+
+def test_a_compare_link_on_the_oldest_fails(repo):
+    text = TAGGED.replace(
+        metadata("0.0.2", "2026-02-03", None), metadata("0.0.2", "2026-02-03", "0.0.1")
+    )
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(
+        found,
+        line_of(text, "v0.0.1...v0.0.2"),
+        "the oldest version not withdrawn has no All changes link",
+    )
+
+
+def test_a_wrong_previous_fails(repo):
+    text = TAGGED.replace("compare/v0.0.2...", "compare/v0.0.1...")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "compare/v0.0.1"), f"{REPO}/compare/v0.0.2...v{SEMVER}")
+
+
+def test_a_missing_compare_link_fails(repo):
+    text = TAGGED.replace(
+        metadata(SEMVER, "2026-03-05", "0.0.2"), metadata(SEMVER, "2026-03-05", None)
+    )
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, f"tag/v{SEMVER})"), "ends with [All changes]")
+
+
+## 0.0.2 withdrawn when SEMVER replaced it, so SEMVER has no All changes link
+GONE_0_0_2 = TAGGED.replace(
+    metadata(SEMVER, "2026-03-05", "0.0.2"), metadata(SEMVER, "2026-03-05", None)
+).replace(metadata("0.0.2", "2026-02-03", None), withdrawn("2026-02-03", "2026-03-06", SEMVER))
+
+
+def test_a_withdrawn_version_needs_no_tag(repo):
+    repo.tag(SEMVER, TAGS[SEMVER])
+    assert problems(repo, GONE_0_0_2) == []
+
+
+def test_an_untagged_newest_above_withdrawn_versions_needs_no_tags(repo):
+    assert problems(repo, GONE_0_0_2) == []
+
+
+def test_a_withdrawn_version_whose_tag_is_still_there_passes(repo):
+    repo.tagged(GONE_0_0_2)
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_a_compare_link_to_a_withdrawn_version_fails(repo):
+    text = GONE_0_0_2.replace(
+        metadata(SEMVER, "2026-03-05", None), metadata(SEMVER, "2026-03-05", "0.0.2")
+    )
+    found = problems(repo, text)
+    only(found, line_of(text, "compare/v0.0.2"), "not withdrawn has no All changes link")
+
+
+def test_the_compare_link_skips_a_withdrawn_version(repo):
+    gone = f"## 0.0.3\n\n{withdrawn('2026-02-10', '2026-03-06', SEMVER)}\n\n- Try it {pull(2)}\n\n"
+    text = TAGGED.replace("## 0.0.2", gone + "## 0.0.2")
+    repo.tagged(text)
+    assert versions.release_notes_problems(SEMVER) == []
+    wrong = text.replace("compare/v0.0.2...", "compare/v0.0.3...")
+    found = problems(repo, wrong)
+    only(found, line_of(wrong, "compare/v0.0.3"), f"{REPO}/compare/v0.0.2...v{SEMVER}")
+
+
+def test_a_withdrawn_version_replaced_by_no_newer_version_fails(repo):
+    text = GONE_0_0_2.replace(f"see [{SEMVER}]", "see [0.2.0]")
+    found = problems(repo, text)
+    only(found, line_of(text, "Withdrawn on"), "0.2.0 is no version above 0.0.2")
+
+
+def test_a_withdrawn_version_with_a_wrong_anchor_fails(repo):
+    text = GONE_0_0_2.replace("(#010-alpha1)", "(#0.1.0-alpha.1)")
+    found = problems(repo, text)
+    only(found, line_of(text, "Withdrawn on"), f"the link to {SEMVER} is #010-alpha1")
+
+
+def test_a_withdrawal_before_the_release_fails(repo):
+    text = GONE_0_0_2.replace("Withdrawn on 2026-03-06", "Withdrawn on 2026-01-06")
+    found = problems(repo, text)
+    only(found, line_of(text, "Withdrawn on"), "comes before the release on 2026-02-03")
+
+
+def test_a_withdrawal_date_that_is_no_date_fails(repo):
+    text = GONE_0_0_2.replace("Withdrawn on 2026-03-06", "Withdrawn on 2026-02-30")
+    found = problems(repo, text)
+    only(found, line_of(text, "Withdrawn on"), "2026-02-30 is no date")
+
+
+def test_the_anchor_is_the_docs_sites_slug():
+    assert versions.anchor("1.0.0-beta.3") == "100-beta3"
+    assert versions.anchor(SEMVER) == "010-alpha1"
+
+
+def plain(text: str) -> str:
+    """TAGGED with only the Other changes of the newest version, under its heading."""
+    start = text.index("### Breaking changes")
+    return text[:start] + text[text.index("### Other changes") :]
+
+
+def test_other_changes_without_a_warning_heading_fails(repo):
+    text = plain(TAGGED)
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "### Other changes"), "only follows a warning heading")
+
+
+def test_a_plain_list_without_a_warning_heading_passes(repo):
+    repo.tagged(plain(TAGGED).replace("### Other changes\n\n", ""))
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_a_warning_heading_after_a_plain_bullet_list_fails(repo):
+    text = TAGGED.replace(
+        "### Breaking changes", f"- Sort the grid {pull(11)}\n\n### Breaking changes"
+    )
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "- Sort the grid"), "under ### Other changes")
+
+
+def test_warning_headings_out_of_order_fail(repo):
+    breaking = TAGGED.index("### Breaking changes")
+    security = TAGGED.index("### Security")
+    deprecated = TAGGED.index("### Deprecated")
+    text = (
+        TAGGED[:breaking]
+        + TAGGED[security:deprecated]
+        + TAGGED[breaking:security]
+        + TAGGED[deprecated:]
+    )
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "### Breaking changes"), "### Breaking changes is out of order")
+
+
+def test_an_unknown_subheading_fails(repo):
+    text = TAGGED.replace("### Deprecated", "### Fixed")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "### Fixed"), "### Fixed is not a heading of an entry")
+
+
+def test_another_heading_level_fails(repo):
+    text = TAGGED.replace("### Deprecated", "#### Deprecated")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "#### Deprecated"), "no headings but ###")
+
+
+def test_a_heading_without_bullets_fails(repo):
+    start = TAGGED.index("### Deprecated")
+    text = TAGGED[:start] + "### Deprecated\n\n" + TAGGED[TAGGED.index("### Other changes") :]
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "### Deprecated"), "### Deprecated has no bullets")
+
+
+def test_a_bullet_without_a_pull_request_link_fails(repo):
+    text = TAGGED.replace(f"- Start bwtidy {pull(1)}", "- Start bwtidy")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "- Start bwtidy"), "ends with its pull request links")
+
+
+def test_text_after_the_pull_request_link_fails(repo):
+    text = TAGGED.replace(f"- Start bwtidy {pull(1)}", f"- Start bwtidy {pull(1)}.")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "- Start bwtidy"), "ends with its pull request links")
+
+
+def test_two_pull_request_links_in_one_parentheses_pass(repo):
+    assert pull(3, 4) in TAGGED
+    repo.tagged()
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_two_pull_request_links_in_two_parentheses_fail(repo):
+    text = TAGGED.replace(pull(3, 4), f"{pull(3)} {pull(4)}")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "keyboard"), "in one pair of parentheses at its end")
+
+
+def test_a_link_to_another_pull_request_than_it_names_fails(repo):
+    text = TAGGED.replace(f"[#1]({REPO}/pull/1)", f"[#1]({REPO}/pull/2)")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "- Start bwtidy"), "the link #1 points to pull 2")
+
+
+def test_pull_request_links_wrapped_to_the_next_line_pass(repo):
+    repo.tagged(TAGGED.replace(pull(3, 4), pull(3, 4).replace(", ", ",\n  ")))
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_a_nested_bullet_fails(repo):
+    text = TAGGED.replace(f"- Start bwtidy {pull(1)}", f"- Start bwtidy\n    - in a grid {pull(1)}")
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "    - in a grid"), "one flat list")
+
+
+def test_a_paragraph_below_the_bullets_fails(repo):
+    text = TAGGED + "\nThat was all.\n"
+    repo.tagged(text)
+    found = versions.release_notes_problems(SEMVER)
+    only(found, line_of(text, "That was all."), "goes above its bullets")
+
+
+def test_a_heading_in_a_code_block_is_no_heading(repo):
+    text = TAGGED.replace(
+        "The first alpha brings a lot.",
+        "The first alpha brings a lot.\n\n```sh\n## not a heading\n```",
+    )
+    repo.tagged(text)
+    assert versions.release_notes_problems(SEMVER) == []
+
+
+def test_ci_names_release_notes_without_the_version(repo):
+    text = INTRO + UNRELEASED + f"## 0.0.9\n\n- Older {pull(1)}\n"
+    repo.release_notes(text)
+    assert versions.version_mismatch() == (
+        f"docs/releases.md:{line_of(text, '## 0.0.9')}: no ## {SEMVER}, the current version as "
+        f"frontend/package.json spells it {RULES}"
+    )
 
 
 def test_ci_names_missing_release_notes(repo):
@@ -151,12 +559,13 @@ def test_ci_names_missing_release_notes(repo):
 
 def test_ci_names_both_a_drifted_package_json_and_missing_release_notes(repo):
     repo.package_json(DRIFTED)
-    repo.release_notes(f"# Release notes\n\n## {DRIFTED}\n\nToo early.\n")
+    text = INTRO + UNRELEASED + f"## {DRIFTED}\n\n- Too early {pull(1)}\n"
+    repo.release_notes(text)
     mismatch = versions.version_mismatch()
     assert mismatch is not None
     assert [line.split(" ")[0] for line in mismatch.splitlines()] == [
         "frontend/package.json",
-        "docs/releases.md",
+        f"docs/releases.md:{line_of(text, DRIFTED)}:",
     ]
 
 

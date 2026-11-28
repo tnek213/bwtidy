@@ -4,6 +4,8 @@
 site_name = "bwtidy"
 site_description = "A web UI and MCP server for keeping a Bitwarden vault tidy"
 docs_dir = "docs"
+# the palettes of the two color schemes and the bundled code font
+extra_css = ["assets/stylesheets/theme.css"]
 repo_url = "https://github.com/tnek213/bwtidy"
 repo_name = "tnek213/bwtidy"
 # the edit address of every page, which overrides/partials/improve-link.html reads the source path from
@@ -23,6 +25,7 @@ nav = [
     "how-to/show-hide-columns.md",
     "how-to/rename-attachment.md",
     "restore.md",
+    "how-to/run-demo.md",
   ] },
   { "Reference" = [
     "reference/ui.md",
@@ -39,6 +42,7 @@ nav = [
     "explanation/tool-note.md",
     "explanation/bw-cli.md",
     "explanation/isolation.md",
+    "explanation/road-to-1.0.md",
   ] },
   { "For contributors" = [
     "contributing.md",
@@ -52,10 +56,15 @@ language = "en"
 # main.html there puts the beta disclaimer as a banner above every page, widens the content and
 # opens a picture larger on a click
 custom_dir = "overrides"
-# the system's fonts, so a page loads nothing from another host
+# no fonts from Google Fonts, so a page loads nothing from another host: text uses the system's
+# fonts and code IBM Plex Mono, which the site bundles (docs/assets/stylesheets/theme.css)
 font = false
 features = [
   "content.code.copy",
+  # a click on a tab picks the same tab in every tab group of the page, and the choice is kept.
+  # The tabs exist only in the build copy that scripts/docs-site makes, from the pairs of shell
+  # commands of a page.
+  "content.tabs.link",
   "navigation.footer",
   "navigation.sections",
   "navigation.top",
@@ -63,21 +72,28 @@ features = [
   "search.highlight",
 ]
 
-# the first palette follows the system, the toggle steps through light and dark
+# the first palette follows the system, the toggle steps through light and dark. The colors are
+# custom: docs/assets/stylesheets/theme.css sets them for the schemes default and slate
 [[project.theme.palette]]
 media = "(prefers-color-scheme)"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/sun-moon"
 toggle.name = "Switch to light mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 
@@ -96,4 +112,10 @@ pymdownx.inlinehilite = {}
 # GitHub's alerts (> [!NOTE], > [!TIP], > [!WARNING]) as boxes, so a box also shows on GitHub
 # and reads as a quote in a backup's RESTORE.md
 pymdownx.quotes.callouts = true
-pymdownx.superfences = {}
+# the content tabs, which exist only in the build copy that scripts/docs-site makes: it turns each
+# pair of shell commands of a page (a Bash and a PowerShell code block) into two tabs
+pymdownx.tabbed.alternate_style = true
+# a code block even when its info string holds an option it does not know, such as a diagram's
+# alt="..." (scripts/docs-site serve shows a diagram as its code block, build makes it a picture
+# first). Without it the fence stays text and its closing fence opens a block of what follows.
+pymdownx.superfences.relaxed_headers = true

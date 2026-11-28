@@ -92,6 +92,8 @@ test('the diff report has one line per item and field, oldest first, without bac
   const dialog = await screen.findByRole('dialog', { name: 'Diff report' })
   expect(dialog).toHaveTextContent('3 operations, 6 lines')
   const table = within(dialog).getByRole('table', { name: 'Diff report' })
+  // A keyboard can scroll it, though it holds no control.
+  expect(within(dialog).getByRole('region', { name: 'Diff report rows' })).toHaveAttribute('tabindex', '0')
   const lines = within(table)
     .getAllByRole('row')
     .map((row) => [...row.children].map((cell) => cell.textContent))

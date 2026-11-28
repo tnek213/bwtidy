@@ -22,12 +22,14 @@ out = sys.stdout.buffer
 if args[:4] == ["--raw", "export", "--format", "zip"]:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
-        z.writestr("data.json", json.dumps({"encrypted": False, "items": []}))
+        items = json.loads(os.environ.get("FAKE_BW_EXPORT", "[]"))
+        z.writestr("data.json", json.dumps({"encrypted": False, "items": items}))
         z.writestr("attachments/ThinkPad X1/thinkpad.txt", b"thinkpad bytes")
     out.write(buf.getvalue())
 elif args[:4] == ["--raw", "export", "--format", "json"]:
     org = args[args.index("--organizationid") + 1]
-    out.write(json.dumps({"encrypted": False, "items": [], "org": org}).encode())
+    items = json.loads(os.environ.get("FAKE_BW_ORG_EXPORT", "{}")).get(org, [])
+    out.write(json.dumps({"encrypted": False, "items": items, "org": org}).encode())
 elif args[:3] == ["--raw", "get", "attachment"]:
     item = args[args.index("--itemid") + 1]
     data = f"bytes of {args[3]} on {item}".encode()

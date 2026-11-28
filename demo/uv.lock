@@ -48,7 +48,7 @@ wheels = [
 
 [[package]]
 name = "bwtidy"
-version = "1.0.0b1"
+version = "1.0.0b3"
 source = { directory = "../backend" }
 dependencies = [
     { name = "cryptography" },
@@ -71,6 +71,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "axe-playwright-python", specifier = ">=0.1.9,<0.2" },
     { name = "import-linter", specifier = ">=2.17,<3" },
     { name = "playwright", specifier = ">=1.64.1,<2" },
     { name = "pytest", specifier = ">=9.0,<10" },

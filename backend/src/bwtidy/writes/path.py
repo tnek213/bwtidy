@@ -710,7 +710,8 @@ class WritePath:
         await APPLY[type(write.op)](self, write, write.op)
 
     async def item_now(self, item_id: str) -> dict[str, Any] | None:
-        """The item as bw serve has it, None only when the settled listings do not hold it either.
+        """The item as bw serve has it, None only when the settled listings (the trash and the
+        archive among them) do not hold it either.
 
         Right after a sync bw serve answers Not found for every object while it decrypts the
         items again (see create.create), and a read can fail for other reasons. A failed read alone
@@ -724,7 +725,11 @@ class WritePath:
             pass
         items = await list_items_settled(self.client)
         trash = await self.client.list_trash()
-        if any(i.get("id") == item_id for i in [*items, *trash]):
+        archived = [
+            *await self.client.list_archived(),
+            *await self.client.list_archived(trash=True),
+        ]
+        if any(i.get("id") == item_id for i in [*items, *trash, *archived]):
             return await self.client.get_item(item_id)
         return None
 

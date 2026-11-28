@@ -41,6 +41,7 @@ from tests.support.gateway_env import (
     wait_for,
 )
 from tests.support.quiet import assert_absent
+from tests.support.sockets import run_root
 
 
 def test_the_gateway_refuses_to_run_without_root_unless_told(tmp_path: Path):
@@ -363,7 +364,11 @@ def client(tmp_path: Path, **extra: Any) -> Iterator[TestClient]:
     static = tmp_path / "static"
     write(static / "index.html", FRONTEND)
     settings = GatewaySettings(
-        accounts_dir=tmp_path / "accounts", switch_uid=False, static_dir=static, **extra
+        accounts_dir=tmp_path / "accounts",
+        switch_uid=False,
+        static_dir=static,
+        run_dir=run_root(tmp_path),
+        **extra,
     )
     with TestClient(create_gateway_app(settings)) as test_client:
         yield test_client

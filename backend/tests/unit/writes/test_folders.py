@@ -191,6 +191,65 @@ def test_a_delete_of_a_folder_with_an_item_in_the_trash_is_refused(env: AppEnv):
     assert names(env)["f1"] == "Work"
 
 
+def archive(env: AppEnv, item_id: str, *, trash: bool = False) -> None:
+    """Archive an item in the fake bw serve, as another device would: only archived=true lists
+    it then, with trash=true when it is in the trash too."""
+    item = env.item(item_id)
+    env.bw.items.remove(item)
+    archived = {**item, "archivedDate": "2026-10-26T13:00:00.000Z"}
+    if trash:
+        archived["deletedDate"] = "2026-10-26T14:00:00.000Z"
+    env.bw.archived.append(archived)
+
+
+def test_a_delete_of_a_folder_that_holds_only_an_archived_item_is_refused(env: AppEnv):
+    """Bitwarden would take the archived item out of the folder too."""
+    archive(env, "login-1")
+    response = env.post(delete("f1", "Work"))
+    assert response.status_code == 422
+    assert "the folder holds 1 item in the archive" in response.json()["detail"]
+    assert names(env)["f1"] == "Work"
+    assert env.bw.archived[0]["folderId"] == "f1"
+
+
+def test_a_delete_of_a_folder_with_an_archived_item_in_the_trash_is_refused(env: AppEnv):
+    archive(env, "login-1", trash=True)
+    response = env.post(delete("f1", "Work"))
+    assert response.status_code == 422
+    assert "1 item in the trash" in response.json()["detail"]
+    assert names(env)["f1"] == "Work"
+
+
+def test_an_item_archived_into_the_folder_after_the_check_fails_the_delete(env: AppEnv):
+    """The write path lists the archived items again right before the delete."""
+    real = env.bw.handler
+    seen = [0]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if (request.method, request.url.path) == SYNC:
+            seen[0] += 1
+            if seen[0] == 3:
+                env.item("card-1")["folderId"] = "f2"
+                archive(env, "card-1")
+        return real(request)
+
+    vars(env.bw)["handler"] = handler
+    create = {"kind": "createItem", "name": "Brand new", "type": 2}
+    response = env.post(create, delete("f2", "Empty"))
+    assert response.status_code == 500, response.text
+    assert "the folder holds 1 item in the archive" in response.json()["detail"]
+    assert names(env)["f2"] == "Empty"
+
+
+@pytest.mark.parametrize("trash", [False, True])
+def test_a_name_equal_to_a_secret_of_an_archived_item_is_refused(env: AppEnv, trash: bool):
+    archive(env, "login-1", trash=trash)
+    response = env.post(rename("f1", "Work", PIN_SECRET))
+    assert response.status_code == 422
+    assert_absent(PIN_SECRET, response.text, "the response")
+    assert names(env)["f1"] == "Work"
+
+
 def test_an_item_moved_in_after_the_check_fails_the_delete(env: AppEnv):
     """The write path lists the items again right before the delete."""
     real = env.bw.handler
@@ -335,6 +394,15 @@ def test_an_agents_rename_into_a_secret_is_stored_rejected_without_the_value(env
     ## from the UI the same rename is refused with the error
     refused = [rename("f1", "Work", PIN_SECRET)]
     assert env.client.post("/api/queue", json={"operations": refused}).status_code == 422
+
+
+def test_an_agents_rename_into_a_secret_of_an_archived_item_shows_the_item(env: AppEnv):
+    archive(env, "login-1")
+    env.reload()
+    queue(env).enqueue(as_operation(rename("f1", "Work", PIN_SECRET)), "summary")
+    [rejected] = env.client.get("/api/queue", params={"status": "rejected"}).json()
+    assert [(r["itemId"], r["after"]) for r in rejected["diff"]] == [("login-1", MASKED)]
+    assert_absent(PIN_SECRET, json.dumps(rejected), "the refusal")
 
 
 def test_the_mcp_tools_propose_a_rename_and_a_delete(env: AppEnv):

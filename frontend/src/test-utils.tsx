@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import { vi } from 'vitest'
+import { onTestFinished, vi } from 'vitest'
 
 export function newQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -61,16 +61,39 @@ export function mockFetch(routes: Record<string, Route>) {
 // polls and delays it needs fire at once instead of in real time. Answers what the assertion
 // returns. It fails like waitFor once the clock has moved by the timeout without a pass.
 export async function waitForPolls<T>(assertion: () => T, { step = 100, timeout = 60_000 } = {}): Promise<T> {
+  // A test that timed out leaves this loop running into the tests after it, where it would move
+  // their fake clock.
+  let finished = false
+  onTestFinished(() => {
+    finished = true
+  })
   for (let waited = 0; ; waited += step) {
     try {
       return assertion()
     } catch (error) {
-      if (waited >= timeout) {
+      if (finished || waited >= timeout) {
         throw error
       }
     }
-    await act(() => vi.advanceTimersByTimeAsync(step))
+    await advanceClock(step)
   }
+}
+
+// Moves the fake clock by ms. AG Grid mounts a header component through a portal and polls with
+// zero delay timeouts until it shows, for up to a second. Inside act, React holds the portal back
+// until act ends, so each mount would spin on those timeouts for a second of real time and keep a
+// core busy. Outside act, as in Testing Library's waitFor, React renders it at once. The act at
+// the end lets React finish what the last timers started, so the next assertion sees it.
+export async function advanceClock(ms: number) {
+  const scope = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+  const previous = scope.IS_REACT_ACT_ENVIRONMENT
+  scope.IS_REACT_ACT_ENVIRONMENT = false
+  try {
+    await vi.advanceTimersByTimeAsync(ms)
+  } finally {
+    scope.IS_REACT_ACT_ENVIRONMENT = previous
+  }
+  await act(() => vi.advanceTimersByTimeAsync(0))
 }
 
 // Types a day (YYYY-MM-DD) into a date field (shared/DateField.tsx) key by key, a section at a time,

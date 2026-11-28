@@ -1,12 +1,12 @@
 """The plan of a restoreItems: what the write path does per item of a change log row, read from
 the decrypted backup and the vault as the cache holds it (docs/spec.md, Backups).
 
-plan_restore says per item: put the backup's item back over the current one, take it out of the
-trash first, create it anew when the trash was emptied, move it back into or out of its
-organization, move an item the row's operation created to the trash, or leave it. The write
-path follows the plan (writes/restore.py), the queue shows it as the diff and
-GET /api/restore-plan shows it before anything is queued. restored_by marks the change log rows
-a later restore undid. Nothing here puts a value into an error message.
+plan_restore says per item: put the backup's item back over the current one (an archived one
+stays archived), take it out of the trash first, create it anew when the trash was emptied,
+move it back into or out of its organization, move an item the row's operation created to the
+trash, or leave it. The write path follows the plan (writes/restore.py), the queue shows it as
+the diff and GET /api/restore-plan shows it before anything is queued. restored_by marks the
+change log rows a later restore undid. Nothing here puts a value into an error message.
 """
 
 import copy
@@ -51,16 +51,22 @@ TOOL_NOTE_RESTORE = (
 NOT_COPIED = ("id", "revisionDate", "attachments", "passwordHistory")
 
 
+## what the plan says of an item that is archived now, which the PUT and the untrash leave
+## archived
+STAYS_ARCHIVED = " (it stays archived)"
+
+
 @dataclass(frozen=True)
 class RestoreStep:
     item_id: str
     action: Action
     ## the item's name in the vault now, else in the backup, for the plan and the diff
     name: str | None
+    archived: bool = False
 
     @property
     def text(self) -> str:
-        return TEXTS[self.action]
+        return TEXTS[self.action] + (STAYS_ARCHIVED if self.archived else "")
 
 
 def plan_copy(item: dict[str, Any]) -> dict[str, Any]:
@@ -110,15 +116,20 @@ def plan_restore(
 ) -> list[RestoreStep]:
     """What the restore does per item id, against the backup and the vault as the cache holds it.
 
-    Raises ValueError for everything refused before anything is written: no item ids, an item
-    active now that was not when the restore was planned (its revisionDate was never checked),
-    and an item to create anew whose attachments the backup lacks or does not hold by item id.
+    An archived item counts as active and stays archived, one in the trash as in the trash
+    (docs/spec.md, Restoring a change log row). Raises ValueError for everything refused before
+    anything is written: no item ids, an item active now that was not when the restore was
+    planned (its revisionDate was never checked), an archived item whose organization changed
+    since the backup, and an item to create anew whose attachments the backup lacks or does
+    not hold by item id.
     """
     if not op.itemIds:
         raise ValueError("itemIds is empty")
     if len(set(op.itemIds)) < len(op.itemIds):
         raise ValueError("itemIds names an item twice")
-    active = cache.items_by_id()
+    archived = cache.archived_by_id()
+    active = {**archived, **cache.items_by_id()}
+    archived_ids = set(archived) | {i["id"] for i in cache.archived_trash if i.get("id")}
     steps = []
     for item_id in op.itemIds:
         now = active.get(item_id)
@@ -136,13 +147,19 @@ def plan_restore(
                     _check_attachments(saved, contents)
             elif _same_organization(saved, now):
                 action = PUT
+            elif item_id in archived:
+                raise ValueError(
+                    f"item {item_id} is archived and its organization changed since the "
+                    "backup, take it out of the archive first"
+                )
             elif not now.get("organizationId"):
                 action = TO_ORGANIZATION
             else:
                 action = RECREATE
         else:
             action = TRASH if now is not None else LEAVE
-        steps.append(RestoreStep(item_id, action, name))
+        stays_archived = item_id in archived_ids and action in (PUT, UNTRASH)
+        steps.append(RestoreStep(item_id, action, name, stays_archived))
     return steps
 
 

@@ -4,7 +4,7 @@
 ## refreshes the digests, Dependabot proposes new ones)
 FROM ghcr.io/astral-sh/uv:0.11@sha256:77280f2f771df71f90786c314fe1bbc1e023feac652969bbf139c280babf2eb7 AS uv
 
-FROM node:24-trixie-slim@sha256:4d00acb4bcc42c454c4eb801526f7ad7f772ea3bd4fd168c5cc2e384abcbb9d4 AS node
+FROM node:26-trixie-slim@sha256:abe7e5a82b61a8ef67b315b85497c9e65173387ccf2f4a029248184b8e020be5 AS node
 
 FROM node AS frontend
 WORKDIR /src/frontend
@@ -13,12 +13,91 @@ RUN npm ci --no-fund --no-audit
 COPY frontend/ ./
 RUN npm run build
 
-## the Bitwarden CLI and every package it brings along, as its own lock file pins them. npm stays
-## in this stage: the app stage takes node and the installed tree only.
+## the open source build of the Bitwarden CLI, built from Bitwarden's source at the commit
+## docker/bitwarden-cli/source.json pins. Bitwarden's npm package is their commercial build, which
+## bundles code under the Bitwarden License. git and the monorepo's tree stay in this stage.
+FROM node AS bitwarden-cli-source
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+COPY docker/bitwarden-cli/source.json /src/source.json
+WORKDIR /src/clients
+## a tag can move, so the build fetches the pinned commit and fails while the tag names another one
+RUN repository="$(node -p 'require("/src/source.json").repository')" \
+    && tag="$(node -p 'require("/src/source.json").tag')" \
+    && commit="$(node -p 'require("/src/source.json").commit')" \
+    && tagged="$(git ls-remote "$repository" "refs/tags/$tag" "refs/tags/$tag^{}" \
+        | awk -v ref="refs/tags/$tag" '$2 == ref { plain = $1 } $2 == ref "^{}" { peeled = $1 } END { print peeled ? peeled : plain }')" \
+    && if [ "$tagged" != "$commit" ]; then \
+        echo "The tag $tag of $repository names the commit '$tagged', source.json pins $commit" >&2; \
+        exit 1; \
+    fi \
+    && git init --quiet \
+    && git fetch --quiet --depth 1 "$repository" "$commit" \
+    && git checkout --quiet FETCH_HEAD \
+    && rm -rf .git
+## no install scripts: they build native modules of the desktop app and of tools such as nx and
+## set up git hooks, the CLI's webpack build needs none of them
+RUN npm ci --ignore-scripts --no-fund --no-audit
+RUN cd apps/cli && npm run build:oss:prod
+## a module under bitwarden_license in the bundle stops the build. The pattern names the source
+## folders, as the bundled package.json names bitwarden_license/bit-cli/webpack.config.js in its
+## build:bit scripts, a plain string and no code.
+RUN if grep -o 'bitwarden_license/bit-c[a-z]*/src/[^"]*' apps/cli/build/*.js; then \
+        echo "apps/cli/build includes code under the Bitwarden License (the modules above)" >&2; \
+        exit 1; \
+    fi
+## where the CLI's corresponding source is, for the image to say so beside the build
+RUN node -e 'const s = require("/src/source.json"); console.log(`The build of the Bitwarden CLI is its open source build (GPL-3.0, LICENSE_GPL.txt), built from ${s.repository} at the tag ${s.tag}, commit ${s.commit}.`)' > /src/SOURCE
+## the build bundles @bitwarden/sdk-internal (GPL-3.0), whose npm package holds only its compiled
+## WebAssembly and names the commit of its repository in VERSION. SOURCE names that source too, and
+## a WebAssembly file in the build that is not the SDK's stops the build, as SOURCE would not name
+## its source. The SDK's package.json, VERSION and LICENSE go beside SOURCE with the sha256 of its
+## WebAssembly files.
+RUN sdk=node_modules/@bitwarden/sdk-internal \
+    && mkdir /src/sdk-internal \
+    && (cd "$sdk" && sha256sum *.wasm node/*.wasm) > /src/sdk-internal/wasm.sha256 \
+    && bundled=0 \
+    && for wasm in apps/cli/build/*.wasm; do \
+        [ -e "$wasm" ] || continue; \
+        sum="$(sha256sum "$wasm" | cut -d ' ' -f 1)"; \
+        if ! grep -q "^$sum " /src/sdk-internal/wasm.sha256; then \
+            echo "$wasm is no WebAssembly of @bitwarden/sdk-internal, so SOURCE would not name its source" >&2; \
+            exit 1; \
+        fi; \
+        bundled=$((bundled + 1)); \
+    done \
+    && if [ "$bundled" = 0 ]; then \
+        echo "apps/cli/build holds no WebAssembly of @bitwarden/sdk-internal, check whether SOURCE should still name its source" >&2; \
+        exit 1; \
+    fi \
+    && commit="$(cat "$sdk/VERSION" 2>/dev/null || true)" \
+    && if ! printf '%s' "$commit" | grep -Eqx '[0-9a-f]{40}'; then \
+        echo "$sdk/VERSION is missing or holds '$commit', not a commit of 40 hex characters, so SOURCE cannot name the SDK's source" >&2; \
+        exit 1; \
+    fi \
+    && repository="$(node -p 'const r = require("./'"$sdk"'/package.json").repository; (typeof r === "string" ? r : r.url).replace(/^git\+/, "").replace(/\.git$/, "")')" \
+    && if ! printf '%s' "$repository" | grep -Eqx 'https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+'; then \
+        echo "$sdk/package.json names the repository '$repository', not a GitHub repository" >&2; \
+        exit 1; \
+    fi \
+    && version="$(node -p 'require("./'"$sdk"'/package.json").version')" \
+    && echo "It bundles the compiled @bitwarden/sdk-internal $version (GPL-3.0, sdk-internal/LICENSE), built from $repository at the commit $commit." >> /src/SOURCE \
+    && cp "$sdk/package.json" "$sdk/VERSION" "$sdk/LICENSE" /src/sdk-internal/
+
+## the Bitwarden CLI and every package it brings along, as its own lock file pins them, its build
+## replaced by the open source one. npm stays in this stage: the app stage takes node and the
+## installed tree only.
 FROM node AS bitwarden-cli
 WORKDIR /usr/local/lib/bitwarden-cli
 COPY docker/bitwarden-cli/package.json docker/bitwarden-cli/package-lock.json ./
 RUN npm ci --no-fund --no-audit
+## the npm package's build is the one with code under the Bitwarden License, and its package.json
+## names a LICENSE.txt the package does not hold
+RUN rm -rf node_modules/@bitwarden/cli/build
+COPY --from=bitwarden-cli-source /src/clients/apps/cli/build node_modules/@bitwarden/cli/build
+COPY --from=bitwarden-cli-source /src/SOURCE /src/clients/LICENSE_GPL.txt node_modules/@bitwarden/cli/
+COPY --from=bitwarden-cli-source /src/sdk-internal node_modules/@bitwarden/cli/sdk-internal
 
 FROM python:3.13-slim-trixie@sha256:7249d5587b78209a006dc4a3b5340678f84ea729239193aa559962cd8c1fce50 AS python
 
@@ -76,6 +155,10 @@ FROM python AS app
 RUN rm -rf /usr/local/lib/python3.13/site-packages/pip /usr/local/lib/python3.13/site-packages/pip-*.dist-info \
     /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.13
 
+## node links libatomic.so.1, which the node image has and the Python image lacks
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libatomic1 \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=bitwarden-cli /usr/local/bin/node /usr/local/bin/node
 COPY --from=bitwarden-cli /usr/local/lib/bitwarden-cli/node_modules /usr/local/lib/bitwarden-cli/node_modules
 
@@ -94,6 +177,9 @@ RUN chmod 644 /usr/local/lib/bwtidy/unref-share-timers.js \
 RUN mkdir -p /data/accounts
 
 COPY --from=backend /app/backend/.venv /app/backend/.venv
+## for `docker compose exec bwtidy bwtidy stats` (docs/reference/configuration.md). A link of the
+## one command, not the venv's bin on PATH, so python3 (the health check's) stays the image's own.
+RUN ln -s /app/backend/.venv/bin/bwtidy /usr/local/bin/bwtidy
 COPY --from=frontend /src/frontend/dist /app/static
 ## every backup holds it as RESTORE.md (collect.RESTORE_DOC)
 COPY docs/restore.md /app/docs/restore.md

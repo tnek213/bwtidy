@@ -41,7 +41,7 @@ STATS_ERROR_HEADER = "X-Bwtidy-Stats-Error"
 
 ## the account directory: its subdirectories, the pending marker of an account whose first
 ## unlock has not happened and the worker's log
-SUBDIRS = ("app", "bw", "run", "home")
+SUBDIRS = ("app", "bw", "home")
 PENDING_MARKER = ".pending"
 WORKER_LOG = "worker.log"
 ## the files in app/: the SQLite file, the MCP token's hash, the CLI's login state and the file

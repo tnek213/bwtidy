@@ -1,3 +1,5 @@
+import errno
+import os
 import re
 import shutil
 import socket
@@ -236,6 +238,31 @@ def test_serve_hands_zensical_the_same_extra(repo, monkeypatch, docs_site):
     assert extra["bwtidy_release"] == "0.1.0-alpha.1"
     assert extra["bwtidy_stars"] == 42
     assert not (repo / docs_site.SERVE_CONFIG).exists()
+
+
+def test_serve_shows_a_diagram_as_a_code_block_apart_from_what_follows(
+    repo, monkeypatch, docs_site
+):
+    text = (REAL_ROOT / "zensical.toml").read_text()
+    extensions = text[text.index("[project.markdown_extensions]") :]
+    extensions = re.split(r"\n(?=\[)", extensions)[0]
+    nav = '["index.md", "how-to/run.md", "restore.md"]'
+    write(repo, "zensical.toml", f'[project]\nsite_name = "bwtidy"\nnav = {nav}\n\n{extensions}\n')
+    page = '# Run\n\n```mermaid alt="A to B"\nflowchart LR\n  a --> b\n```\n\nThen run it.\n'
+    write(repo, "docs/how-to/run.md", page)
+    real = subprocess.run
+
+    ## Zensical's build in place of its serve, on the same config, renders what serve would show
+    def run(cmd, cwd):
+        return real([*cmd[: cmd.index("serve")], "build", *cmd[cmd.index("serve") + 1 :]], cwd=cwd)
+
+    monkeypatch.setattr(docs_site.subprocess, "run", run)
+    assert docs_site.serve([]) == 0
+    html = (repo / "site" / "how-to" / "run" / "index.html").read_text()
+    code = re.search(r"<pre\b.*?</pre>", html, re.DOTALL)
+    assert code, html
+    assert "flowchart" in code[0] and "alt=" not in code[0] and "Then run it" not in code[0]
+    assert re.search(r"</pre>.*<p>Then run it\.</p>", html, re.DOTALL)
 
 
 def test_build_fails_when_the_restore_page_lacks_the_line(repo, monkeypatch, capsys, docs_site):
@@ -598,6 +625,151 @@ def test_an_svg_without_text_needs_no_font(docs_site):
     assert missing_font(docs_site, set(), svg) is None
 
 
+def fitted(docs_site, svg: str) -> str:
+    """The SVG as the converter hands it to resvg, with the families it names fitted."""
+    fit = converter(docs_site)["with_generic_families"]
+    return fit(svg.encode(), docs_site.NAMED_FONTS).decode()
+
+
+## a d2 style sheet: a text class in an embedded font, and the @font-face resvg does not load
+D2_STYLE = (
+    '.d2-1 .text-bold { font-family: "d2-1-font-bold"; }\n'
+    '@font-face { font-family: d2-1-font-bold; src: url("data:font/woff;base64,AAAA"); }\n'
+    '.d2-1 .text-mono { font-family: "d2-1-font-mono-italic"; }\n'
+)
+
+
+def test_a_named_font_gets_the_generic_family_that_stands_in_for_it(docs_site):
+    texts = [f'<text font-family="{family}">A</text>' for family in ("Arial", "helvetica")]
+    texts += ['<text style="font-family: Courier; font-size: 9px">A</text>']
+    svg = fitted(docs_site, svg_with("".join(texts), "#m{font-family:Times}"))
+    assert 'font-family="Arial, sans-serif"' in svg
+    assert 'font-family="helvetica, sans-serif"' in svg
+    assert 'style="font-family: Courier, monospace; font-size: 9px"' in svg
+    assert "#m{font-family: Times, serif}" in svg
+
+
+def test_a_generic_family_in_another_case_is_written_as_resvg_knows_it(docs_site):
+    """As Graphviz writes Helvetica, which resvg would draw in the serif font."""
+    svg = fitted(docs_site, svg_with('<text font-family="Helvetica,sans-Serif">A</text>'))
+    assert 'font-family="Helvetica, sans-serif"' in svg
+
+
+def test_an_svg_whose_families_all_draw_as_meant_stays_as_it_is(docs_site):
+    svg = svg_with(
+        '<text font-family="Times,serif">A</text><text font-family="No Such Font">B</text>',
+        '#m{font-family:"trebuchet ms",verdana,arial,sans-serif;}',
+    )
+    assert fitted(docs_site, svg) == svg
+
+
+def test_a_font_d2_embeds_gets_its_generic_family_weight_and_style(docs_site):
+    text = '<g class="d2-1"><text class="text-bold">A</text></g>'
+    svg = fitted(docs_site, svg_with(text, D2_STYLE))
+    assert '.text-bold { font-family: "d2-1-font-bold", sans-serif; font-weight: bold; }' in svg
+    assert "@font-face { font-family: d2-1-font-bold; src:" in svg
+    expected = '"d2-1-font-mono-italic", monospace; font-style: italic; }'
+    assert f".text-mono {{ font-family: {expected}" in svg
+
+
+def missing_after_fitting(docs_site, installed: set[str], svg: str) -> str | None:
+    return missing_font(docs_site, installed, fitted(docs_site, svg))
+
+
+def test_a_named_font_draws_in_the_stand_in_of_its_generic_family(docs_site):
+    svg = svg_with('<text font-family="Helvetica">A</text>', D2_STYLE)
+    assert missing_after_fitting(docs_site, {"DejaVu Sans", "DejaVu Sans Mono"}, svg) is None
+    assert "draws its sans-serif text" in (missing_after_fitting(docs_site, {"Arimo"}, svg) or "")
+
+
+def test_a_named_font_without_a_generic_family_has_to_be_installed(docs_site):
+    """resvg would draw it in the serif font without a word."""
+    svg = svg_with('<text font-family="No Such Font">A</text>')
+    assert missing_after_fitting(docs_site, {"DejaVu Serif"}, svg) == (
+        "no installed font draws its text in No Such Font, and it names no generic family "
+        "(serif, sans-serif or monospace) to fall back on"
+    )
+    assert missing_after_fitting(docs_site, {"No Such Font"}, svg) is None
+
+
+def test_a_font_the_svg_embeds_is_named_as_the_cause(docs_site):
+    style = "@font-face{font-family:Fancy;src:url(x)} text{font-family:Fancy}"
+    svg = svg_with("<text>A</text>", style)
+    assert missing_after_fitting(docs_site, {"DejaVu Serif"}, svg) == (
+        "no installed font draws its text in Fancy, Fancy is a font the SVG embeds and resvg "
+        "does not load, and it names no generic family (serif, sans-serif or monospace) to fall "
+        "back on"
+    )
+
+
+def label(attributes: str, style: str = "", text: str = "Label") -> str:
+    """An SVG of one text in a group of the class d2-1, at 120 by 40."""
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">'
+        f'<style>{style}</style><g class="d2-1"><text x="4" y="30" font-size="24" {attributes}>'
+        f"{text}</text></g></svg>"
+    )
+
+
+def drawn(docs_site, cache: Path, svgs: dict[str, str]) -> dict[str, bytes]:
+    """The PNG the script's own conversion makes of each SVG, with the system's fonts."""
+    assert docs_site.convert({key: svg.encode() for key, svg in svgs.items()}, cache) == {}
+    return {key: (cache / f"{key}.png").read_bytes() for key in svgs}
+
+
+def test_helvetica_and_arial_are_drawn_in_a_sans_serif_font(tmp_path, docs_site):
+    pngs = drawn(
+        docs_site,
+        tmp_path,
+        {
+            "helvetica": label('font-family="Helvetica,sans-Serif"'),
+            "arial": label('font-family="Arial"'),
+            "sans": label('font-family="sans-serif"'),
+            "serif": label('font-family="serif"'),
+            "empty": label('font-family="serif"', text=""),
+        },
+    )
+    assert pngs["helvetica"] not in (pngs["serif"], pngs["empty"])
+    assert pngs["arial"] == pngs["sans"]
+
+
+def test_d2_labels_are_drawn_in_bold_sans_serif(tmp_path, docs_site):
+    """d2 draws its labels in the bold Source Sans Pro it embeds, which resvg does not load."""
+    pngs = drawn(
+        docs_site,
+        tmp_path,
+        {
+            "d2": label('class="text-bold"', D2_STYLE),
+            "bold": label('font-family="sans-serif" font-weight="bold"'),
+            "serif": label('font-family="serif" font-weight="bold"'),
+            "empty": label('class="text-bold"', D2_STYLE, text=""),
+        },
+    )
+    assert pngs["d2"] == pngs["bold"]
+    assert pngs["d2"] not in (pngs["serif"], pngs["empty"])
+
+
+def test_a_diagram_in_a_font_the_svg_embeds_alone_fails_the_build(
+    repo, monkeypatch, capsys, kroki, docs_site
+):
+    style = "@font-face{font-family:Fancy;src:url(x)} text{font-family:Fancy}"
+    kroki.answer = label("", style)
+    write(repo, "docs/how-to/run.md", GRAPHVIZ_PAGE)
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 1
+    err = capsys.readouterr().err
+    assert (
+        "docs-site: docs/how-to/run.md:5: no installed font draws its text in Fancy, "
+        "Fancy is a font the SVG embeds and resvg does not load"
+    ) in err
+
+
+def test_the_cache_key_changes_with_the_named_fonts(monkeypatch, docs_site):
+    before = docs_site.diagram_key("graphviz", "digraph { a }")
+    monkeypatch.setattr(docs_site, "NAMED_FONTS", {**docs_site.NAMED_FONTS, "serif": ["Georgia"]})
+    assert docs_site.diagram_key("graphviz", "digraph { a }") != before
+
+
 def test_a_diagram_whose_text_no_font_draws_fails_the_build(
     repo, monkeypatch, capsys, kroki, docs_site
 ):
@@ -688,6 +860,25 @@ def test_a_second_build_takes_the_diagram_from_the_cache(
     assert png.read_bytes() == next((first / "how-to").glob("diagram-*.png")).read_bytes()
 
 
+def test_a_cache_on_another_filesystem_than_the_temp_directory_gets_the_png(
+    repo, monkeypatch, tmp_path, kroki, docs_site
+):
+    cache = repo / ".cache" / "kroki"
+    real = os.replace
+
+    def replace(src, dst) -> None:
+        ## the cache stands for a filesystem of its own, a rename into or out of it fails
+        if (cache in Path(src).parents) != (cache in Path(dst).parents):
+            raise OSError(errno.EXDEV, "Invalid cross-device link", str(src), None, str(dst))
+        real(src, dst)
+
+    monkeypatch.setattr(docs_site.os, "replace", replace)
+    kept = build_with_diagrams(repo, monkeypatch, tmp_path, docs_site, GRAPHVIZ_PAGE)
+    [png] = cache.glob("*.png")
+    assert png.read_bytes() == next((kept / "how-to").glob("diagram-*.png")).read_bytes()
+    assert list(cache.iterdir()) == [png]
+
+
 def test_kroki_answering_an_error_fails_the_build(repo, monkeypatch, capsys, kroki, docs_site):
     kroki.status = 400
     kroki.answer = "Error 400: Syntax error in graph (line: 1)"
@@ -729,3 +920,109 @@ def test_without_bwtidy_kroki_url_the_public_kroki_is_used(monkeypatch, docs_sit
 def test_the_types_are_kroki_s_thirty(docs_site):
     assert len(set(docs_site.KROKI_TYPES)) == 30
     assert {"mermaid", "plantuml", "d2", "graphviz", "vegalite"} <= set(docs_site.KROKI_TYPES)
+
+
+BASH = "Linux, macOS, WSL (Bash):"
+POWERSHELL = "Windows (PowerShell):"
+PAIR = (
+    f"{BASH}\n\n```sh\nls -l\n\necho done\n```\n\n"
+    f"{POWERSHELL}\n\n```powershell\nGet-ChildItem\n```\n"
+)
+TABS = (
+    '=== "Linux, macOS, WSL (Bash)"\n\n    ```sh\n    ls -l\n\n    echo done\n    ```\n\n'
+    '=== "Windows (PowerShell)"\n\n    ```powershell\n    Get-ChildItem\n    ```\n'
+)
+
+
+def test_a_pair_of_shell_commands_becomes_two_tabs(docs_site):
+    text = f"# Run\n\nRun this:\n\n{PAIR}\nThen go on.\n"
+    assert docs_site.shell_tabs(text) == f"# Run\n\nRun this:\n\n{TABS}\nThen go on.\n"
+
+
+def test_two_pairs_on_one_page_both_become_tabs(docs_site):
+    text = f"# Run\n\n{PAIR}\nAnd then:\n\n{PAIR}"
+    assert docs_site.shell_tabs(text) == f"# Run\n\n{TABS}\nAnd then:\n\n{TABS}"
+
+
+def test_a_pair_in_a_list_step_keeps_its_indent(docs_site):
+    def indented(text: str) -> str:
+        return "".join(f"    {line}" if line.strip() else line for line in text.splitlines(True))
+
+    text = f"1. Run:\n\n{indented(PAIR)}\n2. Done.\n"
+    tabs = indented(TABS)
+    assert docs_site.shell_tabs(text) == f"1. Run:\n\n{tabs}\n2. Done.\n"
+
+
+def test_a_page_without_a_pair_stays_as_it_is(docs_site):
+    text = (
+        f"# Run\n\n```sh\nls\n```\n\n````markdown\n{PAIR}````\n\n"
+        f"Text that names {BASH} inline.\n\n```powershell\ndir\n```"
+    )
+    assert docs_site.shell_tabs(text) == text
+
+
+@pytest.mark.parametrize(
+    ("page", "line", "why"),
+    [
+        (
+            f"# Run\n\n{BASH}\n\n```sh\nls\n```\n\nThen go on.\n",
+            3,
+            "without 'Windows (PowerShell):'",
+        ),
+        (f"# Run\n\n{POWERSHELL}\n\n```powershell\ndir\n```\n", 3, "without 'Linux, macOS"),
+        (f"# Run\n\n{BASH}\n\nls\n", 3, "is not directly followed by a ```sh block"),
+        (f"# Run\n\n{BASH}\n\n```bash\nls\n```\n", 3, "is not directly followed by a ```sh block"),
+        (
+            f"# Run\n\n{BASH}\n\n```sh\nls\n```\n\n{POWERSHELL}\n\nThen go on.\n",
+            9,
+            "'Windows (PowerShell):' is not directly followed by a ```powershell block",
+        ),
+    ],
+    ids=["bash-alone", "powershell-alone", "bash-without-block", "bash-wrong-language", "ps-bare"],
+)
+def test_build_fails_naming_the_page_and_line_of_a_broken_pair(
+    repo, monkeypatch, capsys, docs_site, page, line, why
+):
+    write(repo, "docs/how-to/run.md", page)
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 1
+    err = capsys.readouterr().err
+    assert f"docs-site: docs/how-to/run.md:{line}: " in err
+    assert why in err
+
+
+def test_build_hands_zensical_the_tabs_and_keeps_the_page_in_the_checkout(
+    repo, monkeypatch, tmp_path, docs_site
+):
+    page = f"# Run\n\n{PAIR}"
+    write(repo, "docs/how-to/run.md", page)
+    kept = tmp_path / "kept"
+    fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site, keep=kept)
+    assert docs_site.build(None) == 0
+    assert (kept / "how-to" / "run.md").read_text() == f"# Run\n\n{TABS}"
+    assert (kept / "index.md").read_text() == "# Home\n"
+    assert (repo / "docs" / "how-to" / "run.md").read_text() == page
+
+
+def test_the_restore_page_gets_its_version_and_its_tabs(repo, monkeypatch, docs_site):
+    restore = f"# Restore\n\n{RESTORE_DOC_COMMIT} The project: there\n\n{PAIR}"
+    write(repo, "docs/restore.md", restore)
+    seen = fake_zensical(monkeypatch, {"index.html": f"<body>{BANNER}</body>"}, docs_site)
+    assert docs_site.build(None) == 0
+    assert seen["restore.md"] == (
+        f"# Restore\n\nWritten for bwtidy 0.1.0-alpha.1 ({COMMIT}). The project: there\n\n{TABS}"
+    )
+
+
+def test_the_site_links_the_tabs_of_the_alternate_style():
+    with (REAL_ROOT / "zensical.toml").open("rb") as file:
+        config = tomllib.load(file)["project"]
+    assert config["markdown_extensions"]["pymdownx"]["tabbed"] == {"alternate_style": True}
+    assert "content.tabs.link" in config["theme"]["features"]
+
+
+def test_the_labels_are_the_tab_titles_of_the_docs(docs_site):
+    assert docs_site.SHELL_TABS == (
+        ("Linux, macOS, WSL (Bash):", "sh"),
+        ("Windows (PowerShell):", "powershell"),
+    )

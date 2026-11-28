@@ -22,7 +22,7 @@ FROM --platform=linux/amd64 python:3.13-slim-trixie@{OLD} AS python
 
 DEMO_DOCKERFILE = f"""# syntax=docker/dockerfile:1@{OLD}
 
-ARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:main
+ARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:latest
 
 FROM ghcr.io/astral-sh/uv:0.11@{OLD} AS uv
 
@@ -345,10 +345,12 @@ def test_the_repo_pins_every_image_by_digest_and_every_action_by_sha(deps):
         assert [f"{r.image}:{r.tag}" for r in refs if r.digest is None] == [], path.name
     for workflow in deps.WORKFLOWS.glob("*.yml"):
         text = workflow.read_text()
+        ## a workflow of this repo (uses: ./.github/workflows/...) is no action to pin
         uses = [
             line
             for line in text.splitlines()
             if line.strip().removeprefix("- ").startswith("uses:")
+            and not line.strip().removeprefix("- ").startswith("uses: ./")
         ]
         assert len(deps.action_pins(text)) == len(uses), workflow.name
 
@@ -379,3 +381,166 @@ def test_update_uv_upgrades_the_lock_of_the_project_it_is_given(deps, monkeypatc
         (["uv", "lock", "--upgrade", "--dry-run"], tmp_path),
         (["uv", "lock", "--upgrade"], tmp_path),
     ]
+
+
+README = """The image builds it from
+Bitwarden's source (<https://github.com/bitwarden/clients>) at the tag
+`cli-v2026.10.0`. Bitwarden's npm package is not used.
+"""
+RESTORE = """These commands install the version that bwtidy uses.
+
+```sh
+npm install --prefix "$CLI" --no-fund --no-audit @bitwarden/cli@2026.10.0
+```
+
+bw 2026.10.0 refuses an SSH key item without its public key.
+"""
+
+
+@pytest.fixture
+def cli_root(deps, tmp_path):
+    """A copy of the files --cli-pin reads, with package.json at 2026.11.0 and the rest at
+    2026.10.0."""
+    cli = tmp_path / "docker" / "bitwarden-cli"
+    cli.mkdir(parents=True)
+    (tmp_path / "docs").mkdir()
+    package = {"name": "x", "private": True, "dependencies": {"@bitwarden/cli": "2026.11.0"}}
+    (cli / "package.json").write_text(json.dumps(package))
+    source = {
+        "repository": "https://github.com/bitwarden/clients",
+        "tag": "cli-v2026.10.0",
+        "commit": SHA,
+    }
+    (cli / "source.json").write_text(json.dumps(source, indent=2) + "\n")
+    (tmp_path / "README.md").write_text(README)
+    (tmp_path / "docker" / "hub-overview.md").write_text(README)
+    (tmp_path / "docs" / "restore.md").write_text(RESTORE)
+    (tmp_path / "docs" / "releases.md").write_text("# Release notes\n\n## Unreleased\n")
+    return tmp_path
+
+
+def tree(root):
+    return {str(p.relative_to(root)): p.read_text() for p in sorted(root.rglob("*")) if p.is_file()}
+
+
+def ls_remote(deps, monkeypatch, listing):
+    asked = []
+    monkeypatch.setattr(deps, "run", lambda command, cwd: asked.append(command) or listing)
+    return asked
+
+
+## an annotated tag lists its own object first and the commit it names as ^{}
+ANNOTATED = f"{'c' * 40}\trefs/tags/cli-v2026.11.0\n{SHA2}\trefs/tags/cli-v2026.11.0^{{}}\n"
+
+
+def test_the_cli_pin_writes_the_tag_the_commit_and_every_doc(deps, cli_root, monkeypatch):
+    asked = ls_remote(deps, monkeypatch, ANNOTATED)
+    errors: list[str] = []
+    before = tree(cli_root)
+    found = deps.update_cli_pin(cli_root, True, errors)
+    assert found == [
+        (
+            "https://github.com/bitwarden/clients",
+            f"cli-v2026.10.0 {SHA[:7]}",
+            f"cli-v2026.11.0 {SHA2[:7]}",
+        ),
+        ("README.md", "2026.10.0", "2026.11.0"),
+        ("docker/hub-overview.md", "2026.10.0", "2026.11.0"),
+        ("docs/restore.md", "2026.10.0", "2026.11.0"),
+    ]
+    assert tree(cli_root) == before
+    assert deps.update_cli_pin(cli_root, False, errors) == found
+    assert errors == []
+    source = json.loads((cli_root / "docker" / "bitwarden-cli" / "source.json").read_text())
+    assert source == {
+        "repository": "https://github.com/bitwarden/clients",
+        "tag": "cli-v2026.11.0",
+        "commit": SHA2,
+    }
+    assert (cli_root / "README.md").read_text() == README.replace("2026.10.0", "2026.11.0")
+    restore = (cli_root / "docs" / "restore.md").read_text()
+    assert "@bitwarden/cli@2026.11.0\n" in restore
+    ## what one version did stays an observation of that version
+    assert "bw 2026.10.0 refuses an SSH key item" in restore
+    assert asked[0][:3] == ["git", "ls-remote", "https://github.com/bitwarden/clients"]
+    assert "refs/tags/cli-v2026.11.0" in asked[0]
+
+
+def test_a_second_cli_pin_changes_nothing(deps, cli_root, monkeypatch):
+    ls_remote(deps, monkeypatch, ANNOTATED)
+    errors: list[str] = []
+    assert deps.update_cli_pin(cli_root, False, errors)
+    written = tree(cli_root)
+    assert deps.update_cli_pin(cli_root, False, errors) == []
+    assert tree(cli_root) == written
+    ## a lightweight tag names the commit itself
+    ls_remote(deps, monkeypatch, f"{SHA2}\trefs/tags/cli-v2026.11.0\n")
+    assert deps.update_cli_pin(cli_root, False, errors) == []
+    assert errors == []
+
+
+def test_a_cli_version_without_its_tag_fails_naming_it(deps, cli_root, monkeypatch):
+    ls_remote(deps, monkeypatch, "")
+    before = tree(cli_root)
+    errors: list[str] = []
+    assert deps.update_cli_pin(cli_root, False, errors) == []
+    assert len(errors) == 1
+    assert "no tag cli-v2026.11.0" in errors[0]
+    assert "@bitwarden/cli 2026.11.0" in errors[0]
+    assert tree(cli_root) == before
+
+
+def test_the_cli_pin_command_fails_naming_a_missing_tag(deps, cli_root, monkeypatch, capsys):
+    ls_remote(deps, monkeypatch, "")
+    assert deps.main(["--cli-pin", "--root", str(cli_root)]) == 1
+    assert "no tag cli-v2026.11.0" in capsys.readouterr().err
+    source = json.loads((cli_root / "docker" / "bitwarden-cli" / "source.json").read_text())
+    assert source["tag"] == "cli-v2026.10.0"
+
+
+@pytest.mark.parametrize("version", ["^2026.11.0", "2026.11.0; touch x", "2026.11", "v2026.11.0"])
+def test_a_cli_version_that_is_not_x_y_z_writes_nothing(deps, cli_root, monkeypatch, version):
+    asked = ls_remote(deps, monkeypatch, ANNOTATED)
+    package = {"dependencies": {"@bitwarden/cli": version}}
+    (cli_root / "docker" / "bitwarden-cli" / "package.json").write_text(json.dumps(package))
+    before = tree(cli_root)
+    errors: list[str] = []
+    assert deps.update_cli_pin(cli_root, False, errors) == []
+    assert "not X.Y.Z" in errors[0]
+    assert asked == []
+    assert tree(cli_root) == before
+
+
+def test_the_cli_pin_asks_only_bitwardens_repository(deps, cli_root, monkeypatch):
+    asked = ls_remote(deps, monkeypatch, ANNOTATED)
+    path = cli_root / "docker" / "bitwarden-cli" / "source.json"
+    source = json.loads(path.read_text())
+    path.write_text(json.dumps({**source, "repository": "ext::sh -c touch% x"}))
+    before = tree(cli_root)
+    errors: list[str] = []
+    assert deps.update_cli_pin(cli_root, False, errors) == []
+    assert "not https://github.com/bitwarden/clients" in errors[0]
+    assert asked == []
+    assert tree(cli_root) == before
+
+
+def test_the_cli_pin_writes_through_no_link(deps, cli_root, monkeypatch, tmp_path_factory):
+    ls_remote(deps, monkeypatch, ANNOTATED)
+    elsewhere = tmp_path_factory.mktemp("elsewhere") / "restore.md"
+    elsewhere.write_text(RESTORE)
+    (cli_root / "docs" / "restore.md").unlink()
+    (cli_root / "docs" / "restore.md").symlink_to(elsewhere)
+    errors: list[str] = []
+    assert deps.update_cli_pin(cli_root, False, errors) == []
+    assert "docs/restore.md" in errors[0]
+    assert elsewhere.read_text() == RESTORE
+    assert "cli-v2026.10.0" in (cli_root / "docker" / "bitwarden-cli" / "source.json").read_text()
+
+
+def test_a_doc_that_no_longer_states_the_version_fails_naming_it(deps, cli_root, monkeypatch):
+    ls_remote(deps, monkeypatch, ANNOTATED)
+    (cli_root / "README.md").write_text("The image builds the CLI from Bitwarden's source.\n")
+    errors: list[str] = []
+    found = deps.update_cli_pin(cli_root, False, errors)
+    assert [name for name, _, _ in found][1:] == ["docker/hub-overview.md", "docs/restore.md"]
+    assert errors == ["README.md no longer states the CLI version, update CLI_PIN_DOCS"]

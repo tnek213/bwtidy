@@ -1,16 +1,32 @@
 #!/usr/bin/env python3
 """update-deps: update every dependency within its declared range, never past it.
 
-  scripts/update-deps             update the lock files, the image digests and the action SHAs
-  scripts/update-deps --dry-run   show what would change and write nothing
+  scripts/update-deps                         update the lock files, the image digests and the
+                                              action SHAs
+  scripts/update-deps --dry-run               show what would change and write nothing
+  scripts/update-deps --cli-pin [--root DIR] [--pr N]
+                                              only write the pin of the Bitwarden CLI in DIR
+                                              (the repo by default), with --dry-run to show it
+
+--cli-pin writes every place that states the CLI version docker/bitwarden-cli/package.json pins:
+source.json's tag cli-vVERSION and the commit it names, and the docs in CLI_PIN_DOCS. With --pr N,
+the number of the pull request that bumps the CLI, it also writes the bullet "Run the Bitwarden
+CLI VERSION in the image" with the link to pull request N under Unreleased in docs/releases.md,
+in place of "Nothing yet." and only once. It reads only those data files below DIR and runs
+nothing from it, so a workflow runs main's copy on the files of a pull request
+(.github/workflows/dependabot-cli-pin.yml).
 
 Backend and demo: uv lock --upgrade, within the ranges of backend/pyproject.toml and
 demo/pyproject.toml. Frontend: npm update
 within the ranges of frontend/package.json (an exact pin stays), then npm ci so node_modules
 match. The image's Bitwarden CLI (docker/bitwarden-cli): npm update --package-lock-only, as only
-the image installs it. The Dockerfile, demo/Dockerfile and compose.demo.yaml (the demo's
-Vaultwarden and nginx): each image keeps the tag it names and gets the digest that tag points to
-now. The workflows: each action moves to the newest release tag of its major
+the image installs it, and source.json gets the tag cli-vVERSION of the version package.json
+pins and the commit that tag names, the source the image builds the CLI from, and the docs that
+state the version get it (the same as --cli-pin). markdownlint-cli2
+(tools/markdownlint) the same way as the CLI's lock file, as scripts/ci runs npm ci there once
+its lock file changed. The Dockerfile, demo/Dockerfile and compose.demo.yaml (the
+demo's Vaultwarden and nginx): each image keeps the tag it names and gets the digest that tag
+points to now. The workflows: each action moves to the newest release tag of its major
 version, with its commit SHA and that tag in the comment above it. Then it runs
 scripts/third-party and the version check, and prints what changed (package, old version, new
 version) per ecosystem. Last it lists the updates outside the ranges (new major versions, newer
@@ -37,6 +53,17 @@ BACKEND = ROOT / "backend"
 DEMO = ROOT / "demo"
 FRONTEND = ROOT / "frontend"
 CLI = ROOT / "docker" / "bitwarden-cli"
+CLI_PACKAGE = "@bitwarden/cli"
+CLI_REPOSITORY = "https://github.com/bitwarden/clients"
+## the docs that state the CLI version the image pins, by their path in the repo, each with a
+## pattern whose group "version" is that version. A line that tells what one version of bw did is
+## an observation of that version and stays as it is.
+CLI_PIN_DOCS = {
+    "README.md": r"at the tag\s+`cli-v(?P<version>[^`\s]+)`",
+    "docker/hub-overview.md": r"at the tag\s+`cli-v(?P<version>[^`\s]+)`",
+    "docs/restore.md": r"npm install .*@bitwarden/cli@(?P<version>\S+)",
+}
+MARKDOWNLINT = ROOT / "tools" / "markdownlint"
 DOCKERFILE = ROOT / "Dockerfile"
 ## every file that pins images by tag and digest: the two Dockerfiles and the demo's compose file
 IMAGE_FILES = [DOCKERFILE, DEMO / "Dockerfile", ROOT / "compose.demo.yaml"]
@@ -272,6 +299,194 @@ def remote_tags(action: str) -> dict[str, str]:
     return tags
 
 
+## --- the source of the Bitwarden CLI
+
+
+def tagged_commit(listing: str, tag: str) -> str | None:
+    """The commit TAG names in an ls-remote listing (an annotated tag peeled), None without it."""
+    found: dict[str, str] = {}
+    for line in listing.splitlines():
+        sha, _, ref = line.partition("\t")
+        found[ref.strip()] = sha.strip()
+    return found.get(f"refs/tags/{tag}^{{}}") or found.get(f"refs/tags/{tag}")
+
+
+def pinned_cli_version(cli: Path, errors: list[str]) -> str | None:
+    """The version of the CLI that package.json in CLI pins, None (and an error) for no X.Y.Z."""
+    version = json.loads((cli / "package.json").read_text())["dependencies"][CLI_PACKAGE]
+    ## the version goes into a git ref and into docs, so it is only ever plain digits and dots
+    if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        errors.append(f"{cli / 'package.json'} pins {CLI_PACKAGE} {version!r}, not X.Y.Z")
+        return None
+    return version
+
+
+def update_cli_source(cli: Path, version: str, dry_run: bool, errors: list[str]) -> list[Change]:
+    """source.json in CLI at the tag of VERSION and the commit it names."""
+    path = cli / "source.json"
+    source = json.loads(path.read_text())
+    tag = f"cli-v{version}"
+    ## the repository to ask comes from here, never from the file, as --cli-pin reads the file
+    ## from a pull request
+    if source.get("repository") != CLI_REPOSITORY:
+        named = source.get("repository")
+        errors.append(f"{path} names the repository {named!r}, not {CLI_REPOSITORY}")
+        return []
+    command = ["git", "ls-remote", CLI_REPOSITORY, f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}"]
+    try:
+        commit = tagged_commit(run(command, ROOT), tag)
+    except (SystemExit, subprocess.TimeoutExpired) as error:
+        errors.append(f"{CLI_REPOSITORY}: {error}")
+        return []
+    if commit is None:
+        errors.append(f"{CLI_REPOSITORY} has no tag {tag} for {CLI_PACKAGE} {version} ({path})")
+        return []
+    if (source.get("tag"), source.get("commit")) == (tag, commit):
+        return []
+    old = f"{source.get('tag')} {str(source.get('commit'))[:7]}"
+    if not dry_run:
+        source.update(tag=tag, commit=commit)
+        path.write_text(json.dumps(source, indent=2) + "\n")
+    return [(CLI_REPOSITORY, old, f"{tag} {commit[:7]}")]
+
+
+def with_cli_version(text: str, pattern: str, version: str) -> tuple[str, list[str]] | None:
+    """TEXT with every match of PATTERN stating VERSION and the versions it stated, None when
+    nothing matches."""
+    found: list[str] = []
+
+    def replace(match: re.Match[str]) -> str:
+        found.append(match["version"])
+        before = match[0][: match.start("version") - match.start()]
+        after = match[0][match.end("version") - match.start() :]
+        return before + version + after
+
+    new = re.sub(pattern, replace, text)
+    return (new, found) if found else None
+
+
+def update_cli_docs(root: Path, version: str, dry_run: bool, errors: list[str]) -> list[Change]:
+    """The docs of CLI_PIN_DOCS below ROOT stating VERSION."""
+    found: list[Change] = []
+    for name, pattern in CLI_PIN_DOCS.items():
+        path = root / name
+        replaced = with_cli_version(path.read_text(), pattern, version)
+        if replaced is None:
+            errors.append(f"{name} no longer states the CLI version, update CLI_PIN_DOCS")
+            continue
+        text, old = replaced
+        if set(old) == {version}:
+            continue
+        found.append((name, ", ".join(sorted(set(old))), version))
+        if not dry_run:
+            path.write_text(text)
+    return found
+
+
+def unsafe_cli_files(root: Path) -> list[str]:
+    """The files --cli-pin reads or writes that are a link or lie outside ROOT.
+
+    A pull request could make one a symbolic link, and the write would then land elsewhere.
+    """
+    names = [
+        "docker/bitwarden-cli/package.json",
+        "docker/bitwarden-cli/source.json",
+        versions.RELEASE_NOTES,
+    ]
+    unsafe = []
+    for name in [*names, *CLI_PIN_DOCS]:
+        path = root / name
+        if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
+            unsafe.append(name)
+        elif not path.is_file():
+            unsafe.append(f"{name} (missing)")
+    return unsafe
+
+
+def cli_note(version: str, pr: int) -> list[str]:
+    """The bullet of the release notes for a bump of the CLI to VERSION in pull request PR."""
+    link = f"[#{pr}]({versions.REPO_URL}/pull/{pr})"
+    return [f"- Run the Bitwarden CLI {version} in the image", f"  ({link})"]
+
+
+def with_cli_note(text: str, version: str, pr: int) -> str | None:
+    """TEXT, the release notes, with the bullet of cli_note under Unreleased, None when it has it.
+
+    The bullet takes the place of "Nothing yet." or comes last. A bullet of the same pull request
+    for another version is replaced, so the notes never name the CLI twice for it.
+    """
+    lines = text.splitlines()
+    heading = f"## {versions.UNRELEASED}"
+    if heading not in lines:
+        return None
+    start = lines.index(heading) + 1
+    end = next(
+        (i for i in range(start, len(lines)) if lines[i].startswith("## ")),
+        len(lines),
+    )
+    bullet = cli_note(version, pr)
+    link = bullet[1].strip()
+    index = start
+    while index < end:
+        if lines[index].startswith("- Run the Bitwarden CLI "):
+            stop = index + 1
+            while stop < end and lines[stop].startswith(" "):
+                stop += 1
+            if link in " ".join(lines[index:stop]):
+                if lines[index:stop] == bullet:
+                    return None
+                lines[index:stop] = bullet
+                return "\n".join(lines) + "\n"
+            index = stop
+        else:
+            index += 1
+    section = lines[start:end]
+    if versions.NOTHING_YET in section:
+        at = start + section.index(versions.NOTHING_YET)
+        lines[at : at + 1] = bullet
+    else:
+        last = max(i for i in range(start, end) if lines[i].strip())
+        lines[last + 1 : last + 1] = bullet
+    return "\n".join(lines) + "\n"
+
+
+def update_cli_note(root: Path, version: str, pr: int, dry_run: bool) -> list[Change]:
+    """The bullet of cli_note in the release notes below ROOT."""
+    path = root / versions.RELEASE_NOTES
+    text = with_cli_note(path.read_text(), version, pr)
+    if text is None:
+        return []
+    if not dry_run:
+        path.write_text(text)
+    return [
+        (f"{versions.RELEASE_NOTES} ({versions.UNRELEASED})", None, cli_note(version, pr)[0][2:])
+    ]
+
+
+def update_cli_pin(
+    root: Path, dry_run: bool, errors: list[str], pr: int | None = None
+) -> list[Change]:
+    """Every place below ROOT that states the CLI version package.json pins: source.json and the
+    docs of CLI_PIN_DOCS, and with PR (its pull request) the bullet of the release notes."""
+    unsafe = unsafe_cli_files(root)
+    if unsafe:
+        errors.append(f"not a regular file in {root}: {', '.join(unsafe)}")
+        return []
+    cli = root / "docker" / "bitwarden-cli"
+    version = pinned_cli_version(cli, errors)
+    if version is None:
+        return []
+    known = len(errors)
+    source = update_cli_source(cli, version, dry_run, errors)
+    ## docs that name a version whose source is unknown would be wrong, so they wait for it
+    if len(errors) > known:
+        return []
+    docs = update_cli_docs(root, version, dry_run, errors)
+    if pr is None or len(errors) > known:
+        return source + docs
+    return source + docs + update_cli_note(root, version, pr, dry_run)
+
+
 ## --- the lock files
 
 
@@ -450,7 +665,11 @@ def outside_packages(
         for name, locked, latest in uv_outdated(tree):
             if reached.get(name) != latest:
                 outside.append(f"{label} {name} {reached.get(name, locked)}: latest {latest}")
-    for label, project in (("frontend", FRONTEND), ("bitwarden-cli", CLI)):
+    for label, project in (
+        ("frontend", FRONTEND),
+        ("bitwarden-cli", CLI),
+        ("markdownlint", MARKDOWNLINT),
+    ):
         answer = run(["npm", "outdated", "--json"], project, check=False)
         start = answer.find("{")
         outdated = json.loads(answer[start:]) if start >= 0 else {}
@@ -467,14 +686,46 @@ def print_changes(label: str, found: list[Change]) -> None:
         print(f"  {name} {old or '(new)'} -> {new or '(removed)'}")
 
 
+def cli_pin_main(root: Path, dry_run: bool, pr: int | None) -> int:
+    """--cli-pin: write the CLI pin below ROOT and print what changed."""
+    errors: list[str] = []
+    found = update_cli_pin(root, dry_run, errors, pr)
+    print("Would change:" if dry_run else "Changed:")
+    print_changes("Bitwarden CLI pin", found)
+    for error in errors:
+        print(f"update-deps: {error}", file=sys.stderr)
+    return 1 if errors else 0
+
+
+def cli_pin_args(args: list[str], dry_run: bool) -> int:
+    """--cli-pin with its options --root DIR and --pr N, each at most once."""
+    options: dict[str, str] = {}
+    while args:
+        if len(args) < 2 or args[0] not in ("--root", "--pr") or args[0] in options:
+            print(__doc__, file=sys.stderr)
+            return 2
+        options[args[0]] = args[1]
+        args = args[2:]
+    pr = options.get("--pr")
+    ## the number goes into the release notes, so it is only ever digits
+    if pr is not None and not re.fullmatch(r"[1-9]\d*", pr):
+        print(f"update-deps: --pr takes the number of a pull request, not {pr!r}", file=sys.stderr)
+        return 2
+    root = Path(options["--root"]) if "--root" in options else ROOT
+    return cli_pin_main(root, dry_run, int(pr) if pr is not None else None)
+
+
 def main(args: list[str]) -> int:
     if args and args[0] in ("-h", "--help"):
         print(__doc__)
         return 0
-    if args not in ([], ["--dry-run"]):
+    dry_run = "--dry-run" in args
+    rest = [arg for arg in args if arg != "--dry-run"]
+    if rest[:1] == ["--cli-pin"]:
+        return cli_pin_args(rest[1:], dry_run)
+    if rest:
         print(__doc__, file=sys.stderr)
         return 2
-    dry_run = args == ["--dry-run"]
     outside: list[str] = []
     errors: list[str] = []
     found = {
@@ -483,6 +734,12 @@ def main(args: list[str]) -> int:
         "frontend (frontend/package-lock.json)": update_npm(FRONTEND, dry_run, install=True),
         "Bitwarden CLI (docker/bitwarden-cli/package-lock.json)": update_npm(
             CLI, dry_run, install=False
+        ),
+        "Bitwarden CLI pin (docker/bitwarden-cli/source.json and the docs)": update_cli_pin(
+            ROOT, dry_run, errors
+        ),
+        "markdownlint (tools/markdownlint/package-lock.json)": update_npm(
+            MARKDOWNLINT, dry_run, install=False
         ),
         "images (Dockerfile, demo/Dockerfile, compose.demo.yaml)": update_images(
             dry_run, outside, errors

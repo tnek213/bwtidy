@@ -7,7 +7,7 @@
 services:
   vaultwarden:
     ## scripts/dev-vault up sets BWTIDY_VW_IMAGE to the seeded snapshot image when it has one
-    image: ${BWTIDY_VW_IMAGE:-vaultwarden/server:1.37.4}
+    image: ${BWTIDY_VW_IMAGE:-vaultwarden/server:1.37.5}
     environment:
       SIGNUPS_ALLOWED: "true"
       ## the name the app container uses: Vaultwarden puts it in attachment links and token issuers
@@ -42,6 +42,8 @@ services:
       ## the single-user backend's of the integration tests
       - accounts-data:/data/accounts
       - ./backend:/src/backend
+      ## the pins of the image's Bitwarden CLI, for backend/tests/integration/test_bw_cli_build.py
+      - ./docker/bitwarden-cli:/src/docker/bitwarden-cli:ro
       ## docs/restore.md for every backup's RESTORE.md, as the worktree has it now (a mount of
       ## the file alone would keep the old one once an editor replaces the file)
       - ./docs:/app/docs:ro

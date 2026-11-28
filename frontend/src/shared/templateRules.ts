@@ -1,6 +1,7 @@
 import { FIELDS_PREFIX, fieldColumn } from './coordinates.ts'
 import type { FieldType } from '../api/operations.ts'
 import type { TemplateCoordinate } from '../api/templates.ts'
+import { caseFold } from './caseFold.ts'
 
 // Item type numbers of Bitwarden and the type names the grid uses.
 export const ITEM_TYPES: Record<number, string> = { 1: 'login', 2: 'note', 3: 'card', 4: 'identity', 5: 'sshKey' }
@@ -58,9 +59,10 @@ export function coordinateColumn(coordinate: TemplateCoordinate): string {
   return coordinate.kind === 'field' ? fieldColumn(coordinate.name) : `${FIELDS_PREFIX}${coordinate.pattern}`
 }
 
-// A field name as names are compared: without surrounding spaces, ignoring case.
+// A field or template name as names are compared: without surrounding spaces, ignoring case (folded_name of
+// the backend).
 export function foldedName(name: string): string {
-  return name.trim().toLocaleLowerCase()
+  return caseFold(name.trim())
 }
 
 export function isSecretCoordinate(coordinate: TemplateCoordinate): boolean {

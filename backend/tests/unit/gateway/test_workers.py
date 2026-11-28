@@ -18,10 +18,12 @@ from typing import Any
 import pytest
 
 import bwtidy.bw.process as bwprocess
+from bwtidy.config import SettingsError
 from bwtidy.gateway import workers as workers_module
-from bwtidy.gateway.accounts import LimitError
-from bwtidy.gateway.app import REQUEST_DRAIN
-from bwtidy.gateway.workers import STOP_TIMEOUT
+from bwtidy.gateway.accounts import MAX_EMAIL, NAME_MAX, AccountKey, LimitError
+from bwtidy.gateway.app import REQUEST_DRAIN, create_gateway_app
+from bwtidy.gateway.settings import GatewaySettings
+from bwtidy.gateway.workers import MAX_SOCKET_PATH, STOP_TIMEOUT, worker_env
 from bwtidy.protocol import ACCOUNT_COOKIE as COOKIE
 from bwtidy.protocol import PENDING_MARKER, WORKER_LOG
 from tests.support.gateway_env import (
@@ -35,7 +37,9 @@ from tests.support.gateway_env import (
     GatewayEnv,
     account,
     existing_account,
+    long_account,
     make_env,
+    settings,
     wait_for,
     write_script,
 )
@@ -100,13 +104,14 @@ def test_the_worker_gets_an_environment_built_from_scratch(env: GatewayEnv):
     token = env.started()
     environment = env.session(token).json()["env"]
     path = env.directory()
+    run = env.gateway.settings.run_path / account(EMAIL).run_name
     ## python adds this one when it coerces the C locale at its start
     environment.pop("LC_CTYPE", None)
     assert environment == {
         "PATH": environment["PATH"],
         "HOME": str(path / "home"),
-        "BWTIDY_SOCKET": str(path / "run" / "app.sock"),
-        "BWTIDY_BW_SOCKET": str(path / "run" / "bw.sock"),
+        "BWTIDY_SOCKET": str(run / "app.sock"),
+        "BWTIDY_BW_SOCKET": str(run / "bw.sock"),
         "BWTIDY_DATA_DIR": str(path / "app"),
         "BITWARDENCLI_APPDATA_DIR": str(path / "bw"),
         "BWTIDY_ACCOUNT_SERVER": ALLOWED,
@@ -115,6 +120,83 @@ def test_the_worker_gets_an_environment_built_from_scratch(env: GatewayEnv):
         "BWTIDY_PENDING_MARKER": str(path / PENDING_MARKER),
         "BWTIDY_SECURE_COOKIES": "0",
     }
+
+
+def longest_account() -> AccountKey:
+    """The longest host_dir and email the gateway accepts, the host_dir with a port."""
+    return long_account(NAME_MAX - len("_65535"), MAX_EMAIL, ":65535")
+
+
+def test_the_sockets_fit_a_unix_socket_path_for_the_longest_account():
+    key = longest_account()
+    environment = worker_env(GatewaySettings(), key, key.path(GatewaySettings().accounts_dir))
+    for name in ("BWTIDY_SOCKET", "BWTIDY_BW_SOCKET"):
+        assert len(os.fsencode(environment[name])) <= MAX_SOCKET_PATH, name
+        assert environment[name].startswith("/data/accounts/.run/")
+
+
+def test_a_worker_of_an_account_with_a_long_directory_starts_and_answers(tmp_path: Path):
+    key = long_account(200, 200)
+    for env in make_env(tmp_path, allowed_servers=frozenset({key.server})):
+        token = env.started(key.server, key.email)
+        path = env.directory(key.host_dir, key.email)
+        assert len(os.fsencode(path / "app.sock")) > MAX_SOCKET_PATH
+        [worker] = env.gateway.workers._workers.values()
+        assert env.client.portal is not None
+        assert env.client.portal.call(worker.answers) is True
+        assert env.session(token).status_code == 200
+        ## its sockets lie in its socket directory, outside the account directory and tmp_path
+        assert worker.run == env.gateway.settings.run_path / key.run_name
+        assert not worker.run.is_relative_to(tmp_path)
+        assert worker.socket.is_socket()
+        assert worker.run.stat().st_mode & 0o777 == 0o700
+        assert env.gateway.settings.run_path.stat().st_mode & 0o777 == 0o711
+
+
+def test_an_accounts_dir_too_long_for_the_sockets_stops_the_gateway(tmp_path: Path):
+    accounts = Path("/" + "a" * 60) / ("b" * 40)
+    with pytest.raises(SettingsError) as raised:
+        create_gateway_app(settings(tmp_path, accounts_dir=accounts, run_dir=None))
+    assert str(raised.value) == (
+        f"BWTIDY_ACCOUNTS_DIR is too long for the workers' sockets in {accounts}/.run: a Unix "
+        "socket path holds at most 107 bytes. Shorten BWTIDY_ACCOUNTS_DIR to at most 76 bytes."
+    )
+    with pytest.raises(SettingsError):
+        create_gateway_app(settings(tmp_path, accounts_dir=Path("/" + "a" * 76), run_dir=None))
+    ## 76 bytes fit: the app is made, its start would make the directories
+    create_gateway_app(settings(tmp_path, accounts_dir=Path("/" + "a" * 75), run_dir=None))
+
+
+def test_the_socket_directory_goes_with_its_worker(env: GatewayEnv):
+    env.started()
+    [worker] = env.gateway.workers._workers.values()
+    assert worker.socket.is_socket()
+    os.kill(worker.pid, signal.SIGKILL)
+    wait_for(lambda: not worker.run.exists(), "the socket directory to go")
+    ## the root stays for the next worker
+    assert env.gateway.settings.run_path.is_dir()
+
+
+def test_the_gateway_s_start_empties_the_socket_root(tmp_path: Path):
+    root = settings(tmp_path).run_path
+    (root / "0123456789abcdef").mkdir(parents=True)
+    (root / "0123456789abcdef" / "app.sock").write_text("left from before")
+    for env in make_env(tmp_path):
+        assert list(env.gateway.settings.run_path.iterdir()) == []
+
+
+def test_a_symlink_at_the_socket_directory_is_replaced_and_not_followed(tmp_path: Path):
+    target = tmp_path / "elsewhere"
+    target.mkdir()
+    (target / "kept").write_text("kept")
+    for env in make_env(tmp_path):
+        run = env.gateway.settings.run_path / account(EMAIL).run_name
+        run.symlink_to(target)
+        env.started()
+        assert not run.is_symlink()
+        assert run.is_dir()
+        assert (run / "app.sock").is_socket()
+        assert sorted(p.name for p in target.iterdir()) == ["kept"]
 
 
 def test_with_the_usage_stats_on_the_worker_is_told_to_report(tmp_path: Path):

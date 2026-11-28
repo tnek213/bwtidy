@@ -2,9 +2,10 @@
 
 The rules of the product and their reasons, where the user docs do not state
 them: [docs/spec.md](docs/spec.md). Read it before changing behavior. When a
-feature changes what the spec says, update the spec in the same commit. This is for the maintainer's agents. Human contributors may
-leave the spec to the maintainer, so an agent reviewing a contributor's pull
-request does not ask for spec changes.
+feature changes what the spec says, update the spec in the same commit. This is
+for the maintainer's agents. Human contributors may leave the spec to the
+maintainer, so an agent reviewing a contributor's pull request does not ask for
+spec changes.
 
 ## Layout
 
@@ -20,6 +21,9 @@ request does not ask for spec changes.
 - `scripts/` helper scripts without `.py` suffix, Python unless a shell
   one-liner is clearer. The package `scripts/devlib/` is what they share, each
   script a command line over it (`scripts/docs-site` imports none of it).
+- `tools/markdownlint/` the npm folder of markdownlint-cli2, a tool of the
+  repo that bwtidy does not ship, and its custom rules in `rules/` (Writing
+  docs).
 - `docs/` the user docs, from `docs/index.md` into four folders:
   `tutorial/`, `how-to/`, `reference/` and `explanation/`. Beside them
   `docs/spec.md` (the rules and reasons the user docs do not state),
@@ -29,35 +33,47 @@ request does not ask for spec changes.
 - `dev/` the developer guide and the dev vault's fixture: `dev/README.md` (set
   up, the commands, the credentials), `dev/dev-vault.md` (the dev stacks, the
   snapshot, the fixture), `dev/testing.md` (the suites and how to write a
-  test), `dev/release.md` (the docs site and the image) and `dev/demo.md`
+  test), `dev/release.md` (merging pull requests, the version and how to
+  write its release notes, releasing with `scripts/release` and the workflow
+  `release.yml`, the docs site and the image) and `dev/demo.md`
   (the design of the public demo).
 - How it is built: [docs/architecture.md](docs/architecture.md). Read it before
   changing structure.
 
 ## Checks
 
-`scripts/ci` runs everything fast: ruff lint, ruff format check, ty,
-import-linter (`uv run --locked lint-imports`, the backend's layers), pytest, oxlint,
-dependency-cruiser (`npm run lint:deps`), knip (`npm run lint:exports`),
-tsc + vite build, vitest. It must pass before every commit.
-`.github/workflows/ci.yml` runs it on GitHub for every push to main and every
-pull request.
-`scripts/ci --fix` lets ruff fix what it can. `scripts/ci --quick` leaves out
-pytest and vitest.
+`scripts/ci` runs everything fast: markdownlint, ruff lint, ruff format check,
+ty, import-linter (`uv run --locked lint-imports`, the backend's layers),
+pytest, oxlint, dependency-cruiser (`npm run lint:deps`), knip
+(`npm run lint:exports`), tsc + vite build, vitest. It must pass before every
+commit. `.github/workflows/ci.yml` runs it on GitHub for every push to main and
+every pull request. `scripts/ci --fix` lets markdownlint and ruff fix what they
+can. `scripts/ci --quick` leaves out pytest and vitest.
 
 Dependencies change only through the lock files: `uv add` or `uv lock` in
-`backend/` or `demo/` (the demo's own project), `npm install` in `frontend/` or
-`docker/bitwarden-cli/` (the image's Bitwarden CLI), as a dev step whose changed lock file goes into the
-commit. Every build and test installs from them locked (`uv sync --locked`,
-`uv run --locked`, `npm ci`) and fails on a lock file that is out of date
-instead of updating it, so a commit builds and tests the same anywhere. The
-Dockerfile pins its images by tag and digest, the workflows their actions by
-commit SHA (the tag in a comment above), and Dependabot proposes updates.
-A dependency is declared with a compatible range, npm's caret: `^X.Y.Z` in a
-`package.json`, a lower bound and `<X+1` in `backend/pyproject.toml` or `demo/pyproject.toml`
-(`<0.(Y+1)` for 0.Y.Z), X.Y.Z being the version the lock holds, or an exact
-pin. `scripts/update-deps` updates everything within those ranges and lists
-what lies beyond them for a person to decide.
+`backend/` or `demo/` (the demo's own project), `npm install` in `frontend/`,
+`docker/bitwarden-cli/` (the image's Bitwarden CLI) or `tools/markdownlint/`
+(markdownlint-cli2, which lints the Markdown files), as a dev step whose changed
+lock file goes into the commit. Every build and test installs from them locked
+(`uv sync --locked`, `uv run --locked`, `npm ci`) and fails on a lock file that
+is out of date instead of updating it, so a commit builds and tests the same
+anywhere. The Dockerfile pins its images by tag and digest, the workflows their
+actions by commit SHA (the tag in a comment above), and Dependabot proposes
+updates. A dependency is declared with a compatible range, npm's caret: `^X.Y.Z`
+in a `package.json`, a lower bound and `<X+1` in `backend/pyproject.toml` or
+`demo/pyproject.toml` (`<0.(Y+1)` for 0.Y.Z), X.Y.Z being the version the lock
+holds, or an exact pin. `scripts/update-deps` updates everything within those
+ranges and lists what lies beyond them for a person to decide.
+
+The image builds the Bitwarden CLI from Bitwarden's source, the commit that
+`docker/bitwarden-cli/source.json` pins (the Dockerfile's stage
+`bitwarden-cli-source`), and takes the packages it brings along from
+`docker/bitwarden-cli/package-lock.json`. To bump the CLI, set the version of
+`@bitwarden/cli` in `docker/bitwarden-cli/package.json`, run `npm install` there
+and then `scripts/update-deps --cli-pin`, which sets the tag `cli-vVERSION` and
+its commit in `source.json` and the version in the docs that state it.
+Dependabot's pull request for the CLI gets that commit from the workflow
+`dependabot-cli-pin.yml` (dev/release.md).
 
 `scripts/e2e` runs the browser tests in `backend/tests/e2e` against a fresh
 dev vault (see dev/testing.md). A change to what the UI does comes with an e2e
@@ -92,11 +108,13 @@ A change to an MCP tool (its name, annotations, parameters or description)
 reruns `scripts/mcp-reference` and commits the `docs/reference/mcp-tools.md`
 it writes in the same commit. `scripts/ci` fails while the file is stale.
 
-Run one backend test file: `cd backend && uv run --locked pytest tests/unit/writes/test_path.py` (the tests of the
-scripts are under `tests/scripts`, the checks on the repo under `tests/repo`).
-Run one frontend test file: `cd frontend && npx vitest run src/x.test.tsx`.
-Run one integration test file: `scripts/integration tests/integration/test_x.py`,
-one e2e test file: `scripts/e2e tests/e2e/test_x.py`, one test of either with `-k NAME`.
+Run one backend test file:
+`cd backend && uv run --locked pytest tests/unit/writes/test_path.py` (the tests
+of the scripts are under `tests/scripts`, the checks on the repo under
+`tests/repo`). Run one frontend test file:
+`cd frontend && npx vitest run src/x.test.tsx`. Run one integration test file:
+`scripts/integration tests/integration/test_x.py`, one e2e test file:
+`scripts/e2e tests/e2e/test_x.py`, one test of either with `-k NAME`.
 
 While you change code, run only the test that fails (a file path, -k NAME,
 -x, or --lf for the last failures). Run the whole suite once at the end, not
@@ -109,12 +127,29 @@ one stack) and take about 20 minutes (e2e) and 15 minutes (integration).
 ## Writing docs
 
 Each page of the user docs (in the four folders, and `docs/restore.md`) is
-one of the four kinds of https://diataxis.fr: a tutorial, a how-to, a
+one of the four kinds of <https://diataxis.fr>: a tutorial, a how-to, a
 reference or an explanation. Keep pages succinct. A fact lives on one page
 and others link to it.
 
+markdownlint checks every Markdown file of the repo against the settings in
+`.markdownlint-cli2.jsonc` (`scripts/ci`), and `scripts/ci --fix` fixes what
+it can. Text is wrapped by hand at 80 characters outside code blocks, tables
+and headings, as markdownlint wraps nothing. The VS Code extension markdownlint
+(`DavidAnson.vscode-markdownlint`) reads the same file and shows the same
+findings in the editor, the custom rule only in a trusted workspace.
+
+The custom rule BWT001 (wrapped-line-list-marker) reports a wrapped line in
+the first paragraph of a list item when the line starts with a number and a
+period (or `-`, `*` or `+`) and a space. The docs site starts a new item there
+and drops the marker while GitHub keeps the line in the text. Move the line
+break so the marker ends the line before.
+
 Write without semicolons. A colon only introduces a list block. A sentence has
 at most one comma and a paragraph at most two.
+
+The text refers to a numbered mark in a screenshot with its circled digit
+after a no-break space (U+00A0), as in Search ①, and `scripts/docs-lint`
+checks the space.
 
 A sequence is prose, not a numbered list, because a page already runs from top
 to bottom. Numbers stay only in a tutorial or a how-to, where the reader keeps
@@ -123,29 +158,49 @@ their place while clicking through the app.
 A complicated section gets a diagram when a picture makes it easier to follow,
 of the type that fits the content best.
 
-Be helpful and professional, with a relaxed tone that speaks to the reader as "you". The docs describe what happens, in the present
-or future tense, never what happened in one run. A bullet list is for parallel
-items that can be read in any order, while sentences that follow from each
-other are paragraphs, so new text follows both. UI that is used often gets a screenshot from
-the docs suite. A prerequisite, a tip or a warning that matters may go in a
-box, written as GitHub's alert (`> [!NOTE]`, `> [!TIP]` or `> [!WARNING]`),
-and a directory layout is drawn as a tree in a `text` code block. No content
-tabs and no `!!!` admonitions: GitHub shows these pages too, and every backup
-holds `docs/restore.md` as plain text, where that syntax turns into code
-blocks. Cards (`<div class="grid cards" markdown>`) are for a landing page.
-A diagram is a fenced code block whose language is a Kroki diagram type
-(`mermaid`, `plantuml`, `d2`, `graphviz` or any other type https://kroki.io/
-lists) with `alt="WHAT IT SHOWS"` after the type, as in
+Be helpful and professional, with a relaxed tone that speaks to the reader as
+"you". The docs describe what happens, in the present or future tense, never
+what happened in one run. A bullet list is for parallel items that can be read
+in any order, while sentences that follow from each other are paragraphs, so new
+text follows both. UI that is used often gets a screenshot from the docs suite.
+A prerequisite, a tip or a warning that matters may go in a box, written as
+GitHub's alert (`> [!NOTE]`, `> [!TIP]` or `> [!WARNING]`), and a directory
+layout is drawn as a tree in a `text` code block. No content tabs and no `!!!`
+admonitions: GitHub shows these pages too, and every backup holds
+`docs/restore.md` as plain text, where that syntax turns into code blocks.
+The one exception is a shell command for both Bash and Windows PowerShell,
+written as a pair in plain Markdown. It is a paragraph that is exactly
+`Linux, macOS, WSL (Bash):` directly followed by a ```` ```sh ```` block, then
+a paragraph that is exactly `Windows (PowerShell):` directly followed by a
+```` ```powershell ```` block, with only a blank line between each label and
+its block. The labels are plain paragraphs, not bold, as markdownlint's MD036
+takes a bold line for a heading. `scripts/docs-site build` turns each pair into
+two linked tabs in its copy of the docs only, and fails on a label without its
+block or on half a pair (dev/release.md, "The documentation site"). Cards
+(`<div class="grid cards" markdown>`) are for a landing page. A diagram is a
+fenced code block whose language is a Kroki diagram type (`mermaid`, `plantuml`,
+`d2`, `graphviz` or any other type <https://kroki.io/> lists) with
+`alt="WHAT IT SHOWS"` after the type, as in
 ```` ```mermaid alt="The gateway starts one worker per account" ````. An
 editor's Kroki preview (such as a Kroki extension of VS Code) shows it while
 you write, and the docs build turns it into a picture (dev/release.md,
 "Diagrams"). `scripts/docs-lint` reports a diagram without alt text.
-Examples use placeholder hosts such as https://bwtidy.example.
+Examples use placeholder hosts such as <https://bwtidy.example>.
 `README.md` and `docs/index.md` share three texts, each the same in both:
 the introduction (between the comments `<!-- intro: ... -->` and
 `<!-- end of intro -->`), the beta caution (the warning box "Made
 with AI" under the heading Beta software) and the list under "At a glance". A
 change to one changes the other.
+`docker/hub-overview.md` is the image's overview on Docker Hub
+(dev/release.md, "The Docker Hub overview"). It shares three texts with
+`README.md`: the introduction, the beta caution and the paragraph that starts
+"bwtidy is an independent project". Its caution is a plain quote without the
+`> [!WARNING]` line, as Docker Hub shows an alert's text without formatting.
+Every link in it is absolute (`https://`). It describes the tags, the port,
+the volumes and the settings of the image. A change to one of them updates it
+too. `backend/tests/repo/test_docker_hub_overview.py` checks the shared texts,
+the links and the size. It also checks that every variable the overview names
+is in the configuration reference.
 The banner on every page of the site (`overrides/main.html`) links to the one
 in `docs/index.md`.
 A new page gets its line in the nav of `zensical.toml`, and a page links only
@@ -153,6 +208,8 @@ to pages and images under `docs/` (it names another repo file as code), or
 the site's strict build in `scripts/ci` fails (`scripts/docs-site`).
 
 ## Rules
+
+<!-- markdownlint-disable MD038 -->
 
 - Never touch a real vault. Never use the host's Bitwarden CLI state
   (`~/.config/Bitwarden CLI`), never run `bw` on the host against
@@ -172,7 +229,7 @@ the site's strict build in `scripts/ci` fails (`scripts/docs-site`).
   why, instead of moving modules, loosening a contract or adding an exception.
   A change to the architecture updates the document and the contract in the
   same commit.
-- Treat the GitHub repo (https://github.com/tnek213/bwtidy) as public. Every
+- Treat the GitHub repo (<https://github.com/tnek213/bwtidy>) as public. Every
   link to the source, the license or another repo file points into this repo,
   never elsewhere (gnu.org, fsf.org, a copy of the text).
 - Stored data (the SQLite schema in `db.py`, the tool note's sections, the
@@ -181,6 +238,12 @@ the site's strict build in `scripts/ci` fails (`scripts/docs-site`).
 - Name no person in the repo apart from the copyright lines (README.md's
   License section, the About page, the authors in `backend/pyproject.toml`).
   A rule carries its reason, never its date, its history or who made it.
-  Examples use placeholder hosts such as https://bwtidy.example.
+  Examples use placeholder hosts such as <https://bwtidy.example>.
 - Commit messages follow the style in CONTRIBUTING.md (Commits). An agent
   writes the subject only, never a body, and keeps it at most 72 characters.
+- A pull request with a user-visible change adds its bullet under Unreleased
+  in `docs/releases.md`, as dev/release.md (The release notes) says. The
+  check of `ci.yml` fails without it (`scripts/release check-pr`), unless the
+  pull request has the label `no release note`.
+
+<!-- markdownlint-enable MD038 -->

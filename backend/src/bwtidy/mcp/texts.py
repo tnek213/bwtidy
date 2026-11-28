@@ -41,20 +41,21 @@ def bullets(*entries: str) -> str:
 
 READ_NOTE = "Secret values are never available, only the names of the secret columns that are set."
 SECRET_FORMAT_NOTE = (
-    "A secret column never shows a format: with a datatype it counts as set or not set only, and"
+    "A secret column never shows a format. With a datatype it counts only as set or not set, and"
     " it has no entry in `formats`."
 )
 PROPOSE_NOTE = (
-    "This only proposes the change: it adds one entry to bwtidy's review queue and changes"
-    " nothing in the vault. The user approves or rejects it in the bwtidy web UI. Answers the"
-    " entry id and its summary, list_proposals shows what became of it. Secret values are"
-    " never available. The user sees every proposal, and a proposal that would put a secret value"
-    " into a non-secret column never reaches the vault."
+    "This only proposes the change. It adds one entry to bwtidy's review queue and changes"
+    " nothing in the vault. The user approves or rejects it in the bwtidy web UI. The answer is"
+    " the entry's `entryId` and `summary`, and list_proposals shows what became of the entry."
+    " Secret values are never available. The user sees every proposal, and a proposal that would"
+    " put a secret value into a non-secret column never reaches the vault."
 )
 END_NOTE = (
-    "The answer comes first, the session ends right after it: the unsaved edits of the web UI"
-    " are written, the vault is locked and every tool answers that MCP is disabled until the user"
-    " logs in again in the bwtidy web UI and turns MCP on."
+    "The answer comes first, the session ends right after it. The unsaved edits of the web UI are"
+    " written and the vault is locked. Until the user logs in again in the bwtidy web UI and turns"
+    " MCP on, every tool call fails with the answer that MCP is disabled or that bwtidy is locked"
+    " for this account."
 )
 
 ## the columns an item shows outside "values", because every filter and proposal names them
@@ -69,72 +70,78 @@ MATCH_NOTE = paragraphs(
         "`host`: the host and port.",
         "`startsWith`: the start of the URL.",
         "`exact`: the whole URL.",
-        "`regex`: a regular expression, which Bitwarden evaluates as JavaScript. bwtidy refuses"
-        " only one Python cannot compile either.",
+        "`regex`: a regular expression, which Bitwarden evaluates as JavaScript. bwtidy checks"
+        " it with Python and refuses only one that Python cannot compile.",
         "`never`.",
         "null is the client's default, a setting of the user's browser extension that is not in"
         " the vault.",
     ),
-    "Only URIs and match settings change: no secret value is read or written.",
+    "Only URIs and match settings change. No secret value is read or written.",
 )
 
 LIST_ITEMS = paragraphs(
-    "List the items of the vault: all of them, or those matching every filter given.",
+    "List the items of the vault that are not archived, all of them or only those that match"
+    " every filter given.",
     "Each item has:",
     bullets(
         f"`id`, {', '.join(f'`{column}`' for column in TOP_COLUMNS[:-1])} and `{TOP_COLUMNS[-1]}`.",
-        "The other non-secret values by column (`notes`, `login.uris`, `login.username`,"
-        " `fields.<name>`, ...).",
-        "`login.uris` as a list of `{uri, match}`: match a word, null for the client's default"
-        " (see propose_set_uris).",
-        "`attachments`: the id, fileName and size in bytes of each attachment. The size is the one"
-        " Bitwarden lists, which is the encrypted size. Never the file's contents or url.",
+        "`values`: the other non-secret values by column (`notes`, `login.uris`,"
+        " `login.username`, `fields.<name>`, ...). Its `login.uris` is a list of `{uri, match}`,"
+        " where `match` is a word or null for the client's default (see propose_set_uris).",
+        "`attachments`: the id, fileName and size in bytes of each attachment. The size is the"
+        " encrypted size that Bitwarden lists. The file's contents and url are never shown.",
         "`secretColumns`: the secret columns that hold a value.",
-        "`template`: the matching template and the fill score per template.",
+        "`template`: `match`, the name of the template the item matches or null, and `scores`,"
+        " one fill score per template.",
     ),
-    "The fill score counts the item type and every coordinate's datatype as one more thing to"
-    " match each:",
+    "A fill score counts the item type as one more thing to match, and each coordinate's"
+    " datatype as one more too:",
     bullets(
-        "`total`: the template's required coordinates (the ones not optional), plus 1, plus the"
-        " coordinates with a datatype (an optional one only when it has a value).",
+        "`total`: the template's required coordinates (the ones not optional), plus 1 for the"
+        " type, plus the coordinates with a datatype. An optional coordinate with a datatype"
+        " counts only when it has a value.",
         "`filled`: the required coordinates with a value, plus 1 when `typeMatches`, plus a term"
-        " from 0 to 1 per datatype counted in total.",
+        " from 0 to 1 for each datatype counted in `total`.",
         "`score`: filled/total. A full match has filled == total, so a value off its format makes"
         " a near miss.",
+        "`missing`: the required coordinates without a value.",
     ),
-    "A datatype's term is how well the value matches format, never whether it is right, and it"
-    " is 0 without a value. A score with such terms has `formats`, one entry per non-secret"
-    " column with a datatype:",
+    "A datatype's term says how well the value matches format, never whether the value is"
+    " right. It is 0 without a value. A score with such terms has `formats`, one entry per"
+    " non-secret column with a datatype:",
     bullets(
         "`column`.",
         "`datatype`: its name.",
         "`score`: 1 is a full match.",
-        "`distance`: the least inserted, deleted or substituted characters that make the value"
-        " match format.",
+        "`distance`: the fewest characters to insert, delete or substitute so that the value"
+        " matches format.",
         "`firstEdit`: the position in the value of the first of those edits.",
         "`expected`: what the format wants there.",
-        "`tooLong`: too long to check, it scores 0.",
+        "`tooLong`: the value is too long to check, so it scores 0.",
     ),
     SECRET_FORMAT_NOTE,
     READ_NOTE,
 )
 
-GET_ITEM = paragraphs("One item by id, shaped like an item of list_items.", READ_NOTE)
+GET_ITEM = paragraphs(
+    "Get one item by its id. It has the same shape as an item of list_items.", READ_NOTE
+)
 
 LIST_FOLDERS = paragraphs(
-    "The folders with the number of items in each (`items`) and of items in the trash still"
-    " in it (`itemsInTrash`).",
+    "List the folders. Each has its `name`, the number of items in it (`items`) and the number"
+    " of items in the trash that are still in it (`itemsInTrash`). `itemsWithoutFolder` counts"
+    " the items outside the trash that are in no folder.",
     READ_NOTE,
 )
 
 LIST_COLLECTIONS = paragraphs(
-    "The organizations and their collections with the number of items in each. An"
-    " organization item needs at least one collection.",
+    "List the organizations and their collections, with the number of items in each collection."
+    " An organization item needs at least one collection.",
     READ_NOTE,
 )
 
 LIST_TEMPLATES = paragraphs(
-    "The templates. Each has:",
+    "List the templates. Each has:",
     bullets(
         "`name`.",
         "`description`, when the user wrote one.",
@@ -143,49 +150,50 @@ LIST_TEMPLATES = paragraphs(
         " 2 boolean). A coordinate with a datatype names it (see list_datatypes). An optional"
         ' one has `"optional": true`.',
     ),
-    "An item matches a template when it has the template's type, a value for every coordinate"
-    " that is not optional and each value with a datatype matches format.",
-    "An optional coordinate is not needed for a match and is never in `missing`, but a value it"
-    " has must still match its datatype.",
-    "A coordinate of kind fieldPattern stands for the custom fields whose name fits its pattern"
-    " that no other coordinate names. In the pattern `*` matches any characters, case and"
-    " surrounding spaces are ignored. It counts once however many fit, and scores its datatype"
-    " by the lowest of them.",
+    "An item matches a template when it has the template's type and a value for every"
+    " coordinate that is not optional, and when each value with a datatype matches format.",
+    "An optional coordinate is not needed for a match and is never in `missing`. A value it has"
+    " must still match its datatype.",
+    "A coordinate of kind fieldPattern stands for every custom field whose name fits its pattern"
+    " and that no other coordinate names. In the pattern `*` matches any characters. Case and"
+    " surrounding spaces are ignored. The coordinate counts once however many fields fit, and its"
+    " datatype term is the lowest of theirs.",
     SECRET_FORMAT_NOTE,
     READ_NOTE,
 )
 
 LIST_DATATYPES = paragraphs(
-    "The datatypes: named formats the user defines once and template coordinates use. Each has:",
+    "List the datatypes, the named formats the user defines once and template coordinates use."
+    " Each has:",
     bullets(
         "`name`, `pattern`, `description` and `ignoreCase`.",
         "`examples`: values that match format.",
-        "`counterExamples`: values that do not.",
+        "`counterExamples`: values that do not match format.",
         "`usedBy`: the template coordinates that use it, each with `template` and `column`.",
     ),
-    "The pattern must match the whole value, unless the datatype has `wholeValue` false: then it"
-    " may match any part of the value (a `^` first or a `$` last still anchors that side).",
-    "Not listed: a broken datatype, which counts as none, and a datatype that only secret"
-    " columns use, or none.",
+    "The pattern must match the whole value. A datatype with `wholeValue` false may match any"
+    " part of the value instead, and there a `^` first or a `$` last still anchors that side.",
+    "A broken datatype counts as no datatype and is not listed. Nor is a datatype that no"
+    " non-secret template coordinate uses.",
     "A datatype says how well a value matches format, never that a value is right. The fill"
     " scores of list_items and get_item show the results.",
     SECRET_FORMAT_NOTE,
-    "The user alone makes datatypes and corrects values, no tool proposes either.",
+    "Only the user makes datatypes and corrects values, and no tool proposes either.",
     READ_NOTE,
 )
 
 LIST_NEAR_DUPLICATES = paragraphs(
-    "Groups of custom field columns whose names are equal after case folding and trimming"
-    " whitespace, candidates for propose_merge_columns or propose_rename_field.",
+    "List groups of custom field columns whose names are equal after case folding and trimming"
+    " whitespace. Each group is a candidate for propose_merge_columns or propose_rename_field.",
     READ_NOTE,
 )
 
 LIST_PROPOSALS = paragraphs(
-    "Your own proposals, newest first, at most 100. Only proposals made through MCP are listed,"
-    " never the web UI's edits. Each has:",
+    "List the proposals made through MCP, newest first and at most 100. The web UI's edits are"
+    " never listed. Each proposal has:",
     bullets(
-        "`id`: the entryId its propose call answered.",
-        "`summary`: the one it answered.",
+        "`id`: the `entryId` its propose call answered.",
+        "`summary`: the `summary` its propose call answered.",
         "`status`.",
         "`createdAt`.",
         "`decidedAt`: when it left pending, null while pending.",
@@ -195,13 +203,13 @@ LIST_PROPOSALS = paragraphs(
     bullets(
         "`pending`: waiting for the user.",
         "`approved`: being written.",
-        "`rejected`: the user said no, do not propose it again.",
+        "`rejected`: the user said no. Do not propose it again.",
         "`applied`: written to the vault.",
         "`failed`.",
     ),
-    "`reason` is null except for a failed entry, then one word:",
+    "`reason` is null except for a failed entry, which has one of these fixed reasons:",
     bullets(
-        "`conflict`: an item changed since the proposal, list it again and propose again.",
+        "`conflict`: an item changed since the proposal. List it again and propose again.",
         "`merge conflict`.",
         "`write failed`.",
         "`interrupted`.",
@@ -212,41 +220,41 @@ LIST_PROPOSALS = paragraphs(
 )
 
 PROPOSE_MOVE_TO_FOLDER = paragraphs(
-    "Propose moving items into a folder. A missing folder is created, an empty name takes"
-    " the items out of their folder.",
+    "Propose moving items into a folder. A folder that does not exist yet is created with the"
+    " move. An empty name takes the items out of their folder.",
     PROPOSE_NOTE,
 )
 
 PROPOSE_RENAME_FOLDER = paragraphs(
-    "Propose a new name for a folder. Its items stay in it. Refused when the name is empty or"
-    " another folder has it, ignoring case.",
+    "Propose a new name for a folder. Its items stay in it. It is refused when the name is empty"
+    " or when another folder has it, ignoring case.",
     PROPOSE_NOTE,
 )
 
 PROPOSE_DELETE_FOLDER = paragraphs(
-    "Propose deleting an empty folder. A folder that holds an item, also one in the trash,"
-    " is refused: move its items out first (propose_move_to_folder). list_folders counts"
-    " the items of each folder.",
+    "Propose deleting an empty folder. A folder that holds an item is refused, and so is one"
+    " whose only items are in the trash. Move its items out first (propose_move_to_folder)."
+    " list_folders counts the items of each folder, in the trash too.",
     PROPOSE_NOTE,
 )
 
 PROPOSE_SET_COLLECTIONS = paragraphs(
-    "Propose the collections of an organization item, replacing the ones it has. Personal"
-    " items go through propose_move_to_organization.",
+    "Propose the collections of an organization item, replacing the ones it has. A personal item"
+    " goes through propose_move_to_organization instead.",
     PROPOSE_NOTE,
 )
 
 PROPOSE_MOVE_TO_ORGANIZATION = paragraphs(
-    "Propose moving a personal item into an organization, in the given collections."
-    " Organization items go through propose_move_to_personal.",
+    "Propose moving a personal item into an organization, in the given collections. An"
+    " organization item goes through propose_move_to_personal instead.",
     PROPOSE_NOTE,
 )
 
 PROPOSE_MOVE_TO_PERSONAL = paragraphs(
     "Propose moving an organization item into the personal vault.",
-    "The item is created anew in the personal vault with its attachments and the old one"
-    " trashed, so its passkeys and password history are lost and everyone who shares its"
-    " collections loses it.",
+    "The item is created anew in the personal vault with its attachments, and the old one goes"
+    " to the trash. Its passkeys and password history are lost, and everyone who shares its"
+    " collections loses the item.",
     PROPOSE_NOTE,
 )
 
@@ -254,20 +262,20 @@ PROPOSE_RENAME_ITEM = paragraphs("Propose a new name for an item.", PROPOSE_NOTE
 
 PROPOSE_SET_URIS = paragraphs(
     "Propose the whole URI list of a login, each URI with its match setting, in the order given.",
-    "It replaces the URIs the login has (get_item lists them), so give every URI to keep. A URI"
-    " that is empty, or a regex that does not compile, is refused at once and nothing is"
-    " queued.",
+    "The list replaces the URIs the login has (get_item lists them), so give every URI to keep."
+    " An empty URI or a regex that does not compile is refused at once, and nothing is queued.",
     MATCH_NOTE,
     PROPOSE_NOTE,
 )
 
 PROPOSE_SET_URI_MATCH = paragraphs(
-    "Propose one match setting for the URIs of logins: in each item, every URI that"
-    " `uri_pattern` matches gets the match, the others keep theirs.",
+    "Propose one match setting for the URIs of logins. In each item every URI that"
+    " `uri_pattern` matches gets the match, and the other URIs keep theirs.",
     bullets(
         "`uri_pattern` is a shell glob over the whole URI, ignoring case (`*example.com*` for"
-        " every URI holding example.com), every URI when left out.",
-        "Items with no URI it changes are left out, and none left is an error.",
+        " every URI holding example.com). Without it every URI matches.",
+        "An item whose URIs would all keep their match is left out. When no item is left, the"
+        " call is an error and nothing is queued.",
         "One queue entry holds every item.",
     ),
     MATCH_NOTE,
@@ -275,20 +283,20 @@ PROPOSE_SET_URI_MATCH = paragraphs(
 )
 
 PROPOSE_RENAME_FIELD = paragraphs(
-    "Propose renaming a custom field in every item that has it, or in the items given. Type"
-    " and position stay.",
+    "Propose renaming a custom field in every item that has it, or only in the items given. The"
+    " field keeps its type and position.",
     "An item that already has a field with the new name needs propose_merge_columns instead.",
     PROPOSE_NOTE,
 )
 
 PROPOSE_MERGE_COLUMNS = paragraphs(
-    "Propose merging columns into one target column, in every item that has one of the"
-    " source columns or in the items given.",
+    "Propose merging columns into one target column, in every item that has one of the source"
+    " columns or only in the items given.",
     bullets(
         "Values not kept are removed.",
-        "An item with values in more than one merged column needs a resolution naming the"
-        " column to keep, the answer lists those items.",
-        "A target built-in slot must exist in the item's type, a type change goes through"
+        "An item with values in more than one merged column needs a resolution that names the"
+        " column to keep. Without one the call is an error that lists those items.",
+        "A built-in target slot must exist in the item's type. A type change goes through"
         " propose_apply_template.",
     ),
     PROPOSE_NOTE,
@@ -308,17 +316,17 @@ PROPOSE_APPLY_TEMPLATE = paragraphs(
 )
 
 PROPOSE_CONVERT_ITEM = paragraphs(
-    "Propose converting an item to another type: a new item is created with the new type"
-    " and the old one goes to the trash, both after the user approves.",
+    "Propose converting an item to another type. A new item is created with the new type and"
+    " the old one goes to the trash, both after the user approves.",
     "The mapping is `{target column: the item's column}`:",
     bullets(
-        "Mapped columns move: a mapped custom field is dropped from the old place, mapped notes"
-        " are cleared.",
+        "Mapped columns move. A mapped custom field is dropped from its old place, and mapped"
+        " notes are cleared.",
         "Unmapped built-in values of the old type become custom fields.",
         "Attachments are copied.",
     ),
-    "No value passes through MCP: the values move inside the vault. A secret column may not be"
-    " mapped into a non-secret one.",
+    "No value passes through MCP, since the values move inside the vault. A secret column may"
+    " not be mapped into a non-secret one.",
     "An SSH key needs its private key mapped from a column of the item, for example"
     ' `{"sshKey.privateKey": "notes"}` for a secure note that holds the key. Its public key and'
     " fingerprint are filled in from it when they are empty.",
@@ -326,21 +334,20 @@ PROPOSE_CONVERT_ITEM = paragraphs(
 )
 
 PROPOSE_MERGE_ITEMS = paragraphs(
-    "Propose merging one item into another: the mapped columns of the source item move into"
-    " the target item (`{target column: source column}`), then the source item goes to the"
-    " trash.",
+    "Propose merging one item into another. The mapped columns of the source item move into the"
+    " target item (`{target column: source column}`), then the source item goes to the trash.",
     "A new field gets the type of its source, so a hidden value stays hidden.",
     PROPOSE_NOTE,
 )
 
 PROPOSE_RENAME_ATTACHMENT = paragraphs(
-    "Propose a new file name for an attachment of an item, its id as list_items and get_item"
-    " show it.",
-    "When the user approves, bwtidy renames it itself: it uploads the file again under the new"
+    "Propose a new file name for an attachment of an item. Name the attachment by the id that"
+    " list_items and get_item show.",
+    "When the user approves, bwtidy renames it itself. It uploads the file again under the new"
     " name and deletes the old one, so the attachment gets a new id. The contents never pass"
-    " through MCP, no tool reads or answers them.",
-    "Refused when the name is empty, holds a slash or a backslash, is the name it has now, or is"
-    " the name of another attachment of the item (ignoring case).",
+    " through MCP, and no tool reads or answers them.",
+    "The name is refused when it is empty, holds a slash or a backslash, is the name the"
+    " attachment has now or is the name of another attachment of the item (ignoring case).",
     PROPOSE_NOTE,
 )
 
@@ -349,35 +356,36 @@ PROPOSE_TRASH_ITEM = paragraphs(
 )
 
 PROPOSE_CREATE_ITEM = paragraphs(
-    "Propose a new item, from a raw type or from a template (give exactly one).",
+    "Propose a new item from a raw type or from a template. Give exactly one of the two.",
     bullets(
         "A template brings its type and its custom fields, created empty with their field types.",
-        "`values` sets non-secret columns by name, like list_items names them"
-        " (`login.username`, `login.uris`, `notes`, `fields.<name>`, ...). A custom field the"
-        " template does not name becomes a text field.",
+        "`values` sets non-secret columns by name, as list_items names them (`login.username`,"
+        " `login.uris`, `notes`, `fields.<name>`, ...). A custom field that the template does"
+        " not name becomes a text field.",
     ),
-    "Secret values are never taken, a value for a secret column is refused. A secret field"
+    "Secret values are never taken, and a value for a secret column is refused. A secret field"
     " (password, TOTP, card number or code, private key, hidden field) is either left blank or"
     " generated:",
     bullets(
-        "Left blank: fields left blank start empty, so the item shows as near its template, and"
-        " the user fills them in the bwtidy web UI, where they show up in the To fill in list.",
-        "Generated: a `login.password` or a hidden field can instead get a value generated by bw"
-        " when the item is written (`generate_secrets`, or `generate_password` for a login's"
-        " password), which nobody sees until the user reveals it in the web UI and nobody can"
-        " read through MCP. It follows the default generator settings the user keeps on the"
-        " Settings page.",
+        "Left blank: the field starts empty and the user fills it in the bwtidy web UI, where it"
+        " shows up in the To fill in list. When the template requires the field, the item shows as"
+        " near its template.",
+        "Generated: a `login.password` or a hidden field can instead get a value that bw"
+        " generates when the item is written (`generate_secrets`, or `generate_password` for a"
+        " login's password). Nobody sees it until the user reveals it in the web UI, and nobody"
+        " can read it through MCP. It follows the default generator settings the user keeps on"
+        " the Settings page.",
     ),
-    "An SSH key is refused, its private key cannot come through MCP: propose_convert_item from"
-    " an item that holds the key is the way.",
+    "An SSH key is refused because its private key cannot come through MCP. Use"
+    " propose_convert_item on an item that holds the key instead.",
     PROPOSE_NOTE,
 )
 
 END_SESSION = paragraphs("End the bwtidy session, like Log out in the web UI.", END_NOTE)
 
 LOG_OUT_OF_BITWARDEN = paragraphs(
-    "End the bwtidy session and log bwtidy's Bitwarden CLI out, like Log out with Also log"
-    " out of Bitwarden in the web UI. The next login in the web UI runs the Bitwarden login"
-    " again, and bitwarden.com may email a one-time code.",
+    "End the bwtidy session and log bwtidy's Bitwarden CLI out, like Log out with Also log out"
+    " of Bitwarden in the web UI. The next login in the web UI runs the Bitwarden login again,"
+    " and bitwarden.com may email a one-time code.",
     END_NOTE,
 )

@@ -36,6 +36,11 @@ function isTyping(key: KeyboardEvent): boolean {
   return key.key.length === 1 && !key.ctrlKey && !key.metaKey && !key.altKey
 }
 
+// The keys that open a menu, the cell menu on a cell and the header menu on a header.
+export function isMenuKey(key: KeyboardEvent): boolean {
+  return key.key === 'ContextMenu' || (key.key === 'F10' && key.shiftKey)
+}
+
 // What a double click, a key, a right click or an inline edit on a grid cell does: start AG Grid's
 // inline editor, open a cell dialog or the cell menu, or queue the edit. startEdit is also the cell
 // menu's Edit value.
@@ -88,12 +93,12 @@ export function useCellEvents(
     // The template and Rare fields columns are GridPage's own, not coordinates, so cellOf does not know them.
     const columnId = event.column.getColId()
     if ((columnId === TEMPLATE_COLUMN || columnId === RARE_FIELDS_COLUMN) && event.data) {
-      showMenu({ row: event.data, column: null, rowIndex, position })
+      showMenu({ row: event.data, column: null, columnId, rowIndex, position })
       return
     }
     const cell = cellOf(event)
     if (cell) {
-      showMenu({ ...cell, rowIndex, position })
+      showMenu({ ...cell, columnId, rowIndex, position })
     }
   }
 
@@ -109,7 +114,7 @@ export function useCellEvents(
     if (!('column' in event) || !(key instanceof KeyboardEvent) || event.api.getEditingCells().length > 0) {
       return
     }
-    if (key.key === 'ContextMenu' || (key.key === 'F10' && key.shiftKey)) {
+    if (isMenuKey(key)) {
       key.preventDefault()
       const rect = (key.target as HTMLElement).getBoundingClientRect()
       openMenu(event, { top: rect.bottom, left: rect.left })

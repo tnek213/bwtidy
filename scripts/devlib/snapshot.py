@@ -41,6 +41,7 @@ def snapshot_inputs(root: Path) -> list[Path]:
         root / "docker" / "unref-share-timers.js",
         root / "docker" / "bitwarden-cli" / "package.json",
         root / "docker" / "bitwarden-cli" / "package-lock.json",
+        root / "docker" / "bitwarden-cli" / "source.json",
     ]
     fixtures = sorted((root / "dev").glob("fixture-*.json"))
     attachments = sorted(p for p in (root / "dev" / "attachments").glob("*") if p.is_file())

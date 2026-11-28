@@ -110,7 +110,11 @@ class BackupKeeper:
     def vault_fingerprint(self) -> str:
         """The fingerprint of the vault as the cache holds it."""
         return fingerprint(
-            self.cache.items, self.cache.folders, self.cache.collections, self.cache.organizations
+            self.cache.items,
+            self.cache.folders,
+            self.cache.collections,
+            self.cache.organizations,
+            archived=self.cache.archived,
         )
 
     def newest_backup(self) -> BackupInfo | None:

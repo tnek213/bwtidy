@@ -2,20 +2,24 @@
 """ci: lint, format check, type check, then test, backend first. Stops at the first failure.
 
   scripts/ci                    check everything
-  scripts/ci --fix              let ruff fix what it can first, then check
+  scripts/ci --fix              let markdownlint and ruff fix what they can first, then check
   scripts/ci --quick            check everything except the test suites (pytest, npm test)
   scripts/ci --quick --fix      both
 
 First it checks that frontend/package.json has the version of backend/pyproject.toml (Python's
 0.1.0a1 is 0.1.0-alpha.1 as semver.org spells it, b is beta, rc is rc), the only version that is
 written by hand, as do the copies in the lock files (the package bwtidy in backend/uv.lock, the
-version and packages[""].version of frontend/package-lock.json), that docs/releases.md has a
-heading for the version (its release notes), that each npm lock file
-(frontend/, docker/bitwarden-cli/) lists what its package.json asks for, and that
-frontend/src/about/thirdParty.json lists the packages of the lock files (scripts/third-party), then
-the docs (scripts/docs-lint): every image a markdown file links exists and every image in
-docs/images is linked, every link between pages resolves (a #anchor too), and the prose has no
-semicolon, em dash or ` -- ` (AGENTS.md), then that docs/reference/mcp-tools.md is what
+version and packages[""].version of frontend/package-lock.json), that docs/releases.md (the
+release notes) has an entry for the version and follows the format of dev/release.md (The release
+notes, its dates compared with the tags v*), that each npm lock file
+(frontend/, docker/bitwarden-cli/, tools/markdownlint/) lists what its package.json asks for, and
+that frontend/src/about/thirdParty.json lists the packages of the lock files (scripts/third-party),
+then that every Markdown file of the repo follows the rules of .markdownlint-cli2.jsonc
+(markdownlint-cli2 from tools/markdownlint, which it installs with npm ci when it is not, see
+devlib/markdownlint.py), then the docs (scripts/docs-lint): every image a markdown file links
+exists and every image in docs/images is linked, every link between pages resolves (a #anchor
+too), and the prose has no semicolon, em dash or ` -- ` (AGENTS.md), then that
+docs/reference/mcp-tools.md is what
 scripts/mcp-reference writes from the MCP server's tools, then a strict build of the documentation
 site (scripts/docs-site build: every page is in the nav, every nav entry, page link and anchor
 resolves in the site). bwtidy follows Semantic Versioning 2.0.0 (https://semver.org).
@@ -26,7 +30,9 @@ Demo (demo/, via uv, its own pyproject.toml and uv.lock, dev/demo.md): ruff lint
 pytest (demo/tests).
 Frontend (frontend/, via npm): oxlint, dependency-cruiser (what imports what, cycles), knip (unused
 files, exports and types), tsc + vite build, vitest.
-Only ruff can fix anything. The rest needs a human (or an agent).
+Only markdownlint and ruff can fix anything: --fix runs markdownlint-cli2 --fix before the first
+check and ruff before the first backend check. The rest needs a human (or an agent), such as a
+line of Markdown text too long for markdownlint, which wraps nothing.
 
 --quick skips pytest, demo pytest and npm test, the test suites and the heaviest steps (a Check has
 quick=False). The pre-push hook uses it for a push to a branch other than main. The CI workflow
@@ -44,7 +50,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
 
-from devlib import locks, versions
+from devlib import locks, markdownlint, versions
 from devlib.paths import ROOT, SCRIPTS
 
 BACKEND = ROOT / "backend"
@@ -116,6 +122,7 @@ def vitest_env() -> dict[str, str]:
 
 ## in their order, ci stops at the first that fails. The steps in backend/ and frontend/ need
 ## their dependencies, ci installs them (and with --fix runs FIXES) before the first of them.
+## With --fix MARKDOWN_FIX runs before the first check, as markdownlint is one of the first.
 CHECKS = [
     Check("versions", ROOT, versions.version_mismatch),
     Check("lock files", ROOT, locks.lock_mismatch),
@@ -125,6 +132,7 @@ CHECKS = [
         [str(SCRIPTS / "third-party"), "--check"],
         hint="(run scripts/third-party)",
     ),
+    Check("markdownlint", ROOT, markdownlint.check),
     Check("docs-lint", ROOT, [str(SCRIPTS / "docs-lint")]),
     Check(
         "mcp-reference",
@@ -169,6 +177,8 @@ CHECKS = [
     Check("npm build", FRONTEND, npm("build")),
     Check("npm test", FRONTEND, npm("test"), env=vitest_env, quick=False),
 ]
+
+MARKDOWN_FIX = Check("markdownlint --fix", ROOT, markdownlint.fix)
 
 FIXES = [
     Check("ruff check", BACKEND, uv("ruff", "check", "--fix", ".", *SCRIPTS_CHECKED)),
@@ -215,6 +225,8 @@ def main(args: list[str]) -> int:
     fix = "--fix" in args
     quick = "--quick" in args
     prepared = False
+    if fix:
+        run(MARKDOWN_FIX, fix)
     for check in quick_checks(quick):
         if check.cwd != ROOT and not prepared:
             ensure_deps()

@@ -144,6 +144,7 @@ def test_retention_deletes_old_backups_with_their_fingerprints_and_decrypted_cop
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("raw/items.json", "[]")
         archive.writestr("raw/trash.json", "[]")
+        archive.writestr("raw/archived.json", "[]")
     reader._last = BackupContents(old[-1], buffer.getvalue())
     login_backup = backup_name(NOW)
 

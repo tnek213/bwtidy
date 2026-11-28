@@ -211,8 +211,11 @@ def print_of(
     folders=(FOLDER,),
     collections=(COLLECTION,),
     organizations=(ORGANIZATION,),
+    archived=(),
 ) -> str:
-    return fingerprint(list(items), list(folders), list(collections), list(organizations))
+    return fingerprint(
+        list(items), list(folders), list(collections), list(organizations), archived=list(archived)
+    )
 
 
 def test_the_fingerprint_ignores_the_order_of_everything():
@@ -252,6 +255,9 @@ def test_the_fingerprint_changes_with_every_covered_change():
         print_of(collections=({**COLLECTION, "name": "Renamed"},)),
         print_of(organizations=()),
         print_of(organizations=({**ORGANIZATION, "name": "Renamed"},)),
+        print_of(archived=(ITEM_B,)),
+        print_of(archived=({**ITEM_B, "revisionDate": "2026-10-26T13:00:00.000Z"},)),
+        print_of(archived=({**ITEM_B, "attachments": ATTACHMENTS[:1]},)),
     ]:
         assert changed not in seen
         seen.add(changed)
@@ -269,19 +275,33 @@ FOLDERS: list[dict[str, Any]] = [{"id": "f1", "name": "A"}, {"id": "f2", "name":
 
 
 def test_a_folder_move_without_a_new_revision_changes_the_fingerprint():
-    before = fingerprint([ITEM], FOLDERS, [], [])
+    before = fingerprint([ITEM], FOLDERS, [], [], archived=[])
     moved = {**copy.deepcopy(ITEM), "folderId": "f2"}
-    assert fingerprint([moved], FOLDERS, [], []) != before
+    assert fingerprint([moved], FOLDERS, [], [], archived=[]) != before
 
 
 def test_a_favorite_toggle_without_a_new_revision_changes_the_fingerprint():
-    before = fingerprint([ITEM], FOLDERS, [], [])
+    before = fingerprint([ITEM], FOLDERS, [], [], archived=[])
     starred = {**copy.deepcopy(ITEM), "favorite": True}
-    assert fingerprint([starred], FOLDERS, [], []) != before
+    assert fingerprint([starred], FOLDERS, [], [], archived=[]) != before
 
 
 def test_the_fingerprint_reads_a_missing_folder_and_favorite_as_none_and_false():
     """bw serve's listing leaves out null keys, and the two listings of one vault must agree."""
     bare = {k: v for k, v in ITEM.items() if k not in ("folderId", "favorite")}
     explicit = {**ITEM, "folderId": None, "favorite": False}
-    assert fingerprint([bare], FOLDERS, [], []) == fingerprint([explicit], FOLDERS, [], [])
+    assert fingerprint([bare], FOLDERS, [], [], archived=[]) == fingerprint(
+        [explicit], FOLDERS, [], [], archived=[]
+    )
+
+
+def test_archiving_an_item_changes_the_fingerprint_without_a_new_revision():
+    """bw serve lists an archived item only with archived=true, and archiving it may keep its
+    revisionDate, so the two listings count apart."""
+    archived = print_of(items=(ITEM_A,), archived=(ITEM_B,))
+    assert archived != print_of()
+    assert archived != print_of(items=(ITEM_A, ITEM_B, ITEM_B))
+
+
+def test_the_fingerprint_ignores_the_order_of_the_archived_items():
+    assert print_of(archived=(ITEM_A, ITEM_B)) == print_of(archived=(ITEM_B, ITEM_A))

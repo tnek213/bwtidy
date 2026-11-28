@@ -154,8 +154,9 @@ export function draftProblem(draft: Template, others: Template[]): string | null
   if (name === '') {
     return 'A template needs a name.'
   }
-  if (others.some((other) => other.name === name)) {
-    return `There is already a template named ${name}.`
+  const taken = others.find((other) => foldedName(other.name) === foldedName(name))
+  if (taken !== undefined) {
+    return `There is already a template named ${taken.name.trim()}.`
   }
   if ((draft.description ?? '').trim().length > MAX_DESCRIPTION) {
     return `A description holds at most ${MAX_DESCRIPTION} characters.`

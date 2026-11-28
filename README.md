@@ -1,6 +1,7 @@
 # bwtidy
 
-<!-- intro: the same text in README.md and docs/index.md -->
+<!-- intro: the same text in README.md, docs/index.md and
+docker/hub-overview.md -->
 
 Password vaults get inconsistent over time. Some items use `Password` while
 others use `password`. Some web addresses include a protocol prefix and others
@@ -17,10 +18,11 @@ through MCP. The agent can add proposed changes to a queue without seeing
 secret values. You review each proposal and decide whether to accept it. Only
 accepted proposals are written to your vault.
 
-Before each write bwtidy saves a backup of the whole vault. The backup is an
-age-encrypted ZIP stored in bwtidy's backups volume. You can restore it with
-standard tools. Your vault stays on your Bitwarden or Vaultwarden server.
-bwtidy reads and writes vault data through Bitwarden's official CLI.
+Before each write of your changes bwtidy saves a backup of the whole vault.
+The backup is an age-encrypted ZIP stored in bwtidy's backups volume. You can
+restore it with standard tools. Your vault stays on your Bitwarden or
+Vaultwarden server. bwtidy reads and writes vault data through Bitwarden's
+official CLI.
 
 bwtidy is for people who want their Bitwarden or Vaultwarden vault to follow
 standards they define themselves. It helps them apply those standards
@@ -39,9 +41,10 @@ consistently across the vault.
 > export made outside bwtidy. Expect bugs and breaking changes between
 > versions.
 
-Does bwtidy work for you? Give [Works for me](https://github.com/tnek213/bwtidy/discussions/16) a thumbs up.
-If you have a minute, a comment with your bwtidy version, Bitwarden or
-Vaultwarden, and roughly how many items your vault has helps others decide.
+Does bwtidy work for you? Give [Works for
+me](https://github.com/tnek213/bwtidy/discussions/16) a thumbs up. If you have a
+minute, a comment with your bwtidy version, Bitwarden or Vaultwarden, and
+roughly how many items your vault has helps others decide.
 
 bwtidy is an independent project. It is not affiliated with, endorsed by or
 sponsored by Bitwarden, Inc. Bitwarden is a trademark of Bitwarden, Inc., used
@@ -52,18 +55,19 @@ here only to say which vaults bwtidy works with.
 - **Your vault stays on your server.** bwtidy runs in one container on your
   machine. It reads and writes your vault through `bw`, Bitwarden's official
   CLI.
-- **A backup before every write.** bwtidy saves a backup of the whole vault
-  before each write. The backup is a ZIP encrypted with age using your master
-  password as the passphrase. It lives in bwtidy's backups volume and can be
-  restored with standard tools without bwtidy.
+- **A backup before your changes are written.** bwtidy saves a backup of the
+  whole vault before each write of your changes. The backup is a ZIP encrypted
+  with age using your master password as the passphrase. It lives in bwtidy's
+  backups volume and can be restored with standard tools without bwtidy.
 - **Your master password.** It remains in memory while you are logged in and is
   wiped when you log out. It is also wiped two minutes after you close the last
   tab or after two hours without activity. Both timings are defaults. A copy is
-  stored in bwtidy's note in your vault so older backups remain readable after
+  stored in the bwtidy note in your vault so older backups remain readable after
   you change your password. It is never written elsewhere or logged and it is
   never given to an AI agent.
-- **bwtidy's settings stay in one item.** It stores settings in a secure note
-  named `bwtidy`. You can rename the note and bwtidy will still find it.
+- **Your templates travel with your vault.** bwtidy keeps your templates and
+  datatypes in a secure note named `bwtidy` along with the generator settings.
+  You can rename the note and bwtidy will still find it.
 - **Accounts are kept apart.** Each account runs in its own process under its
   own Linux user. One account cannot read another account's data.
 - **You control changes.** In the web UI you make changes directly. An AI agent
@@ -73,7 +77,7 @@ here only to say which vaults bwtidy works with.
 - **No telemetry.** bwtidy sends no telemetry to its author or anyone else. Its
   vault connection is to your Bitwarden or Vaultwarden server.
 
-How each part works: [Explanation](docs/index.md#explanation).
+[Explanation](docs/index.md#explanation) says how each part works.
 
 ## Running
 
@@ -82,17 +86,21 @@ publishes its web page on port 8765 of the host's 127.0.0.1 and keeps each
 account's data in a volume at `/data/accounts`, and its backups at
 `/backups`.
 
-bwtidy runs the Bitwarden CLI exactly as Bitwarden publishes it and follows
-its new releases: see
-[Which version of the CLI](docs/explanation/bw-cli.md#which-version-of-the-cli).
+bwtidy ships the open source build of the Bitwarden CLI and follows its new
+releases (see
+[Which version of the CLI](docs/explanation/bw-cli.md#which-version-of-the-cli)).
 
-How to run it: [Run bwtidy](docs/how-to/run.md), from pulling the image to
-the first login, a reverse proxy and updates.
+[Run bwtidy](docs/how-to/run.md) shows how to run it. It goes from pulling
+the image to the first login and also covers a reverse proxy and updates.
+
+The image is
+[tnek213/bwtidy on Docker Hub](https://hub.docker.com/r/tnek213/bwtidy).
+Its overview lists the tags, the port, the volumes and the settings.
 
 ## Documentation
 
-The docs are a site at https://tnek213.github.io/bwtidy/. A running bwtidy
-serves the same site at `/docs/`, such as http://127.0.0.1:8765/docs/,
+The docs are a site at <https://tnek213.github.io/bwtidy/>. A running bwtidy
+serves the same site at `/docs/`, such as <http://127.0.0.1:8765/docs/>,
 without a login.
 
 - [The documentation site](https://tnek213.github.io/bwtidy/)
@@ -114,6 +122,8 @@ without a login.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): how everyone taking part behaves, and
   where to report what breaks it
 - [SECURITY.md](SECURITY.md): how to report a security issue, privately
+- [ACCESSIBILITY.md](ACCESSIBILITY.md): what works with a keyboard and a screen
+  reader, what does not, and how to report a barrier
 - [The developer guide](dev/README.md): set up, the dev vault, the tests, releasing
 - [AGENTS.md](AGENTS.md): the rules every change follows and the checks it
   must pass
@@ -136,8 +146,13 @@ details. The full text is in LICENSE.
 bwtidy changes the contents of a password vault. Keep your own Bitwarden
 export, made outside bwtidy, before you use it on a vault you care about.
 
-The container image includes the official Bitwarden CLI, which Bitwarden, Inc.
-licenses separately under its own terms (GPL-3.0).
+The container image includes the open source build of the Bitwarden CLI.
+Bitwarden, Inc. licenses it separately under GPL-3.0. The image builds it from
+Bitwarden's source (<https://github.com/bitwarden/clients>) at the tag
+`cli-v2026.11.0`. Bitwarden's npm package is not used because it includes code
+under the Bitwarden License. The CLI bundles Bitwarden's SDK (also GPL-3.0)
+from <https://github.com/bitwarden/sdk-internal>. The file `SOURCE` beside the
+CLI in the image names the commit of each.
 
 The About page (About bwtidy in the app bar's menu, More actions) shows the
 license, links the source code and thanks the projects bwtidy is built on,

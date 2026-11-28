@@ -1,7 +1,7 @@
 import { createTheme } from '@mui/material'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest'
-import { jsonResponse } from '../test-utils.tsx'
+import { advanceClock, jsonResponse } from '../test-utils.tsx'
 import { REVEAL_MS } from './reveal.ts'
 import { noCellMarks } from './cellMarks.ts'
 import { columnDef } from './columns.tsx'
@@ -147,7 +147,7 @@ test('a secret cell shows the mask and reveals the value on click for 30 seconds
     expect.objectContaining({ method: 'GET' }),
   )
 
-  await act(() => vi.advanceTimersByTimeAsync(REVEAL_MS))
+  await advanceClock(REVEAL_MS)
 
   expect(within(secret).getByTestId('secret-value')).toHaveTextContent('•'.repeat(8))
   expect(screen.queryByText('hunter2')).toBeNull()
@@ -1096,7 +1096,7 @@ test('Rare fields is off at 0, and setting N shows the rare fields as JSON and h
   fireEvent.click(within(rare).getByRole('button', { name: 'Reveal fields.BIOS Password' }))
   await waitFor(() => expect(rare).toHaveTextContent('{ "BIOS Password": "s3cret", "vlan": "20" }'))
   // Hidden again after 30 seconds, like a masked cell.
-  await act(() => vi.advanceTimersByTimeAsync(REVEAL_MS))
+  await advanceClock(REVEAL_MS)
   await waitFor(() => expect(rare).toHaveTextContent('{ "BIOS Password": , "vlan": "20" }'))
   expect(cell('item-3', 'rareFields')).toHaveTextContent('{ "brand": "Visa" }')
 
@@ -1138,4 +1138,47 @@ test('the search tints a Rare fields cell whose shown value matches', async () =
 
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search' }), { target: { value: 'visa' } })
   await waitFor(() => expect(cell('item-3', 'rareFields')).toHaveClass('bw-search-hit'))
+})
+
+test('the page has a heading for a screen reader and names the checkbox column', async () => {
+  renderGrid(grid)
+  await screen.findByText('Code forge')
+  expect(screen.getByRole('heading', { name: 'Vault', level: 2 })).toBeInTheDocument()
+  expect(screen.getAllByRole('columnheader', { name: 'Tick rows' }).length).toBeGreaterThan(0)
+})
+
+test('the cell menu reveals and hides a secret, as the eye does', async () => {
+  givenGridViewport()
+  renderGrid(grid, {
+    routes: { 'GET /api/items/item-1/secret?column=login.password': () => jsonResponse(200, { value: 'hunter2' }) },
+  })
+  await screen.findByText('Code forge')
+  const secret = cell('item-1', 'login.password')
+  const value = await within(secret).findByTestId('secret-value')
+  expect(value).toHaveAttribute('aria-live', 'polite')
+  expect(within(value).getByRole('img', { name: 'Hidden' })).toHaveTextContent('•'.repeat(8))
+
+  fireEvent.contextMenu(secret, { clientX: 10, clientY: 10 })
+  fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Reveal value' }))
+  await waitFor(() => expect(value).toHaveTextContent('hunter2'))
+
+  fireEvent.contextMenu(secret, { clientX: 10, clientY: 10 })
+  fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Hide value' }))
+  await waitFor(() => expect(value).toHaveTextContent('•'.repeat(8)))
+})
+
+test('Shift+F10 and the context menu key on a field header open its menu', async () => {
+  renderGrid(grid)
+  await screen.findByText('Code forge')
+  const bios = header('fields.BIOS Password')
+  if (!bios) {
+    throw new Error('no header fields.BIOS Password')
+  }
+  for (const key of [{ key: 'F10', shiftKey: true }, { key: 'ContextMenu' }]) {
+    fireEvent.keyDown(bios, key)
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByRole('menuitem', { name: 'Rename field…' })).toBeInTheDocument()
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+  }
 })

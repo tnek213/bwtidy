@@ -72,6 +72,7 @@ DURATIONS = {
     "test_reencrypt.py": 85,
     "test_normalize.py": 81,
     "test_to_fill.py": 78,
+    "test_archived.py": 77,
     "test_set_uris.py": 75,
     "test_gateway.py --root": 440,
     "test_mcp.py": 53,
@@ -82,6 +83,7 @@ DURATIONS = {
     "test_generator.py": 33,
     "test_seed.py": 31,
     "test_grid.py": 19,
+    "test_bw_cli_build.py": 4,
     "test_gateway.py": 1,
 }
 ## the order of pytest's own summary line

@@ -3,6 +3,6 @@
   "private": true,
   "description": "The Bitwarden CLI of the image, installed with npm ci from this lock file",
   "dependencies": {
-    "@bitwarden/cli": "2026.10.0"
+    "@bitwarden/cli": "2026.11.0"
   }
 }

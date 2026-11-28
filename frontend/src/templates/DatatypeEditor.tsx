@@ -31,6 +31,7 @@ import MarkedLines, { type LineMark } from './MarkedLines.tsx'
 import { NO_PASSWORD_MANAGER } from '../shared/noPasswordManager.ts'
 import { isFullMatch, MAX_EXAMPLES, resultText, typedPattern, valueLines } from './patterns.ts'
 import ProseAlert from '../theme/ProseAlert.tsx'
+import { caseFold } from '../shared/caseFold.ts'
 
 const CHECK_DELAY_MS = 250
 
@@ -246,7 +247,7 @@ export default function DatatypeEditor({ initial, title, otherNames, error, onCl
   const facts = answer !== null && !('error' in answer) ? answer : null
 
   const trimmed = name.trim()
-  const nameTaken = otherNames.some((other) => other.trim().toLowerCase() === trimmed.toLowerCase())
+  const nameTaken = otherNames.some((other) => caseFold(other.trim()) === caseFold(trimmed))
   const upToDate = checked !== null && sameRules(checked.sent, request)
   const rulesHold =
     facts !== null &&

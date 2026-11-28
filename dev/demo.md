@@ -18,13 +18,13 @@ visitor's account when its worker exits.
 
 `compose.demo.yaml` runs five containers:
 
-| Container     | Image                       | What it does                                                         |
-| ------------- | --------------------------- | -------------------------------------------------------------------- |
-| `init`        | the demo image              | writes the stack's secrets into the `secrets` volume, then exits      |
-| `vaultwarden` | `vaultwarden/server:1.37.4` | the demo's own server, HTTPS with the self-signed certificate of `init` |
-| `demo`        | the demo image              | bwtidy's gateway wrapped by `bwtidy_demo`, and the workers it starts  |
-| `controller`  | the demo image              | the pool of ready vaults, and the deletion of Vaultwarden users      |
-| `edge`        | nginx                       | the only published port, rate limits, proxies to `demo`              |
+| Container     | Image                       | What it does                                                                                                    |
+| ------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `init`        | the demo image              | writes the stack's secrets into the `secrets` volume, sets the owners of the secrets and the ledger, then exits |
+| `vaultwarden` | `vaultwarden/server:1.37.4` | the demo's own server, HTTPS with the self-signed certificate of `init`                                         |
+| `demo`        | the demo image              | bwtidy's gateway wrapped by `bwtidy_demo`, and the workers it starts                                            |
+| `controller`  | the demo image              | the pool of ready vaults, and the deletion of Vaultwarden users                                                 |
+| `edge`        | nginx                       | the only published port, rate limits, proxies to `demo`                                                         |
 
 The version of Vaultwarden is the dev stack's (`compose.dev.yaml`), so the
 demo runs against the server the tests run against. The demo image has bw
@@ -35,7 +35,9 @@ Three networks:
 
 - `back` (`internal: true`): `vaultwarden`, `demo` and `controller`.
 - `front` (`internal: true`): `edge` and `demo`.
-- `public` (a normal network): `edge` only.
+- `public` (a normal network): `edge` only. Its bridge has a fixed name
+  (`DEMO_PUBLIC_BRIDGE`), so the host's firewall can limit what it reaches
+  (Limit the way out).
 
 `init` needs no network (`network_mode: none`). An internal Docker network
 has no route out of the host, so only the edge can reach anything outside
@@ -52,8 +54,13 @@ the stack, and only the edge can be reached from outside. Who reaches what:
 
 Every container has a read-only file system, drops all capabilities (the
 `demo` container keeps the six that `compose.yaml` gives bwtidy, the edge the
-four nginx needs to bind port 80 and start its workers) and sets
+four nginx needs to bind port 80 and start its workers, `init` keeps `CHOWN`
+to give the secrets and the ledger their owners) and sets
 `no-new-privileges`. What must be written is a tmpfs or a volume.
+
+The controller runs as a user of its own (see Controller). `init`, `demo`
+and Vaultwarden run as root: `init` sets the owners, the gateway starts each
+worker as its account's uid and Vaultwarden's image runs as root.
 
 `depends_on` orders the start and, with `restart: true`, what compose
 restarts when it makes a container anew: a new `vaultwarden` container is
@@ -112,11 +119,11 @@ and the Vaultwarden user (a start that got no worker releases the vault
 itself). The query names one of three fixed notes, the page never shows a
 text from the request:
 
-| Query          | When                                   | The note                                                 |
-| -------------- | -------------------------------------- | -------------------------------------------------------- |
-| `?note=free`   | the controller has no ready vault (409) | "No demo vault is free right now. Try again in a minute." |
-| `?note=full`   | a cap of the gateway (`LimitError`)    | "The demo is full right now. Try again in a few minutes." |
-| `?note=failed` | anything else: the controller, the worker, the login | "The demo could not start. Try again in a minute." |
+| Query          | When                                                 | The note                                                  |
+| -------------- | ---------------------------------------------------- | --------------------------------------------------------- |
+| `?note=free`   | the controller has no ready vault (409)              | "No demo vault is free right now. Try again in a minute." |
+| `?note=full`   | a cap of the gateway (`LimitError`)                  | "The demo is full right now. Try again in a few minutes." |
+| `?note=failed` | anything else: the controller, the worker, the login | "The demo could not start. Try again in a minute."        |
 
 Below the button the start page shows the demo's usage (see Usage stats).
 
@@ -253,12 +260,12 @@ The wrapper (`bwtidy_demo.gateway`, `bwtidy-demo-gateway`) reads the
 gateway's own settings (`GatewaySettings.from_env`) and these. A missing or
 unusable one stops it at the start with a message naming it:
 
-| Setting                  | Default               | What                                                                 |
-| ------------------------ | --------------------- | -------------------------------------------------------------------- |
-| `DEMO_CONTROLLER_URL`    | none, required        | the controller's API, such as `http://controller:8100`             |
-| `DEMO_SECRETS`           | `/secrets`            | the secrets volume, its `controller-token` must be readable and not empty |
-| `DEMO_SERVER`            | `https://vaultwarden` | the demo's Vaultwarden. `BWTIDY_ALLOWED_SERVERS` must hold it and nothing else |
-| `DEMO_SESSION_MAX`       | `2700`                | the hard maximum of a demo, in seconds                               |
+| Setting               | Default               | What                                                                           |
+| --------------------- | --------------------- | ------------------------------------------------------------------------------ |
+| `DEMO_CONTROLLER_URL` | none, required        | the controller's API, such as `http://controller:8100`                         |
+| `DEMO_SECRETS`        | `/secrets`            | the secrets volume, its `controller-token` must be readable and not empty      |
+| `DEMO_SERVER`         | `https://vaultwarden` | the demo's Vaultwarden. `BWTIDY_ALLOWED_SERVERS` must hold it and nothing else |
+| `DEMO_SESSION_MAX`    | `2700`                | the hard maximum of a demo, in seconds                                         |
 
 `BWTIDY_STATIC_DIR` is required too: the banner is inserted into its
 `index.html`. The secrets volume's variable is `DEMO_SECRETS`, the name
@@ -316,11 +323,11 @@ starts empty and fills at every start.
   the start that takes the vault. No log line holds a password or a token:
   the logs name ids and counts.
 
-| Route           | Body      | Answer                                                                         |
-| --------------- | --------- | ------------------------------------------------------------------------------ |
-| `POST /take`    |           | `{server, email, password}` of a ready vault, now taken. 409 with a text when none is ready |
+| Route           | Body      | Answer                                                                                                                                                                        |
+| --------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /take`    |           | `{server, email, password}` of a ready vault, now taken. 409 with a text when none is ready                                                                                   |
 | `POST /release` | `{email}` | 204 once the user is deleted and forgotten. 400 for an email outside `demo.bwtidy.test`. 502 when Vaultwarden refused: the vault stays taken and the caller releases it again |
-| `GET /status`   |           | `{ready, taken, building, failed, max}`, counts only, `failed` since the start, `max` is `DEMO_MAX` |
+| `GET /status`   |           | `{ready, taken, building, failed, max}`, counts only, `failed` since the start, `max` is `DEMO_MAX`                                                                           |
 
 A release of a user the controller does not know (one from before a
 restart) deletes it all the same, which is what the wrapper's cleanup at its
@@ -330,18 +337,48 @@ Its settings: `DEMO_POOL_READY`, `DEMO_MAX`, `DEMO_FIXTURE` (required),
 `DEMO_LEDGER`, `DEMO_SECRETS` (by default `/secrets`) and `DEMO_SERVER` (by
 default `https://vaultwarden`).
 
+The controller handles vault data (every vault it builds goes through its
+bw), and nothing it does needs root. It runs as the system user
+`controller` of the demo image, uid and gid 10100 (`user: "10100:10100"` in
+`compose.demo.yaml`). The number is fixed, so `init` can set the owners
+before the controller starts. It lies below bwtidy's accounts
+(`BWTIDY_UID_BASE`, 70000 and up) and is none of the ids the nginx and
+Vaultwarden images use. The user's home is `/tmp`, a tmpfs, and every bw
+call gets a `HOME` and a `BITWARDENCLI_APPDATA_DIR` of its own in there.
+
+The controller reads the secrets through its group (see Secrets) and owns
+the ledger. The image's `/ledger` is owned by the controller with mode 0700,
+so a new `ledger` volume gets that owner when Docker fills it from the image.
+A volume an older demo made is owned by root. `init` mounts it too and at
+every start gives the controller what root owns in it, so an existing host
+needs no manual step: each file and directory there owned by root gets the
+mode 0600 (a directory 0700) and then the controller's uid and gid. A
+symlink is never followed. A volume the controller owns already is left as
+it is, since what it holds is the controller's own.
+
 ## Secrets
 
 `init` (`bwtidy_demo.init`, `bwtidy-demo-init`) writes into the `secrets`
-volume (`DEMO_SECRETS`, by default `/secrets`), each file in one rename:
+volume (`DEMO_SECRETS`, by default `/secrets`), each file in one rename. Every
+file is owned by root, and its group and mode let exactly its readers in:
 
-| File                      | Mode | What                                                              |
-| ------------------------- | ---- | ----------------------------------------------------------------- |
-| `vaultwarden-admin-token` | 0600 | Vaultwarden reads it with `ADMIN_TOKEN_FILE`, the controller too   |
-| `controller-token`        | 0600 | the controller's API token, the controller and the wrapper read it |
-| `vaultwarden.key`         | 0600 | the server's TLS key, Vaultwarden reads it                        |
-| `vaultwarden.crt`         | 0644 | the server certificate for the name `vaultwarden`, then the CA    |
-| `ca.crt`                  | 0644 | the self-signed CA, trusted by the workers and the controller (`NODE_EXTRA_CA_CERTS`, bw refuses plain http) |
+| File                      | Group      | Mode | Read by                              | What                                                                   |
+| ------------------------- | ---------- | ---- | ------------------------------------ | ---------------------------------------------------------------------- |
+| `vaultwarden-admin-token` | controller | 0640 | Vaultwarden, the controller          | Vaultwarden's `ADMIN_TOKEN_FILE`, the controller deletes users with it |
+| `controller-token`        | controller | 0640 | the controller, the wrapper          | the controller's API token                                             |
+| `vaultwarden.key`         | root       | 0600 | Vaultwarden                          | the server's TLS key                                                   |
+| `vaultwarden.crt`         | root       | 0644 | Vaultwarden (public)                 | the server certificate for the name `vaultwarden`, then the CA         |
+| `ca.crt`                  | root       | 0644 | the controller, the workers (public) | the self-signed CA (`NODE_EXTRA_CA_CERTS`, bw refuses plain http)      |
+
+Vaultwarden runs as root without capabilities, so it has no `DAC_OVERRIDE`
+and reads the admin token and the key as their owner. The controller reads
+the two tokens as a member of the group `controller` (gid 10100). The
+wrapper runs as root and reads its token as the owner. The workers run as
+their accounts' uids, outside the group, so they read neither token and
+only the certificates. A file is written with mode 0600 and gets its group
+and its mode once it is in place. `init` sets the owner, the group and the
+mode of every file at every start, also on a volume it keeps, so a volume an
+older demo wrote gets them too.
 
 The CA's key is never written: it signs the server certificate and is gone,
 so nothing can sign another certificate the stack trusts. Both certificates
@@ -361,8 +398,8 @@ removes the ledger and the usage stats too.
 
 No secret ever leaves the stack, and none comes from outside: nothing is
 configured by hand and nothing is shown. The tokens are readable by root
-only. The certificate is readable by everyone, as the workers run as the
-accounts' uids. The edge mounts no secret.
+and the controller only. The certificates are readable by everyone, as the
+workers run as the accounts' uids. The edge mounts no secret.
 
 Vaultwarden's data is temporary (a tmpfs of `DEMO_VAULTWARDEN_DATA_SIZE`,
 256 MB by default): a restart starts it empty. The account directories are a
@@ -377,28 +414,28 @@ keeps their users, unused, until Vaultwarden restarts. Restart the stack
 
 ## Vaultwarden settings
 
-| Setting                        | Value                         | Why                                                   |
-| ------------------------------ | ----------------------------- | ----------------------------------------------------- |
-| `SIGNUPS_ALLOWED`              | `true`                        | the controller registers, it is never reachable from outside |
-| SMTP                           | none                          | the registration answers its token without mail       |
-| `WEB_VAULT_ENABLED`            | `false`                       | nobody uses it                                        |
-| `SENDS_ALLOWED`                | `false`                       | nothing to share                                      |
-| `EMERGENCY_ACCESS_ALLOWED`     | `false`                       |                                                       |
-| `INVITATIONS_ALLOWED`          | `false`                       |                                                       |
-| `ORG_CREATION_USERS`           | `none`                        | the fixture has no organizations                      |
-| `PASSWORD_HINTS_ALLOWED`       | `false`                       |                                                       |
-| `SHOW_PASSWORD_HINT`           | `false`                       |                                                       |
-| `ICON_SERVICE`                 | `internal`                    | no request leaves the stack                           |
-| `DISABLE_ICON_DOWNLOAD`        | `true`                        | no request leaves the stack                           |
-| `PUSH_ENABLED`                 | `false`                       | no request leaves the stack                           |
-| `USER_ATTACHMENT_LIMIT`        | small (in KB)                 | a visitor cannot fill the disk                        |
-| `USER_SEND_LIMIT`              | small (in KB)                 | the same, should sends ever be on                     |
-| `ADMIN_TOKEN_FILE`             | the token in the secrets volume | the controller's user deletion                      |
-| `DOMAIN`                       | `https://vaultwarden`         | the name the workers use                              |
-| `ROCKET_PORT`, `ROCKET_TLS`    | 443, the certificate and key in the secrets volume | bw refuses plain http               |
-| `LOGIN_RATELIMIT_SECONDS`, `LOGIN_RATELIMIT_MAX_BURST` | 1, 1000 | every login comes from one address, the `demo` container |
-| `UNAUTHENTICATED_RATELIMIT_SECONDS`, `UNAUTHENTICATED_RATELIMIT_MAX_BURST` | 1, 1000 | the registrations and bw's prelogin count here, all from two addresses |
-| `ADMIN_RATELIMIT_MAX_BURST`    | 30                            | a controller that restarts a few times still logs in  |
+| Setting                                                                    | Value                                              | Why                                                                    |
+| -------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- |
+| `SIGNUPS_ALLOWED`                                                          | `true`                                             | the controller registers, it is never reachable from outside           |
+| SMTP                                                                       | none                                               | the registration answers its token without mail                        |
+| `WEB_VAULT_ENABLED`                                                        | `false`                                            | nobody uses it                                                         |
+| `SENDS_ALLOWED`                                                            | `false`                                            | nothing to share                                                       |
+| `EMERGENCY_ACCESS_ALLOWED`                                                 | `false`                                            |                                                                        |
+| `INVITATIONS_ALLOWED`                                                      | `false`                                            |                                                                        |
+| `ORG_CREATION_USERS`                                                       | `none`                                             | the fixture has no organizations                                       |
+| `PASSWORD_HINTS_ALLOWED`                                                   | `false`                                            |                                                                        |
+| `SHOW_PASSWORD_HINT`                                                       | `false`                                            |                                                                        |
+| `ICON_SERVICE`                                                             | `internal`                                         | no request leaves the stack                                            |
+| `DISABLE_ICON_DOWNLOAD`                                                    | `true`                                             | no request leaves the stack                                            |
+| `PUSH_ENABLED`                                                             | `false`                                            | no request leaves the stack                                            |
+| `USER_ATTACHMENT_LIMIT`                                                    | small (in KB)                                      | a visitor cannot fill the disk                                         |
+| `USER_SEND_LIMIT`                                                          | small (in KB)                                      | the same, should sends ever be on                                      |
+| `ADMIN_TOKEN_FILE`                                                         | the token in the secrets volume                    | the controller's user deletion                                         |
+| `DOMAIN`                                                                   | `https://vaultwarden`                              | the name the workers use                                               |
+| `ROCKET_PORT`, `ROCKET_TLS`                                                | 443, the certificate and key in the secrets volume | bw refuses plain http                                                  |
+| `LOGIN_RATELIMIT_SECONDS`, `LOGIN_RATELIMIT_MAX_BURST`                     | 1, 1000                                            | every login comes from one address, the `demo` container               |
+| `UNAUTHENTICATED_RATELIMIT_SECONDS`, `UNAUTHENTICATED_RATELIMIT_MAX_BURST` | 1, 1000                                            | the registrations and bw's prelogin count here, all from two addresses |
+| `ADMIN_RATELIMIT_MAX_BURST`                                                | 30                                                 | a controller that restarts a few times still logs in                   |
 
 Vaultwarden's limits count per address, and all its requests come from the
 `demo` and `controller` containers, so its defaults (a burst of 10 logins,
@@ -427,19 +464,58 @@ the demo. Two independent guarantees hold, so either alone is enough:
 
 The defaults, kept after measuring (Memory):
 
-| Limit                          | Default    | Setting                                                    |
-| ------------------------------ | ---------- | ---------------------------------------------------------- |
-| vaults ready in the pool       | 2          | `DEMO_POOL_READY` (controller)                             |
-| vaults ready plus handed out   | 6          | `DEMO_MAX` (controller)                                    |
-| visitors at once               | 6          | `BWTIDY_MAX_WORKERS=6`                                     |
-| starts in flight               | 2          | `BWTIDY_MAX_PENDING=2` (a start's directory is pending until its unlock) |
-| idle session end               | 15 minutes | `BWTIDY_SESSION_IDLE_TIMEOUT=900` (seconds)               |
-| closed tab                     | 2 minutes  | `BWTIDY_HEARTBEAT_TIMEOUT`, bwtidy's default 120          |
-| a session at most              | 45 minutes | `DEMO_SESSION_MAX=2700` (seconds, the wrapper)            |
-| MCP token lifetime             | 1 day      | the wrapper's rewrite of `POST /api/mcp/token`             |
-| `POST /demo/start`             | per address: a burst of 5, then 6 a minute | `DEMO_START_BURST`, `DEMO_START_RATE` (the edge) |
-| `/mcp`                         | per address: a burst of 40, then 10 a second | `DEMO_MCP_BURST`, `DEMO_MCP_RATE` (the edge) |
-| a request body                 | 1 MB, 1 kB for a start | the edge's `client_max_body_size`               |
+| Limit                        | Default                                      | Setting                                                                  |
+| ---------------------------- | -------------------------------------------- | ------------------------------------------------------------------------ |
+| vaults ready in the pool     | 2                                            | `DEMO_POOL_READY` (controller)                                           |
+| vaults ready plus handed out | 6                                            | `DEMO_MAX` (controller)                                                  |
+| visitors at once             | 6                                            | `BWTIDY_MAX_WORKERS=6`                                                   |
+| starts in flight             | 2                                            | `BWTIDY_MAX_PENDING=2` (a start's directory is pending until its unlock) |
+| idle session end             | 15 minutes                                   | `BWTIDY_SESSION_IDLE_TIMEOUT=900` (seconds)                              |
+| closed tab                   | 2 minutes                                    | `BWTIDY_HEARTBEAT_TIMEOUT`, bwtidy's default 120                         |
+| a session at most            | 45 minutes                                   | `DEMO_SESSION_MAX=2700` (seconds, the wrapper)                           |
+| MCP token lifetime           | 1 day                                        | the wrapper's rewrite of `POST /api/mcp/token`                           |
+| `POST /demo/start`           | per address: a burst of 5, then 6 a minute   | `DEMO_START_BURST`, `DEMO_START_RATE` (the edge)                         |
+| `/mcp`                       | per address: a burst of 40, then 10 a second | `DEMO_MCP_BURST`, `DEMO_MCP_RATE` (the edge)                             |
+| a request body               | 1 MB, 1 kB for a start                       | the edge's `client_max_body_size`                                        |
+
+Every service also has a memory and a process limit, set in
+`compose.demo.yaml` (`mem_limit`, with `memswap_limit` equal to it so a
+container cannot swap past its limit, and `pids_limit`). A public demo shares
+its host with other services, so a visitor cannot be allowed to take all of
+its memory or start processes until it slows. The defaults rest on the
+visitor limits above and the measures of Memory, each with about 25 percent
+headroom, rounded up. The arithmetic stands in a comment above each limit in
+the compose file.
+
+| Service     | Memory (`DEMO_MEM_...`)     | Processes (`DEMO_PIDS_...`) | Why                                                                            |
+| ----------- | --------------------------- | --------------------------- | ------------------------------------------------------------------------------ |
+| init        | `DEMO_MEM_INIT` 128m        | `DEMO_PIDS_INIT` 64         | a Python process that writes a few files and exits                             |
+| vaultwarden | `DEMO_MEM_VAULTWARDEN` 384m | `DEMO_PIDS_VAULTWARDEN` 64  | 25 MiB peak plus a full data tmpfs (256m), 42 processes                        |
+| controller  | `DEMO_MEM_CONTROLLER` 320m  | `DEMO_PIDS_CONTROLLER` 32   | the 226 MiB peak while it builds a vault, 16 processes                         |
+| demo        | `DEMO_MEM_DEMO` 2700m       | `DEMO_PIDS_DEMO` 128        | 6 visitors, 2 starts in flight and a full accounts tmpfs (512m), 101 processes |
+| edge        | `DEMO_MEM_EDGE` 32m         | `DEMO_PIDS_EDGE` 32         | 13 MiB peak, 14 processes                                                      |
+
+The Memory budget says which limit covers which row: the visitors, the
+gateway, the starts in flight and the accounts tmpfs are the demo's, the
+Vaultwarden row and the data tmpfs are Vaultwarden's, the controller's peak is
+the controller's and the idle row is each service's own.
+
+An operator who raises `DEMO_MAX` raises the demo's limits too, per added
+visitor: 275 MiB in `DEMO_MEM_DEMO` (220 MiB, plus 25 percent), 20 in
+`DEMO_PIDS_DEMO` (about 15 measured, plus 25 percent) and 5 MiB in
+`DEMO_MEM_VAULTWARDEN`. One who raises a tmpfs size adds 1.25 MiB per MiB to the
+limit of the service that owns it: `DEMO_ACCOUNTS_SIZE` to `DEMO_MEM_DEMO`,
+`DEMO_VAULTWARDEN_DATA_SIZE` to `DEMO_MEM_VAULTWARDEN`. The pages of a tmpfs
+count against the memory of the container that writes them.
+
+A container that hits a limit fails in a way that is easy to miss, so look for
+it when the demo misbehaves. Out of memory: the kernel kills a process or the
+container, and `docker inspect -f '{{.State.OOMKilled}}' CONTAINER` says
+`true` for the container itself. Out of processes: forks fail with errors
+such as "Resource temporarily unavailable" in the container's log, and
+`docker exec CONTAINER cat /sys/fs/cgroup/pids.current` is at the limit.
+Raise the matching variable of the table, never past what the Memory budget
+allows for the host.
 
 A start refused by a cap (429 from the gateway) or by the edge's rate limit
 gets the start page with "The demo is full right now. Try again in a few
@@ -510,6 +586,16 @@ services:
     networks:
       - front
       - public
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
 
   edge:
     network_mode: service:sidecar
@@ -522,7 +608,19 @@ services:
 
 The sidecar joins `front` (where the demo is) and `public` (the route out for
 the tunnel), and the edge shares its network namespace, so nginx reaches
-`demo:8000` through the sidecar's networks. Run both files:
+`demo:8000` through the sidecar's networks.
+
+The sidecar gets the fewest privileges, as the other containers do. A VPN
+client needs `NET_ADMIN` for its tunnel and its routes. Add only the
+capabilities its own docs ask for. Most clients also need the device
+`/dev/net/tun` (`devices: [/dev/net/tun]`). The root file system is
+read-only with a tmpfs for what the client writes while it runs. A client
+that keeps state (its keys, its login) needs a volume for that directory, and
+one that cannot run read-only at all goes without `read_only`.
+`no-new-privileges` keeps a process in it from gaining privileges through a
+setuid binary.
+
+Run both files:
 
 ```sh
 docker compose -f compose.demo.yaml -f sidecar.yaml up -d
@@ -532,7 +630,113 @@ Set `DEMO_EDGE_PORT` to the port the tunnel forwards to, and
 `DEMO_TRUSTED_PROXIES` to the proxy's address as the edge sees it (the tunnel
 address of the proxy). `demo/tests/files/sidecar-override.yaml` is this
 override with the stand-in, and a test checks that `docker compose config`
-accepts it.
+accepts it and that the sidecar keeps the privileges above.
+
+## Limit the way out
+
+`back` and `front` have no route out of the host, but `public` has one. From
+the edge (or the sidecar of Behind a reverse proxy, which the edge shares) a
+connection could reach the host's own services, the local network and the
+internet. `scripts/demo-egress` lets `public` reach only what its mode needs.
+It runs as root on the host, not in any image. It needs Python 3 and
+iptables alone, so the file works on a host without a checkout.
+
+It finds the network by its bridge. Docker names a bridge `br-` and a random
+id, a new one for every new network, so `compose.demo.yaml` fixes the name
+with `DEMO_PUBLIC_BRIDGE` (`br-bwtidy-demo` by default, at most 15
+characters).
+
+The modes:
+
+- `none`, for the edge alone on `public`: only the answers of connections
+  that came in leave the network. The edge answers on its published port and
+  Docker's resolver answers the name `demo` inside the container, so it needs
+  no connection of its own.
+- `vpn`, for a VPN sidecar on `public`: nothing to an address outside the
+  public internet, then UDP to any port and TCP to 80, 443 and 53. The ranges
+  it drops are "this network", the private ranges of RFC 1918, the shared
+  address space of RFC 6598 (which tailnets use), loopback, link-local,
+  multicast and the reserved range.
+
+Mode `vpn` fits a client like Tailscale: WireGuard over UDP to its peers'
+public addresses on any port, STUN on UDP 3478 and its servers over TCP 443
+and 80. What it leaves open is that UDP and TCP 443 (and 80 and 53) to any
+public address. A process that takes over the sidecar or the edge can still
+talk to the internet that way, never to the host or the local network.
+
+In both modes nothing reaches the host itself (any of its addresses, its
+public one too) apart from those answers. A client whose DNS stays in its
+own network namespace needs no more. Another client, or a host whose
+resolver is on the local network, needs `--allow-dns ADDRESS` with the
+resolver's address: UDP and TCP 53 to it pass before any drop, also to the
+host when the address is one of the host's own.
+
+It writes two chains of its own, named after the bridge. Docker checks its
+chain `DOCKER-USER` first for traffic it forwards and never flushes it, so
+`BWTIDY-FWD-NAME` is jumped to from there. Traffic to the host's own
+addresses goes through `INPUT` instead, which Docker leaves alone, so
+`BWTIDY-IN-NAME` is jumped to from `INPUT`. Each jump is the first rule of
+its chain and matches `-i NAME`. What passes returns to the rules after the
+jump, so the script never opens what Docker or the host's firewall closes.
+It needs Docker's iptables firewall (the default), which makes
+`DOCKER-USER`.
+
+The commands:
+
+```sh
+scripts/demo-egress print --bridge br-bwtidy-demo --mode vpn
+sudo scripts/demo-egress apply --bridge br-bwtidy-demo --mode vpn --allow-dns 192.0.2.53
+sudo scripts/demo-egress remove --bridge br-bwtidy-demo
+```
+
+`print` shows the iptables commands `apply` runs on a host without the
+chains and runs none of them. `apply` flushes and fills its chains again and
+keeps one jump each, so a second run changes nothing. While it runs a DROP
+rule for the bridge sits first in `DOCKER-USER` and `INPUT`, so the network
+is never open in between. A run that stops halfway leaves that rule and so
+the network closed. `remove` deletes the jumps, that rule and the chains.
+`apply` refuses a bridge name over 15 characters or with other characters
+than letters, digits, dot, dash and underscore. It stops with the cause
+when iptables is missing, when it does not run as root and when
+`DOCKER-USER` does not exist yet (Docker has not started).
+
+To run it at boot, install a copy that only root can change (root must not
+run a file of a checkout that another user can write) and a oneshot unit
+that runs after Docker:
+
+```sh
+sudo install -m 0755 scripts/demo-egress /usr/local/sbin/demo-egress
+sudo systemctl edit --force --full bwtidy-demo-egress.service
+sudo systemctl enable --now bwtidy-demo-egress.service
+```
+
+The unit:
+
+```ini
+[Unit]
+Description=Limit what the bwtidy demo's public network can reach
+After=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/demo-egress apply --bridge br-bwtidy-demo --mode vpn
+ExecStop=/usr/local/sbin/demo-egress remove --bridge br-bwtidy-demo
+
+[Install]
+WantedBy=docker.service
+```
+
+`After` starts it once Docker has made `DOCKER-USER`. `PartOf` stops and
+restarts it with Docker, and `WantedBy=docker.service` starts it whenever
+Docker starts. Docker starts the stack's containers as it starts, so for the
+moment until the unit has run the network is as open as without it. Use
+`--mode none` without a sidecar, and the bridge name of `DEMO_PUBLIC_BRIDGE`
+when you set one.
+
+It covers IPv4 alone. `compose.demo.yaml` gives no network IPv6, and a
+network with IPv6 needs the same rules in ip6tables.
 
 ## Testing
 
@@ -542,7 +746,10 @@ The demo's tests are in `demo/tests`, `scripts/ci` runs them:
 cd demo && uv run --locked pytest -q
 ```
 
-`test_init.py` checks the files of `init`, their modes, that a second run
+`test_init.py` checks the files of `init`, their owners, groups and modes
+(with `os.chown` recorded, as the tests do not run as root), that a rerun
+over files of root or of an older mode fixes them, the owners in the ledger
+(symlinks untouched), that a second run
 keeps a full set and writes a set that lacks a file anew, and that a strict
 TLS client trusting the CA accepts the
 server certificate for `vaultwarden` only. `test_controller.py` runs the
@@ -552,7 +759,10 @@ every route, `/status` and the log lines without a secret), and `BwCli`
 against a fake `bw` script (the arguments, the environment and the
 temporary directory).
 
-`test_edge.py` renders the edge's config as the container does (an empty `DEMO_TRUSTED_PROXIES` writes no real-ip config, a list writes one `set_real_ip_from` each, `DEMO_EDGE_PORT` sets the listen port) and checks that the sidecar override is valid compose.
+`test_edge.py` renders the edge's config as the container does (an empty
+`DEMO_TRUSTED_PROXIES` writes no real-ip config, a list writes one
+`set_real_ip_from` each, `DEMO_EDGE_PORT` sets the listen port) and checks that
+the sidecar override is valid compose.
 
 `test_gateway.py` runs the wrapper with the gateway's fake worker approach:
 a small script that answers the health, the bw-login sequence and an echo of
@@ -595,9 +805,12 @@ The admin API's user deletion is tested against the mock only.
 ### The stack test
 
 `scripts/demo-stack test` proves the two guarantees on running containers.
-It builds the normal image from the worktree, the demo image on top of it,
-starts the stack on a free port of 127.0.0.1 (in a compose project and with
-images named after the worktree, so several worktrees never share one) and
+It builds the normal image from the worktree, the demo image on top of it
+(never on a published image, so a change to the demo is tested with the code
+beside it and not with the last release),
+starts the stack on a free port of 127.0.0.1 (in a compose project, with
+images and a public bridge named after the worktree, so several worktrees
+never share one) and
 runs `demo/tests/stack/test_demo_stack.py` against it. `scripts/ci` never
 runs it: the file skips without `DEMO_STACK=1`.
 
@@ -623,8 +836,9 @@ checks:
   `https://vaultwarden` with a four word id, the grid and MCP's
   `list_items` (with a token capped to one day) list the fixture's items.
 - The usage stats: `/demo/stats.json` shows the vault start, the grid and
-  `list_items` without the vault's id, and a dump of the stats database holds
-  no password of the fixture and nothing shaped like a vault's password.
+  `list_items` without the vault's id. `bwtidy stats` in the `demo`
+  container lists the grid. A dump of the stats database holds no password
+  of the fixture and nothing shaped like a vault's password.
 - Every refused route answers 403 with the wrapper's text, for a stranger
   and for a visitor, with a real server in the body and in other spellings
   of the path (sent raw). Afterwards the accounts root holds the one
@@ -638,6 +852,13 @@ checks:
 - `DEMO_MAX=1`: the test starts the stack again with one vault, a second
   start while the first runs gets the "free" note, and the end of the first
   makes room.
+- The controller's user: `docker inspect` names `10100:10100` and every
+  process in the container runs as uid and gid 10100 (from `/proc`). The
+  secrets have the owners, groups and modes of Secrets.
+- An older volume: with the ledger and the secrets given to root (the
+  secrets at 0600) by a container of their own, the stack made anew fixes
+  their owners, the controller writes new ids to the ledger and the pool
+  fills again.
 
 A failure of a refused route, of a connection that must fail or of the
 cleanup is a reason to stop and find out, never to weaken the test.
@@ -653,21 +874,22 @@ docker compose -f compose.demo.yaml up -d --build
 The demo then answers on `http://127.0.0.1:8770`. Every setting has a
 default. A `.env` beside the compose file or the environment changes it:
 
-| Setting                 | Default                          | What                                                        |
-| ----------------------- | -------------------------------- | ----------------------------------------------------------- |
-| `BWTIDY_IMAGE`          | `docker.io/tnek213/bwtidy:main`  | the normal image the demo image is built on                 |
-| `DEMO_IMAGE`            | `bwtidy-demo:local`              | the name the built demo image gets                          |
-| `DEMO_BUILD_CONTEXT`    | `.`                              | the build context: the checkout, or a git URL               |
-| `DEMO_BIND`, `DEMO_PORT` | `127.0.0.1`, `8770`             | where the edge is published                                 |
-| `DEMO_EDGE_PORT`        | `80`                             | the port nginx listens on inside the edge, the published port maps to it |
-| `DEMO_TRUSTED_PROXIES`  | empty                            | reverse proxies whose `X-Forwarded-For` is believed (Behind a reverse proxy) |
-| `DEMO_HOST`             | empty                            | the public host name, for MCP's host check (`BWTIDY_MCP_HOSTS`) |
-| `DEMO_SECURE_COOKIES`   | empty                            | `1` behind HTTPS (`BWTIDY_SECURE_COOKIES`)                  |
-| `DEMO_POOL_READY`, `DEMO_MAX` | 2, 6                       | the pool and the visitors at once                           |
-| `DEMO_MAX_PENDING`      | 2                                | starts in flight (`BWTIDY_MAX_PENDING`)                     |
-| `DEMO_SESSION_IDLE`, `DEMO_SESSION_MAX` | 900, 2700        | seconds, the idle end and the hard maximum                  |
-| `DEMO_START_RATE`, `DEMO_START_BURST`, `DEMO_MCP_RATE`, `DEMO_MCP_BURST` | `6r/m`, 5, `10r/s`, 40 | the edge's limits per address |
-| `DEMO_VAULTWARDEN_DATA_SIZE`, `DEMO_ACCOUNTS_SIZE` | `256m`, `512m` | the two tmpfs the visitors fill           |
+| Setting                                                                  | Default                           | What                                                                               |
+| ------------------------------------------------------------------------ | --------------------------------- | ---------------------------------------------------------------------------------- |
+| `BWTIDY_IMAGE`                                                           | `docker.io/tnek213/bwtidy:latest` | the normal image the demo image is built on                                        |
+| `DEMO_IMAGE`                                                             | `bwtidy-demo:local`               | the name the built demo image gets                                                 |
+| `DEMO_BUILD_CONTEXT`                                                     | `.`                               | the build context: the checkout, or a git URL                                      |
+| `DEMO_BIND`, `DEMO_PORT`                                                 | `127.0.0.1`, `8770`               | where the edge is published                                                        |
+| `DEMO_EDGE_PORT`                                                         | `80`                              | the port nginx listens on inside the edge, the published port maps to it           |
+| `DEMO_TRUSTED_PROXIES`                                                   | empty                             | reverse proxies whose `X-Forwarded-For` is believed (Behind a reverse proxy)       |
+| `DEMO_PUBLIC_BRIDGE`                                                     | `br-bwtidy-demo`                  | the bridge name of the network `public`, at most 15 characters (Limit the way out) |
+| `DEMO_HOST`                                                              | empty                             | the public host name, for MCP's host check (`BWTIDY_MCP_HOSTS`)                    |
+| `DEMO_SECURE_COOKIES`                                                    | empty                             | `1` behind HTTPS (`BWTIDY_SECURE_COOKIES`)                                         |
+| `DEMO_POOL_READY`, `DEMO_MAX`                                            | 2, 6                              | the pool and the visitors at once                                                  |
+| `DEMO_MAX_PENDING`                                                       | 2                                 | starts in flight (`BWTIDY_MAX_PENDING`)                                            |
+| `DEMO_SESSION_IDLE`, `DEMO_SESSION_MAX`                                  | 900, 2700                         | seconds, the idle end and the hard maximum                                         |
+| `DEMO_START_RATE`, `DEMO_START_BURST`, `DEMO_MCP_RATE`, `DEMO_MCP_BURST` | `6r/m`, 5, `10r/s`, 40            | the edge's limits per address                                                      |
+| `DEMO_VAULTWARDEN_DATA_SIZE`, `DEMO_ACCOUNTS_SIZE`                       | `256m`, `512m`                    | the two tmpfs the visitors fill                                                    |
 
 The server (`https://vaultwarden`) is no setting: the compose file names it,
 and the wrapper refuses to start with any other.
@@ -678,41 +900,46 @@ each worker with the `bwtidy` script beside its own Python, so a second venv
 would not do): first the packages of `demo/uv.lock` at their locked
 versions and hashes, which the base already holds unless the two lock files
 drifted, then the project alone, both without resolving anything. The
-bwtidy in the demo image is the base's, never the checkout's sources. The
-default base follows `main`. A deployment pins a short-commit tag or a
-version, so it runs a bwtidy somebody chose:
+bwtidy in the demo image is the base's, never the checkout's sources.
+
+The demo runs only a release. The default base is `latest`, the newest
+release. A deployment builds the demo layer from a release's git tag on the
+image of that same version, never from main or another commit, so the demo's
+code always matches the bwtidy it wraps:
 
 ```sh
-BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234 docker compose -f compose.demo.yaml up -d --build
+git checkout v1.0.0-beta.3
+BWTIDY_IMAGE=docker.io/tnek213/bwtidy:1.0.0-beta.3 docker compose -f compose.demo.yaml up -d --build
 ```
 
 Without a checkout, the host needs `compose.demo.yaml` and
 `demo/edge/default.conf.template` and `demo/edge/15-trusted-proxies.sh` (the
 edge mounts them) at their paths, and
-`DEMO_BUILD_CONTEXT` names the repo for the build, a branch or commit after
+`DEMO_BUILD_CONTEXT` names the repo for the build, the release's tag after
 `#`:
 
 ```sh
-DEMO_BUILD_CONTEXT=https://github.com/tnek213/bwtidy.git#main docker compose -f compose.demo.yaml up -d --build
+DEMO_BUILD_CONTEXT=https://github.com/tnek213/bwtidy.git#v1.0.0-beta.3 BWTIDY_IMAGE=docker.io/tnek213/bwtidy:1.0.0-beta.3 docker compose -f compose.demo.yaml up -d --build
 ```
 
 `docker compose build` needs buildx 0.17 or later. With an older one, build
 with plain docker and start without a build, as `scripts/demo-stack` does:
 
 ```sh
-docker build -f demo/Dockerfile --build-arg BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234 -t bwtidy-demo:local .
+docker build -f demo/Dockerfile --build-arg BWTIDY_IMAGE=docker.io/tnek213/bwtidy:1.0.0-beta.3 -t bwtidy-demo:local .
 docker compose -f compose.demo.yaml up -d --no-build
 ```
 
-To build on the checkout's own bwtidy instead of a published image, build
-the normal image first (`docker build --target app -t bwtidy:demo-base .`)
-and set `BWTIDY_IMAGE=bwtidy:demo-base`.
+For local work the demo builds on the checkout's own bwtidy instead of a
+published image, as `scripts/demo-stack` does (The stack test). Build the
+normal image first (`docker build --target app -t bwtidy:demo-base .`) and
+set `BWTIDY_IMAGE=bwtidy:demo-base`.
 
 After a changed setting, `up -d` again makes the containers it concerns
 anew. `docker compose -f compose.demo.yaml down` stops the stack and keeps
-the ledger and the secrets. `down --volumes` removes them and the usage stats, and with the
-ledger the promise that an id is never used twice, so use it for a test
-stack only.
+the ledger and the secrets. `down --volumes` removes them and the usage stats,
+and with the ledger the promise that an id is never used twice, so use it for a
+test stack only.
 
 The controller's counts, from the host:
 
@@ -801,15 +1028,21 @@ being `POST /demo/start` through the edge followed by `GET /api/session`.
 | 2        | 11   | 486  | 44         | 19          | 560   |
 | 3        | 11   | 704  | 44         | 20          | 779   |
 
+Processes, `pids.current` in each container's cgroup, the peak of samples
+taken while 6 visitors started (2026-11-26, the same versions, a heartbeat
+sent for each so none ended): edge 14, demo 101 (about 15 per visitor), controller
+16, vaultwarden 42. The demo's peak memory was 1,311 MiB with the 6 visitors
+and the controller's 226 MiB.
+
 Each visitor costs about 220 MiB in the demo container and 2 to 3 MiB in
 Vaultwarden. The split of one visitor in the demo container (RSS, from
 `/proc`, since the image has no `ps`):
 
-| Process                          | RSS      |
-| -------------------------------- | -------- |
-| `bw serve` (node), per visitor   | 205-215 MB |
-| the worker (`bwtidy`), per visitor | 91 MB  |
-| the gateway, once                | 62-65 MB |
+| Process                            | RSS        |
+| ---------------------------------- | ---------- |
+| `bw serve` (node), per visitor     | 205-215 MB |
+| the worker (`bwtidy`), per visitor | 91 MB      |
+| the gateway, once                  | 62-65 MB   |
 
 The two RSS figures add up to more than the 220 MiB the container's cgroup
 counts, because the processes share the pages of the Python and node
@@ -824,14 +1057,14 @@ MiB for the accounts (`DEMO_ACCOUNTS_SIZE`) and 256 MiB for Vaultwarden
 
 The budget for a 4 GB x86 VPS, with about 1 GB kept for the OS and peaks:
 
-| Part                                     | MiB       |
-| ---------------------------------------- | --------- |
-| the four containers with no visitor      | 111       |
-| 6 visitors at 220 MiB plus 3 in Vaultwarden | 1,340  |
-| the controller's peak while it builds    | 170 more  |
-| two starts in flight (`BWTIDY_MAX_PENDING`), about 100 each for bw's login | 200 |
-| tmpfs full (both)                        | 768       |
-| total in the worst case                  | about 2,600 |
+| Part                                                                       | MiB         |
+| -------------------------------------------------------------------------- | ----------- |
+| the four containers with no visitor                                        | 111         |
+| 6 visitors at 220 MiB plus 3 in Vaultwarden                                | 1,340       |
+| the controller's peak while it builds                                      | 170 more    |
+| two starts in flight (`BWTIDY_MAX_PENDING`), about 100 each for bw's login | 200         |
+| tmpfs full (both)                                                          | 768         |
+| total in the worst case                                                    | about 2,600 |
 
 That is under the 3 GB that remain after the 1 GB, so the default stays at
 `DEMO_MAX=6` and `BWTIDY_MAX_WORKERS=6`, and `DEMO_POOL_READY=2` (a ready
@@ -839,16 +1072,16 @@ vault is only a user in Vaultwarden, no process, so the pool costs almost
 nothing). 8 visitors would add 440 MiB and reach the limit with full tmpfs,
 so a bigger machine is what raises `DEMO_MAX`, by about 220 MiB each.
 
-## On the maintainer's host
+## Private, through an SSH tunnel
 
 For a host where only the maintainer may reach the demo (the demo is not
 public there). Keep the default `DEMO_BIND=127.0.0.1`, so the edge listens
 on loopback of the host and nothing else can connect:
 
 ```sh
-git clone https://github.com/tnek213/bwtidy.git
+git clone --branch v1.0.0-beta.3 https://github.com/tnek213/bwtidy.git
 cd bwtidy
-BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234 docker compose -f compose.demo.yaml up -d --build
+BWTIDY_IMAGE=docker.io/tnek213/bwtidy:1.0.0-beta.3 docker compose -f compose.demo.yaml up -d --build
 ```
 
 From a laptop, an SSH tunnel brings the port over, and the demo is at
@@ -878,22 +1111,22 @@ front of it holds the certificate for the public name.
 1. Put these in a `.env` beside `compose.demo.yaml`, with the public name:
 
    ```sh
-   BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234
+   BWTIDY_IMAGE=docker.io/tnek213/bwtidy:1.0.0-beta.3
    DEMO_HOST=demo.example.org
    DEMO_SECURE_COOKIES=1
    ```
 
    `DEMO_SECURE_COOKIES=1` sets the Secure flag on the cookies, which only
    works behind HTTPS. `DEMO_HOST` lets MCP's host check accept the name.
-   `BWTIDY_IMAGE` pins the normal image to a short-commit tag, so the demo
+   `BWTIDY_IMAGE` pins the normal image to a release, so the demo
    runs a bwtidy somebody chose.
 
-2. Build from a pinned commit with a remote git context, so the VPS needs no
-   checkout of the sources (only `compose.demo.yaml` and
-   the two files of `demo/edge` at their paths):
+2. Build from the tag of that release with a remote git context, so the VPS
+   needs no checkout of the sources (only `compose.demo.yaml` and the two
+   files of `demo/edge` at their paths, taken from the same tag):
 
    ```sh
-   DEMO_BUILD_CONTEXT=https://github.com/tnek213/bwtidy.git#COMMIT docker compose -f compose.demo.yaml up -d --build
+   DEMO_BUILD_CONTEXT=https://github.com/tnek213/bwtidy.git#v1.0.0-beta.3 docker compose -f compose.demo.yaml up -d --build
    ```
 
    With a buildx older than 0.17, build with plain docker as in Run it.
@@ -901,7 +1134,7 @@ front of it holds the certificate for the public name.
 3. A reverse proxy for the public name, which sets no limits of its own
    (the edge has them). Caddy gets the certificate by itself:
 
-   ```
+   ```text
    demo.example.org {
        reverse_proxy 127.0.0.1:8770
    }
@@ -909,7 +1142,7 @@ front of it holds the certificate for the public name.
 
    The same with nginx and a certificate from certbot:
 
-   ```
+   ```nginx
    server {
        listen 443 ssl;
        server_name demo.example.org;
@@ -928,10 +1161,10 @@ front of it holds the certificate for the public name.
    the proxy for every visitor, unless the edge trusts the proxy's
    `X-Forwarded-For` (Behind a reverse proxy).
 
-Updating: pull the new commit or set a new `COMMIT` and `BWTIDY_IMAGE`, and
-run the `up -d --build` again. Every container that changed is made anew,
-and every demo running ends with it (Vaultwarden starts empty). The ledger
-volume stays, so no id is used twice.
+Updating: check out the new release's tag or set it in `DEMO_BUILD_CONTEXT`,
+set its version in `BWTIDY_IMAGE` and run the `up -d --build` again. Every
+container that changed is made anew, and every demo running ends with it
+(Vaultwarden starts empty). The ledger volume stays, so no id is used twice.
 
 Logs: `docker compose -f compose.demo.yaml logs -f demo controller edge`
 (each log is capped at 3 files of 10 MB). The controller's counts are in the
@@ -972,7 +1205,8 @@ A visitor cannot:
 - Log in to any other server or account: `BWTIDY_ALLOWED_SERVERS` holds only
   the demo's Vaultwarden, the routes that create or change a login or an
   account are refused (Refused routes), and no container but the edge has a
-  route out of the host.
+  route out of the host (which `scripts/demo-egress` limits, Limit the way
+  out).
 - See or reach another visitor's vault: each has its own account directory,
   its own uid and cookies, and its own Vaultwarden user.
 - Reach Vaultwarden's admin page, the controller or the demo gateway

@@ -48,8 +48,9 @@ async def list_items_settled(client: BwClient) -> list[dict[str, Any]]:
 
 
 class VaultCache:
-    """The vault in RAM: its items, folders, collections, organizations and the items in the
-    trash, and own, the chain of bwtidy's own writes this session (own_writes.py)."""
+    """The vault in RAM: its items, folders, collections, organizations, the items in the
+    trash and the archived items, and own, the chain of bwtidy's own writes this session
+    (own_writes.py)."""
 
     def __init__(self, client: BwClient, on_load: Callable[[], None]) -> None:
         self._client = client
@@ -59,10 +60,16 @@ class VaultCache:
         self.folders: list[dict[str, Any]] = []
         self.collections: list[dict[str, Any]] = []
         self.organizations: list[dict[str, Any]] = []
-        ## the items in the trash and their ids, so a restore knows what it can take out of it
-        ## and a folder that still holds one is not deleted
+        ## the items in the trash, so a folder that still holds one is not deleted, and the ids
+        ## of every item in the trash (the archived ones too), so a restore knows what it can
+        ## take out of it
         self.trashed: list[dict[str, Any]] = []
         self.trash_ids: set[str] = set()
+        ## the archived items, which every other listing leaves out: those that are not in the
+        ## trash (archived) and those that are (archived_trash). The backups' fingerprint, the
+        ## restores and the folder checks read them (docs/spec.md, Backups)
+        self.archived: list[dict[str, Any]] = []
+        self.archived_trash: list[dict[str, Any]] = []
         self.loaded = False
         self.own = OwnWrites()
         ## how many loads replaced the items, so what is computed from them (formats.py) knows
@@ -76,6 +83,14 @@ class VaultCache:
     def items_by_id(self) -> dict[str, dict[str, Any]]:
         """The items by id, an item without an id left out."""
         return {item["id"]: item for item in self.items if item.get("id")}
+
+    def archived_by_id(self) -> dict[str, dict[str, Any]]:
+        """The archived items that are not in the trash by id, an item without an id left out."""
+        return {item["id"]: item for item in self.archived if item.get("id")}
+
+    def set_aside(self) -> list[dict[str, Any]]:
+        """The items the item listing leaves out: those in the trash and the archived ones."""
+        return [*self.trashed, *self.archived, *self.archived_trash]
 
     def replace_item(self, item_id: str, item: dict[str, Any]) -> None:
         """Put bw serve's answer to an own PUT in place of the cached item, until the next
@@ -91,7 +106,9 @@ class VaultCache:
         self.collections = await self._client.list_collections()
         self.organizations = await self._client.list_organizations()
         self.trashed = await self._client.list_trash()
-        self.trash_ids = {i["id"] for i in self.trashed if i.get("id")}
+        self.archived = await self._client.list_archived()
+        self.archived_trash = await self._client.list_archived(trash=True)
+        self.trash_ids = {i["id"] for i in [*self.trashed, *self.archived_trash] if i.get("id")}
         self.loaded = True
         try:
             self._on_load()
@@ -106,5 +123,7 @@ class VaultCache:
         self.organizations = []
         self.trashed = []
         self.trash_ids = set()
+        self.archived = []
+        self.archived_trash = []
         self.loaded = False
         self.own.clear()

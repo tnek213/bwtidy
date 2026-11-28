@@ -1,0 +1,125 @@
+# Adds the commit that a bump of the Bitwarden CLI needs to Dependabot's pull request: main's
+# scripts/update-deps --cli-pin writes source.json, the docs that name the version from the
+# pull request's docker/bitwarden-cli/package.json and the pull request's bullet in the release
+# notes (dev/release.md, The CLI pin of Dependabot's pull requests). It runs main's workflow and
+# main's script with a token that can write, so it never runs anything from the pull request:
+# that checkout is only data the script reads and writes. By hand it takes the number of such a
+# pull request.
+name: Dependabot CLI pin
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: The number of Dependabot's pull request that bumps the Bitwarden CLI
+        type: number
+        required: true
+
+# contents to make the commit, pull-requests to read the pull request
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: dependabot-cli-pin-${{ github.event.pull_request.number || inputs.pull_request }}
+  cancel-in-progress: false
+
+jobs:
+  pin:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'dependabot/npm_and_yarn/docker/bitwarden-cli/'))
+    runs-on: ubuntu-latest
+    steps:
+      # the event's copy of the pull request is old by the time a run by hand starts, so both read
+      # it again and check it the same way
+      - name: Check the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.pull_request.number || inputs.pull_request }}
+        run: |
+          fields=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$NUMBER" \
+            --jq '[.user.login, .head.repo.full_name // "", .head.ref, .head.sha, .base.ref, .state] | @tsv')
+          IFS=$'\t' read -r author repo ref sha base state <<<"$fields"
+          if [ "$author" != 'dependabot[bot]' ] || [ "$repo" != "$GITHUB_REPOSITORY" ] \
+            || [ "$base" != main ] || [ "$state" != open ] \
+            || [[ ! "$ref" =~ ^dependabot/npm_and_yarn/docker/bitwarden-cli/[A-Za-z0-9._/-]+$ ]] \
+            || [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "pull request $NUMBER is not an open Dependabot bump of the Bitwarden CLI on this repo" >&2
+            exit 1
+          fi
+          echo "ref=$ref" >>"$GITHUB_OUTPUT"
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+      # main's workflow and script, the code that runs
+      # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          path: main
+          persist-credentials: false
+      # the pull request's files, data that nothing runs
+      # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+          path: head
+          persist-credentials: false
+      - name: Write the CLI pin
+        id: pin
+        env:
+          NUMBER: ${{ github.event.pull_request.number || inputs.pull_request }}
+        run: |
+          version=$(jq -r '.dependencies["@bitwarden/cli"]' head/docker/bitwarden-cli/package.json)
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "docker/bitwarden-cli/package.json pins @bitwarden/cli at '$version', not X.Y.Z" >&2
+            exit 1
+          fi
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          python3 main/scripts/update-deps --cli-pin --root head --pr "$NUMBER"
+      # through the API, as GitHub signs a commit it makes there (Protect main requires signed
+      # commits) and git push would sign nothing
+      - name: Commit the CLI pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ steps.pr.outputs.ref }}
+          SHA: ${{ steps.pr.outputs.sha }}
+          VERSION: ${{ steps.pin.outputs.version }}
+        run: |
+          unexpected=$(git -C head status --porcelain --untracked-files=all | grep -v '^ M ' || true)
+          if [ -n "$unexpected" ]; then
+            echo "the CLI pin did more than change tracked files:" >&2
+            echo "$unexpected" >&2
+            exit 1
+          fi
+          mapfile -t changed < <(git -C head diff --name-only)
+          if [ "${#changed[@]}" -eq 0 ]; then
+            echo "the pull request pins the CLI source already"
+            exit 0
+          fi
+          additions='[]'
+          for path in "${changed[@]}"; do
+            additions=$(jq --arg path "$path" --arg contents "$(base64 -w0 "head/$path")" \
+              '. + [{path: $path, contents: $contents}]' <<<"$additions")
+          done
+          jq -n --arg repo "$GITHUB_REPOSITORY" --arg ref "$REF" --arg sha "$SHA" \
+            --arg headline "Pin the Bitwarden CLI source to cli-v$VERSION" --argjson additions "$additions" \
+            '{
+              query: "mutation ($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid url } } }",
+              variables: {input: {
+                branch: {repositoryNameWithOwner: $repo, branchName: $ref},
+                expectedHeadOid: $sha,
+                message: {headline: $headline},
+                fileChanges: {additions: $additions}
+              }}
+            }' >"$RUNNER_TEMP/commit.json"
+          url=$(gh api graphql --input "$RUNNER_TEMP/commit.json" --jq '.data.createCommitOnBranch.commit.url')
+          echo "committed $url"
+          # GitHub holds the pull_request runs of a push made with GITHUB_TOKEN until someone with
+          # write access approves them, and a run started any other way does not count as ci
+          echo "::notice::Committed the CLI pin. Approve the workflows to run in the pull request's merge box, ci then runs on the new commit."

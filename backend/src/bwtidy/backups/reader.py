@@ -39,12 +39,15 @@ class BackupContents:
                 self._members = set(archive.namelist())
                 items = json.loads(archive.read("raw/items.json"))
                 trash = json.loads(archive.read("raw/trash.json"))
+                archived = json.loads(archive.read("raw/archived.json"))
                 self.folder_names = _names(archive, "raw/folders.json")
                 self.collection_names = _names(archive, "raw/collections.json")
         except (zipfile.BadZipFile, KeyError, ValueError):
             raise ValueError(f"the backup {name} is damaged") from None
         self.items: dict[str, dict[str, Any]] = {i["id"]: i for i in items if i.get("id")}
         self.trash: dict[str, dict[str, Any]] = {i["id"]: i for i in trash if i.get("id")}
+        ## the archived items, those in the trash too
+        self.archived: dict[str, dict[str, Any]] = {i["id"]: i for i in archived if i.get("id")}
 
     def attachment_member(self, item: dict[str, Any], attachment: dict[str, Any]) -> str | None:
         """Where the backup holds an attachment of a backup item, None when it does not.

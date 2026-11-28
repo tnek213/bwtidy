@@ -1,19 +1,13 @@
 {#- The beta disclaimer as a banner above every page, without a button to close it. A wider content
 column than the theme's, and a picture that opens larger on a click. All of it inline, from no
-CDN, as a running bwtidy serves the site offline. -#}
+CDN, as a running bwtidy serves the site offline. The colors and the code font are in
+docs/assets/stylesheets/theme.css. -#}
 {% extends "base.html" %}
 
 {% block extrahead %}
   {#- Links and requests to other sites carry no Referer, so a self-hosted bwtidy's address stays private. -#}
   <meta name="referrer" content="same-origin">
   <style>
-    .md-banner {
-      color: #1a1a1a;
-      background-color: #ffc400;
-    }
-    [data-md-color-scheme="slate"] .md-banner {
-      background-color: #f0b400;
-    }
     /* one slim line: the colour draws the eye, the size need not */
     .md-banner .md-banner__inner {
       margin-top: .15rem;
@@ -42,10 +36,11 @@ CDN, as a running bwtidy serves the site offline. -#}
     /* running text keeps a readable line length, while pictures, tables and code keep the whole column */
     .md-typeset p:not(:has(img)),
     .md-typeset li:not(:has(img, table, pre)),
+    .md-typeset :is(h1, h2, h3, h4, h5, h6),
     .md-typeset blockquote:not(:has(img, table, pre)),
     .md-typeset .admonition:not(:has(img, table, pre)),
     .md-typeset details:not(:has(img, table, pre)) {
-      max-width: 80ch;
+      max-width: 72ch;
     }
     .md-typeset table p,
     .md-typeset table li {

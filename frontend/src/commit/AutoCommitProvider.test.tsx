@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import App from '../App.tsx'
 import type { GridData } from '../api/grid.ts'
 import { accountQueryKey } from '../api/account.ts'
-import { jsonResponse, mockFetch, newQueryClient, renderWithQuery, waitForPolls } from '../test-utils.tsx'
+import { advanceClock, jsonResponse, mockFetch, newQueryClient, renderWithQuery, waitForPolls } from '../test-utils.tsx'
 import type { AutoCommitStatus } from './autoCommit.ts'
 import type { DiffRow, QueueEntry } from '../api/queue.ts'
 import { showAccount, switchAccount } from '../shared/account.ts'
@@ -148,7 +148,7 @@ test.each([
   [
     'both',
     [uiEntry(7, usernameEdit), mcpEntry(8)],
-    'Queue, 1 unsaved edits, 1 MCP proposals to review',
+    'Queue, 2 pending: 1 unsaved edits, 1 MCP proposals to review',
     /^1 unsaved edits\. Saved automatically in [0-9] s\.1 MCP proposals to review\.$/,
   ],
   ['nothing', [], 'Queue, nothing pending', /^Nothing pending\.$/],
@@ -210,7 +210,7 @@ test('a value a commit took stays in the grid until the grid reloaded after the 
   // The commit takes the entry from the pending list and runs.
   pending = []
   committing = true
-  await act(() => vi.advanceTimersByTimeAsync(3000))
+  await advanceClock(3000)
   expect(username()).toHaveTextContent('user.l')
   expect(gridCalls(fetchMock)).toBe(1)
 
@@ -223,7 +223,7 @@ test('a value a commit took stays in the grid until the grid reloaded after the 
   committing = false
   commits = 1
   await waitForPolls(() => expect(gridCalls(fetchMock)).toBe(2))
-  await act(() => vi.advanceTimersByTimeAsync(3000))
+  await advanceClock(3000)
   expect(username()).toHaveTextContent('user.l')
   expect(username()).toHaveClass('bw-queued-cell')
 
@@ -251,7 +251,7 @@ test('two commits in a row keep both values until the grid reloaded after the se
   // The first commit runs, and an edit queued meanwhile waits for the next one.
   pending = []
   committing = true
-  await act(() => vi.advanceTimersByTimeAsync(2000))
+  await advanceClock(2000)
   pending = [uiEntry(8, brandEdit)]
   await waitForPolls(() => expect(brand()).toHaveClass('bw-queued-cell'))
 
@@ -259,7 +259,7 @@ test('two commits in a row keep both values until the grid reloaded after the se
   pending = []
   commits = 1
   vault = written(usernameEdit)
-  await act(() => vi.advanceTimersByTimeAsync(3000))
+  await advanceClock(3000)
   expect(gridCalls(fetchMock)).toBe(1)
   expect(username()).toHaveTextContent('user.l')
   expect(brand()).toHaveTextContent('Mastercard')
@@ -341,7 +341,7 @@ test('a commit that fails names the items and reasons, marks the conflict and ti
   const reloads = gridCalls(fetchMock)
   commits = 2
   await waitForPolls(() => expect(gridCalls(fetchMock)).toBeGreaterThan(reloads))
-  await act(() => vi.advanceTimersByTimeAsync(2000))
+  await advanceClock(2000)
   expect(screen.queryByText(/Could not save/)).toBeNull()
 })
 

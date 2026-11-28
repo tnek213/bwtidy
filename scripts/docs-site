@@ -38,6 +38,16 @@ backend/pyproject.toml spelled the semver way, then the commit, from BWTIDY_COMM
 Dockerfile passes it) or else the checkout's last commit, as `0.1.0-alpha.1 (261111 7db8830)`.
 It fails when the page lacks the line. `serve` shows the page as it is.
 
+A page offers a shell command for Bash and for Windows PowerShell as a pair (AGENTS.md, Writing
+docs): the paragraph "Linux, macOS, WSL (Bash):" and a ```sh block, then the paragraph
+"Windows (PowerShell):" and a ```powershell block. After the version is in, `build` turns each
+pair of its copy of docs/ into two content tabs (SHELL_TABS), titled by the labels without their
+colon and with each code block indented by 4 spaces below its title, so the lines stay where they
+were. zensical.toml links the tabs, so a click on one shows the same shell in every tab group of
+the page and the choice is kept. A label not directly followed by its code block, or one half of
+a pair without the other, fails the build, naming the page and the line. The checkout keeps plain
+Markdown, which GitHub and a backup's RESTORE.md show as it is, and so does `serve`.
+
 Both `build` and `serve` hand the pages that version as extra.bwtidy_version (the link to the
 docs issue form), its semver alone as extra.bwtidy_release and the repo's star count from
 BWTIDY_STARS as extra.bwtidy_stars, left out when the variable is unset or not digits only (the
@@ -53,13 +63,21 @@ source to BWTIDY_KROKI_URL (https://kroki.io when unset or empty) as TYPE/svg, a
 with MERMAID_INIT as its first line unless it starts with an init directive of its own, and resvg
 (resvg-py of the group docs, run through uv) converts the SVG at ZOOM and DPI on BACKGROUND,
 drawing the text with the system's fonts (GENERIC_FONTS: the first installed one of each list
-stands in for serif, sans-serif and monospace). A diagram with a text that none of them draws
-(resvg would leave it out without a word) fails the build, naming the page, the line, the generic
-family and the fonts it tried. The PNG is named after a hash of the type, the source and the
-converter's settings, and kept under that hash in .cache/kroki/ at the repo root, so a later build
-finds it there and makes no request. A server that cannot be reached or answers with an error fails
-the build, naming the page, the line and the server's message. Docs without a diagram build without
-any request. `serve` shows a diagram as its code block.
+stands in for serif, sans-serif and monospace). Before resvg runs, a font-family list that names
+no generic family gets the one of its first font in NAMED_FONTS (Helvetica and Arial sans-serif,
+Times serif, Courier monospace), and of a font d2 embeds sans-serif or monospace with its weight
+and style, as resvg loads no font an SVG embeds and draws a missing font in the serif one. A
+generic family in another case is written in lower case, the only one resvg knows. A diagram with
+a text that none of them draws (resvg would leave it out without a word) fails the build, naming
+the page, the line, the generic family and the fonts it tried, and so does a text whose list
+names neither an installed font nor a generic family. The PNG is named after a hash of the type,
+the source and the converter's settings, and kept under that hash in .cache/kroki/ at the repo
+root, so a later build finds it there and makes no request. resvg writes the PNGs into a temp
+directory inside that cache, so each one is renamed into place on the same filesystem and a failed
+conversion leaves nothing. A server that cannot be reached or answers with an error fails the
+build, naming the page, the line and the server's message. Docs without a diagram build without
+any request. `serve` shows a diagram as its code block, as zensical.toml has SuperFences take a
+fence whose info string holds an option it does not know (relaxed_headers).
 """
 
 import hashlib
@@ -94,6 +112,9 @@ BANNER_MARKER = "data-disclaimer"
 ## backend/src/bwtidy/backups/collect.py (a test checks they agree)
 RESTORE_PAGE = "restore.md"
 RESTORE_DOC_COMMIT = "Written for bwtidy COMMIT."
+## the label paragraphs of a pair of shell commands (AGENTS.md, Writing docs) and the language of
+## the fence each one comes with, in their order. The build makes the pair linked content tabs.
+SHELL_TABS = (("Linux, macOS, WSL (Bash):", "sh"), ("Windows (PowerShell):", "powershell"))
 ## what Zensical writes at the top of every site, so a directory that holds both is a build
 BUILD_MARKERS = ("index.html", "sitemap.xml")
 ## a command in the backend's group docs (Zensical and resvg-py), without bwtidy itself
@@ -167,9 +188,38 @@ GENERIC_FONTS = {
     "sans_serif": ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans", "Noto Sans"],
     "monospace": ["Courier New", "Liberation Mono", "DejaVu Sans Mono", "Noto Sans Mono"],
 }
-## run in the group docs with ZOOM, BACKGROUND, DPI, the JSON of GENERIC_FONTS and then pairs of
-## an SVG and a PNG path. It converts what it can and prints a line "SVG<tab>WHY" for each SVG it
-## cannot convert or whose text no installed font draws.
+## named fonts a diagram often asks for, by the generic family whose stand-in draws them where
+## they are missing. resvg draws a missing font in the serif one, so a font-family list that names
+## one of these and no generic family gets that family at its end, in any case of the name.
+NAMED_FONTS = {
+    "serif": ["Times", "Times New Roman", "Times-Roman", "Georgia", "Cambria", "Palatino"],
+    "sans_serif": [
+        "Arial",
+        "Helvetica",
+        "Helvetica Neue",
+        "Verdana",
+        "Tahoma",
+        "Trebuchet MS",
+        "Segoe UI",
+        "Calibri",
+        "Lucida Grande",
+        "Open Sans",
+        "Roboto",
+        "Source Sans Pro",
+    ],
+    "monospace": [
+        "Courier",
+        "Courier New",
+        "Consolas",
+        "Menlo",
+        "Monaco",
+        "Lucida Console",
+        "Source Code Pro",
+    ],
+}
+## run in the group docs with ZOOM, BACKGROUND, DPI, the JSON of GENERIC_FONTS and NAMED_FONTS and
+## then pairs of an SVG and a PNG path. It converts what it can and prints a line "SVG<tab>WHY"
+## for each SVG it cannot convert or whose text no installed font draws.
 CONVERT = """
 import html
 import json
@@ -185,7 +235,19 @@ PROBE = (
 ## so a probe with this as serif finds only the family it names.
 NOWHERE = "bwtidy no such font"
 CSS_FAMILY = re.compile(r"font-family\\s*:\\s*([^;}]+)")
+## an @font-face rule declares a font the SVG embeds, which resvg does not load
+FONT_FACE = re.compile(r"@font-face\\s*\\{[^}]*\\}")
+CSS_FONT = re.compile(r"(@font-face\\s*\\{[^}]*\\})|font-family\\s*:\\s*([^;}]+)")
+## d2 embeds its fonts (Source Sans Pro and Source Code Pro) by names like d2-123-font-bold
+D2_FONT = re.compile(r"d2-\\d+-font-([a-z-]+)")
 GENERIC_NAMES = {"serif": "serif", "sans-serif": "sans_serif", "monospace": "monospace"}
+CSS_GENERICS = {key: name for name, key in GENERIC_NAMES.items()}
+SVG_NS = "http://www.w3.org/2000/svg"
+XLINK_NS = "http://www.w3.org/1999/xlink"
+
+
+def local(tag):
+    return tag.rsplit("}", 1)[-1] if isinstance(tag, str) else ""
 
 
 def draws(render, family, fonts):
@@ -207,40 +269,140 @@ def generic_families(render, candidates):
     return chosen
 
 
-## the font-family lists of an SVG that holds text, "" for resvg's default, else none.
+## the CSS name of the generic family that stands in for each named font, by its name in lower case
+def named_generics(named):
+    return {
+        name.lower(): CSS_GENERICS[key] for key, names in named.items() for name in names
+    }
+
+
+## a font-family list as resvg draws it as meant, with the CSS a d2 font asks for besides.
+## resvg knows a generic family only unquoted in lower case, and draws a missing font in serif.
+def fitted(family, generics):
+    names = [name.strip() for name in family.split(",") if name.strip()]
+    lowered = [name.lower() if name.lower() in GENERIC_NAMES else name for name in names]
+    if lowered != names:
+        return ", ".join(lowered), {}
+    if any(name in GENERIC_NAMES for name in names):
+        return family, {}
+    for name in names:
+        bare = name.strip("'\\"")
+        d2 = D2_FONT.fullmatch(bare)
+        if d2:
+            parts = d2[1].split("-")
+            css = {}
+            if "bold" in parts:
+                css["font-weight"] = "bold"
+            elif "semibold" in parts:
+                css["font-weight"] = "600"
+            if "italic" in parts:
+                css["font-style"] = "italic"
+            generic = "monospace" if "mono" in parts else "sans-serif"
+            return ", ".join([*names, generic]), css
+        if bare.lower() in generics:
+            return ", ".join([*names, generics[bare.lower()]]), {}
+    return family, {}
+
+
+## the SVG with every font-family list fitted, the same bytes when none needed it
+def with_generic_families(svg, named):
+    try:
+        root = ElementTree.fromstring(svg)
+    except ElementTree.ParseError:
+        return svg
+    generics = named_generics(named)
+    changed = False
+
+    def fit_css(css):
+        def one(match):
+            nonlocal changed
+            if match[1]:
+                return match[0]
+            value = match[2].rstrip()
+            family, extra = fitted(value, generics)
+            if family == value and not extra:
+                return match[0]
+            changed = True
+            declarations = "".join(f"; {name}: {setting}" for name, setting in extra.items())
+            return f"font-family: {family}{declarations}{match[2][len(value):]}"
+
+        return CSS_FONT.sub(one, css)
+
+    for element in root.iter():
+        family = element.get("font-family")
+        if family:
+            new, extra = fitted(family, generics)
+            if new != family or extra:
+                changed = True
+                element.set("font-family", new)
+                for name, setting in extra.items():
+                    element.attrib.setdefault(name, setting)
+        if element.get("style"):
+            element.set("style", fit_css(element.get("style")))
+        if local(element.tag) == "style" and element.text:
+            element.text = fit_css(element.text)
+    if not changed:
+        return svg
+    ElementTree.register_namespace("", SVG_NS)
+    ElementTree.register_namespace("xlink", XLINK_NS)
+    return ElementTree.tostring(root)
+
+
+## the font-family lists of an SVG that holds text, "" for resvg's default, else none. The
+## families its @font-face rules declare, apart.
 def text_families(svg):
     try:
         root = ElementTree.fromstring(svg)
     except ElementTree.ParseError:
-        return []
+        return [], set()
     elements = list(root.iter())
-    texts = [e for e in elements if e.tag.rsplit("}", 1)[-1] == "text"]
+    texts = [e for e in elements if local(e.tag) == "text"]
     if not any("".join(text.itertext()).strip() for text in texts):
-        return []
+        return [], set()
     found = []
+    embedded = set()
     for element in elements:
         if element.get("font-family"):
             found.append(element.get("font-family"))
         css = element.get("style") or ""
-        if element.tag.rsplit("}", 1)[-1] == "style":
+        if local(element.tag) == "style":
             css += " " + "".join(element.itertext())
-        found += CSS_FAMILY.findall(css)
-    return list(dict.fromkeys(family.strip() for family in found)) or [""]
+        for face in FONT_FACE.findall(css):
+            embedded.update(f.strip().strip("'\\"") for f in CSS_FAMILY.findall(face))
+        found += CSS_FAMILY.findall(FONT_FACE.sub("", css))
+    families = list(dict.fromkeys(family.strip() for family in found)) or [""]
+    return families, embedded
 
 
-## the generic family a font-family list falls back on, serif as resvg's when it names none.
+## the generic family a font-family list falls back on, serif (resvg's default) for no list at
+## all and None for a list of named fonts alone
 def generic_of(family):
+    if not family.strip():
+        return "serif"
     for name in family.split(","):
-        name = name.strip().strip("'\\"").lower()
-        if name in GENERIC_NAMES:
-            return name
-    return "serif"
+        if name.strip() in GENERIC_NAMES:
+            return name.strip()
+    return None
 
 
-## why a text of the SVG would be left out for want of a font, or None when all draw.
+## why a text of the SVG would be left out or drawn in another font, or None when all draw.
 def missing_font(render, svg, fonts, candidates):
-    for family in text_families(svg):
+    families, embedded = text_families(svg)
+    for family in families:
         generic = generic_of(family)
+        if generic is None:
+            ## a font of the list itself has to draw, not resvg's serif fallback
+            if draws(render, family, {**fonts, "serif_family": NOWHERE}):
+                continue
+            names = [name.strip().strip("'\\"") for name in family.split(",")]
+            inside = [name for name in names if name in embedded]
+            why = ""
+            if inside:
+                why = f", {inside[0]} is a font the SVG embeds and resvg does not load"
+            return (
+                f"no installed font draws its text in {family}{why}, "
+                "and it names no generic family (serif, sans-serif or monospace) to fall back on"
+            )
         key = GENERIC_NAMES[generic]
         ## the text has to draw in a font of its own list, not in resvg's serif fallback
         probe = {**fonts, "serif_family": fonts.get(f"{key}_family", NOWHERE)}
@@ -253,14 +415,19 @@ def missing_font(render, svg, fonts, candidates):
 def main(args):
     import resvg_py
 
-    zoom, background, dpi, candidates, *paths = args
+    zoom, background, dpi, candidates, named, *paths = args
     candidates = json.loads(candidates)
+    named = json.loads(named)
     render = resvg_py.svg_to_bytes
     fonts = generic_families(render, candidates)
     failed = False
     for svg, png in zip(paths[::2], paths[1::2]):
         with open(svg, "rb") as file:
-            source = file.read()
+            original = file.read()
+        source = with_generic_families(original, named)
+        if source != original:
+            with open(svg, "wb") as file:
+                file.write(source)
         why = missing_font(render, source, fonts, candidates)
         if why:
             print(f"{svg}\\t{why}", file=sys.stderr)
@@ -524,6 +691,109 @@ def fill_in_version(docs: Path, version: str) -> bool:
     return True
 
 
+class ShellTabsError(Exception):
+    """A label of a pair of shell commands that is not where the pair needs it, at line."""
+
+    def __init__(self, line: int, message: str) -> None:
+        super().__init__(message)
+        self.line = line
+
+
+def block_end(lines: list[str], start: int, fence: str) -> int:
+    """The index of the line that closes the code block opened at start, else the last line."""
+    end = start + 1
+    while end < len(lines) and not closes(lines[end], fence):
+        end += 1
+    return min(end, len(lines) - 1)
+
+
+def next_block(lines: list[str], index: int) -> int | None:
+    """The index of the first line after index that is not blank, None when there is none."""
+    return next((i for i in range(index + 1, len(lines)) if lines[i].strip()), None)
+
+
+def shell_fence(lines: list[str], label: int, indent: str, language: str) -> tuple[int, int]:
+    """The first and last line of the code block in language right after the label at label."""
+    start = next_block(lines, label)
+    match = OPENING_FENCE.match(lines[start]) if start is not None else None
+    if start is None or not match or match[1] != indent or match[3].split()[:1] != [language]:
+        name = lines[label].strip()
+        raise ShellTabsError(
+            label + 1, f"{name!r} is not directly followed by a ```{language} block"
+        )
+    return start, block_end(lines, start, match[2])
+
+
+def tab_line(line: str, indent: str) -> str:
+    """A line of a code block as the content of a tab at indent: 4 spaces further in."""
+    return f"{indent}    {line.removeprefix(indent)}" if line.strip() else line
+
+
+def shell_tabs(text: str) -> str:
+    """The markdown text with each pair of shell commands as two linked content tabs.
+
+    A pair is the paragraph of each label of SHELL_TABS directly followed by its code block, the
+    Bash one first. Each label becomes the title of a tab without its colon, and its code block
+    is indented by 4 spaces below it, so the text keeps its lines. A label without its code block
+    and one half of a pair without the other raise a ShellTabsError. A code block is copied whole,
+    so a label inside one stays as it is."""
+    (bash, bash_language), (powershell, powershell_language) = SHELL_TABS
+    lines = text.split("\n")
+    out: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        fence = OPENING_FENCE.match(line)
+        if fence:
+            end = block_end(lines, index, fence[2])
+            out += lines[index : end + 1]
+            index = end + 1
+            continue
+        indent = line[: len(line) - len(line.lstrip())]
+        if line.strip() == powershell:
+            raise ShellTabsError(
+                index + 1,
+                f"{powershell!r} without {bash!r} and its ```{bash_language} block before it",
+            )
+        if line.strip() != bash:
+            out.append(line)
+            index += 1
+            continue
+        first = shell_fence(lines, index, indent, bash_language)
+        second_label = next_block(lines, first[1])
+        if second_label is None or lines[second_label].rstrip() != f"{indent}{powershell}":
+            raise ShellTabsError(
+                index + 1,
+                f"{bash!r} and its ```{bash_language} block without {powershell!r} and its "
+                f"```{powershell_language} block right after them",
+            )
+        second = shell_fence(lines, second_label, indent, powershell_language)
+        for label, (start, end) in ((index, first), (second_label, second)):
+            title = lines[label].strip().removesuffix(":")
+            out.append(f'{indent}=== "{title}"')
+            out += lines[label + 1 : start]
+            out += [tab_line(fenced, indent) for fenced in lines[start : end + 1]]
+            if label == index:
+                out += lines[end + 1 : second_label]
+        index = second[1] + 1
+    return "\n".join(out)
+
+
+def make_shell_tabs(docs: Path) -> list[str]:
+    """Turn the pairs of shell commands of every page under docs into tabs, the problems found."""
+    problems = []
+    for page in sorted(docs.rglob("*.md")):
+        text = page.read_text(encoding="utf-8")
+        try:
+            tabbed = shell_tabs(text)
+        except ShellTabsError as error:
+            problems.append(f"{page.relative_to(docs.parent).as_posix()}:{error.line}: {error}")
+            continue
+        if tabbed != text:
+            page.write_text(tabbed, encoding="utf-8")
+    return problems
+
+
 def without_banner(site: Path) -> list[str]:
     """The HTML pages of a built site that lack the disclaimer banner's marker."""
     pages = sorted(site.rglob("*.html"))
@@ -642,7 +912,7 @@ def kroki_source(diagram: Diagram) -> str:
 
 def diagram_key(kind: str, source: str) -> str:
     """The hash a picture is named and cached by: its type, its source and the converter."""
-    settings = [CONVERTER, GENERIC_FONTS]
+    settings = [CONVERTER, GENERIC_FONTS, NAMED_FONTS]
     return hashlib.sha256(json.dumps([kind, source, settings]).encode()).hexdigest()
 
 
@@ -679,7 +949,8 @@ def fetch_svg(kind: str, source: str) -> bytes:
 def convert(svgs: dict[str, bytes], cache: Path) -> dict[str, str]:
     """Convert each SVG to a PNG in the cache under its key, why for each key that failed."""
     cache.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="bwtidy-kroki-") as temp:
+    ## inside the cache, as os.replace cannot move a file to another filesystem
+    with tempfile.TemporaryDirectory(prefix=".convert-", dir=cache) as temp:
         paths = []
         for key, svg in svgs.items():
             (Path(temp) / f"{key}.svg").write_bytes(svg)
@@ -694,6 +965,7 @@ def convert(svgs: dict[str, bytes], cache: Path) -> dict[str, str]:
                 BACKGROUND,
                 str(DPI),
                 json.dumps(GENERIC_FONTS),
+                json.dumps(NAMED_FONTS),
                 *paths,
             ],
             capture_output=True,
@@ -804,7 +1076,9 @@ def build(target: Path | None) -> int:
                 file=sys.stderr,
             )
             return 1
-        problems = render_diagrams(project / DOCS)
+        problems = make_shell_tabs(project / DOCS)
+        if not problems:
+            problems = render_diagrams(project / DOCS)
         for problem in problems:
             print(f"docs-site: {problem}", file=sys.stderr)
         if problems:

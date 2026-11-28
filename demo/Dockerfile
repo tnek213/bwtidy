@@ -4,10 +4,11 @@
 ## Build it from the repo root, as compose.demo.yaml does:
 ##   docker build -f demo/Dockerfile --build-arg BWTIDY_IMAGE=IMAGE .
 
-## the normal image, our own. The default follows main, a deploy pins a short-commit tag
-## (tnek213/bwtidy:abc1234) or a version, so the demo runs a bwtidy somebody chose.
-## An ARG before the first FROM is the only kind a FROM line can use.
-ARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:main
+## the normal image, our own. The default is the newest release. A deploy builds this file from a
+## release's git tag and pins the image of that version (tnek213/bwtidy:1.0.0-beta.3), and
+## scripts/demo-stack passes the image it builds from the worktree. An ARG before the first FROM
+## is the only kind a FROM line can use.
+ARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:latest
 
 ## the same uv as the normal Dockerfile, pinned the same way
 FROM ghcr.io/astral-sh/uv:0.11@sha256:77280f2f771df71f90786c314fe1bbc1e023feac652969bbf139c280babf2eb7 AS uv
@@ -37,8 +38,20 @@ RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
 ## the vault every visitor gets, imported by the controller
 COPY dev/fixture-personal.json /app/demo/fixture-personal.json
 
+## the controller's own user (dev/demo.md, Controller): fixed ids that init gives the secrets'
+## group and the ledger to (bwtidy_demo.init), below bwtidy's accounts (BWTIDY_UID_BASE, 70000)
+## and none that the nginx or Vaultwarden image uses. Its home is the controller's tmpfs. The
+## image's /ledger is its own, so a new ledger volume starts with that owner.
+RUN groupadd --system --gid 10100 controller \
+    && useradd --system --uid 10100 --gid 10100 --no-create-home --home-dir /tmp \
+        --shell /usr/sbin/nologin controller \
+    && mkdir /ledger \
+    && chown 10100:10100 /ledger \
+    && chmod 0700 /ledger
+
 ENV PATH=/app/backend/.venv/bin:$PATH \
     DEMO_FIXTURE=/app/demo/fixture-personal.json
 
-## the base's user (root, for the worker uids), its WORKDIR and its read-only file system stay
+## the base's user (root, for the worker uids), its WORKDIR and its read-only file system stay.
+## compose.demo.yaml runs the controller as its own user.
 CMD ["bwtidy-demo-gateway"]

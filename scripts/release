@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""release: release a version from its entry in docs/releases.md (dev/release.md, To release).
+
+  scripts/release prepare VERSION   turn Unreleased into the entry of VERSION, dated today
+                                    (Swedish time), and bump the version to it, for a pull
+                                    request
+  scripts/release tag VERSION       tag origin/main's head as vVERSION and push the tag, which
+                                    starts .github/workflows/release.yml
+  scripts/release notes VERSION     print the body of VERSION's GitHub release
+  scripts/release check-tag VERSION check that the tag vVERSION can be released (release.yml)
+  scripts/release lint              the version check of scripts/ci, with the release notes
+  scripts/release check-pr BASE HEAD LABELS
+                                    fail when the pull request from BASE to HEAD changes what a
+                                    user sees but not Unreleased, unless LABELS (a JSON list of
+                                    names) has "no release note" (ci.yml)
+
+VERSION is spelled as frontend/package.json spells it (1.0.0-beta.2). prepare refuses a new
+version while Unreleased says "Nothing yet.". It bumps backend/pyproject.toml (Python's spelling)
+and frontend/package.json, refreshes the lock files (uv lock in backend/ and demo/, npm install
+--package-lock-only in frontend/), renames Unreleased to the version with its metadata line and
+puts a new Unreleased above it. When VERSION is the current version and has no tag yet, it keeps
+the version and its entry: the bullets of Unreleased join the entry and its metadata line gets
+today's date. Then it runs the lint and prints what to commit.
+
+tag fetches origin and refuses unless origin/main's version is VERSION, its entry is dated the
+date (Swedish time) of origin/main's head and the tag does not exist yet. notes prints the entry
+without its heading and metadata line, with every relative link made absolute on the docs site
+(https://tnek213.github.io/bwtidy/).
+"""
+
+import sys
+
+from devlib import release
+
+if __name__ == "__main__":
+    sys.exit(release.main(sys.argv[1:], __doc__ or ""))

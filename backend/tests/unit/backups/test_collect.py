@@ -25,6 +25,7 @@ from bwtidy.backups.collect import (
     check_attachments,
     create_backup,
     encrypted_size,
+    exported_ids,
     run_bw,
 )
 from bwtidy.backups.crypto import decrypt_backup
@@ -88,6 +89,21 @@ TRASHED_ITEM = {
     "deletedDate": "2026-10-20T10:00:00.000Z",
     "attachments": [attachment("att5", "item-trashed", "codes.txt")],
 }
+## only GET /list/object/items?archived=true lists these, with trash=true the one in the trash
+ARCHIVED_ITEM = {
+    "id": "item-archived",
+    "name": "Old laptop",
+    "folderId": "f1",
+    "archivedDate": "2026-10-21T10:00:00.000Z",
+    "attachments": [attachment("att6", "item-archived", "laptop.txt")],
+}
+ARCHIVED_TRASHED_ITEM = {
+    "id": "item-archived-trashed",
+    "name": "Old phone",
+    "archivedDate": "2026-10-21T10:00:00.000Z",
+    "deletedDate": "2026-10-22T10:00:00.000Z",
+    "attachments": [attachment("att7", "item-archived-trashed", "phone.txt")],
+}
 
 
 class BackupRun:
@@ -96,6 +112,7 @@ class BackupRun:
     def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         self.bw = FakeBwServe(list(ITEMS))
         self.bw.organizations = [ORG]
+        self.bw.archived = [ARCHIVED_ITEM, ARCHIVED_TRASHED_ITEM]
         self.client = BwClient(self.bw.http())
         self.directory = tmp_path / "backups"
         self.log = tmp_path / "bw.log"
@@ -160,6 +177,8 @@ def test_backup_holds_every_member(env: BackupRun):
     with open_backup(env, info.name) as archive:
         assert sorted(archive.namelist()) == [
             "RESTORE.md",
+            "item-attachments/item-archived-trashed/phone.txt",
+            "item-attachments/item-archived/laptop.txt",
             "item-attachments/item-org/att2-recovery.txt",
             "item-attachments/item-org/recovery.txt",
             "item-attachments/item-personal/thinkpad.txt",
@@ -167,6 +186,7 @@ def test_backup_holds_every_member(env: BackupRun):
             "item-attachments/item-twin/thinkpad.txt",
             "org-org1-export.json",
             "personal-export.zip",
+            "raw/archived.json",
             "raw/collections.json",
             "raw/folders.json",
             "raw/items.json",
@@ -179,6 +199,10 @@ def test_backup_holds_every_member(env: BackupRun):
         assert json.loads(archive.read("raw/folders.json")) == env.bw.folders
         assert json.loads(archive.read("raw/collections.json")) == []
         assert json.loads(archive.read("raw/trash.json")) == [TRASHED_ITEM]
+        assert json.loads(archive.read("raw/archived.json")) == [
+            ARCHIVED_ITEM,
+            ARCHIVED_TRASHED_ITEM,
+        ]
         with zipfile.ZipFile(io.BytesIO(archive.read("personal-export.zip"))) as personal:
             assert "attachments/ThinkPad X1/thinkpad.txt" in personal.namelist()
         manual = archive.read("RESTORE.md").decode()
@@ -224,6 +248,149 @@ def test_every_attachment_is_filed_by_item_id(env: BackupRun):
         )
 
 
+def test_archived_items_and_their_attachments_are_backed_up(env: BackupRun):
+    """bw serve leaves an archived item out of every listing but archived=true, and the
+    attachments of an archived item in the trash are in no export either."""
+    info = env.backup()
+    ## the items, the archived items and the archived items in the trash
+    assert env.bw.calls("GET", "/list/object/items") == 3
+    with open_backup(env, info.name) as archive:
+        assert archive.read("item-attachments/item-archived/laptop.txt") == fake_bytes(
+            "att6", "item-archived"
+        )
+        assert archive.read("item-attachments/item-archived-trashed/phone.txt") == fake_bytes(
+            "att7", "item-archived-trashed"
+        )
+        ## the active items and the trash stay as the other listings answer them
+        assert json.loads(archive.read("raw/items.json")) == ITEMS
+        assert json.loads(archive.read("raw/trash.json")) == [TRASHED_ITEM]
+
+
+def test_a_vault_without_archived_items_gets_an_empty_listing(env: BackupRun):
+    env.bw.archived = []
+    info = env.backup()
+    with open_backup(env, info.name) as archive:
+        assert json.loads(archive.read("raw/archived.json")) == []
+        assert not [m for m in archive.namelist() if m.startswith("item-attachments/item-arch")]
+
+
+def without_premium(env: BackupRun, personal: list[dict], orgs: dict | None = None) -> None:
+    """bw lists no archived item: archived=true answers what is not archived, as the real bw
+    does for an account without premium. The exports hold the given items."""
+    env.bw.premium = False
+    env.monkeypatch.setenv("FAKE_BW_EXPORT", json.dumps(personal))
+    env.monkeypatch.setenv("FAKE_BW_ORG_EXPORT", json.dumps(orgs or {}))
+
+
+def test_an_archived_item_of_an_account_without_premium_is_backed_up(env: BackupRun):
+    """The personal export holds the archived item while no listing has it, so the backup
+    gets it by id and downloads its attachment like any other."""
+    env.bw.archived = [ARCHIVED_ITEM]
+    without_premium(env, [PERSONAL_ITEM, TWIN_ITEM, ARCHIVED_ITEM])
+    info = env.backup()
+    assert env.bw.calls("GET", "/object/item/item-archived") == 1
+    assert env.bw.calls("GET", "/object/item/item-personal") == 0
+    with open_backup(env, info.name) as archive:
+        assert json.loads(archive.read("raw/archived.json")) == [ARCHIVED_ITEM]
+        assert archive.read("item-attachments/item-archived/laptop.txt") == fake_bytes(
+            "att6", "item-archived"
+        )
+        assert json.loads(archive.read("raw/items.json")) == ITEMS
+        assert json.loads(archive.read("raw/trash.json")) == [TRASHED_ITEM]
+    ## the cache lists no archived item either, so a backup stays reusable
+    assert info.fingerprint == fingerprint(ITEMS, env.bw.folders, [], [ORG], archived=[])
+
+
+def test_an_archived_org_item_of_an_account_without_premium_is_backed_up(env: BackupRun):
+    archived = {**ARCHIVED_ITEM, "id": "item-org-archived", "organizationId": "org1"}
+    archived["attachments"] = [attachment("att8", "item-org-archived", "router.txt")]
+    env.bw.archived = [archived]
+    without_premium(env, [PERSONAL_ITEM, TWIN_ITEM], {"org1": [ORG_ITEM, archived]})
+    info = env.backup()
+    with open_backup(env, info.name) as archive:
+        assert json.loads(archive.read("raw/archived.json")) == [archived]
+        assert archive.read("item-attachments/item-org-archived/router.txt") == fake_bytes(
+            "att8", "item-org-archived"
+        )
+        assert json.loads(archive.read("raw/items.json")) == ITEMS
+
+
+def test_an_exported_item_that_is_neither_listed_nor_archived_fails_the_backup(env: BackupRun):
+    """It would be backed up without its attachments, so no backup is written."""
+    lost = {**PERSONAL_ITEM, "id": "item-lost"}
+    env.bw.archived = [lost]
+    without_premium(env, [PERSONAL_ITEM, lost])
+    with pytest.raises(BackupError) as error:
+        env.backup()
+    assert error.value.step == "archived items"
+    assert "item item-lost is in an export but in no listing" in str(error.value)
+    assert env.files() == []
+
+
+def test_an_archived_item_bw_serve_does_not_find_fails_the_backup(env: BackupRun):
+    env.bw.archived = []
+    without_premium(env, [PERSONAL_ITEM, ARCHIVED_ITEM])
+    with pytest.raises(BackupError) as error:
+        env.backup()
+    assert error.value.step == "archived items"
+    assert "item item-archived" in str(error.value)
+    assert env.files() == []
+
+
+def test_a_personal_export_without_data_json_fails_the_backup():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("attachments/x/y.txt", b"y")
+    with pytest.raises(BackupError) as error:
+        exported_ids(buffer.getvalue(), [])
+    assert error.value.step == "personal export"
+
+
+def test_exported_ids_come_from_the_personal_and_the_org_exports():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("data.json", json.dumps({"items": [{"id": "a"}, {"name": "no id"}]}))
+    assert exported_ids(buffer.getvalue(), [{"items": [{"id": "b"}]}, {}]) == {"a", "b"}
+
+
+def test_an_archived_attachment_with_the_wrong_number_of_bytes_fails_the_backup(env: BackupRun):
+    env.monkeypatch.setenv("FAKE_BW_SHORT", "att7")
+    with pytest.raises(BackupError) as error:
+        env.backup()
+    assert error.value.step == "attachments"
+    assert "attachment att7 of item item-archived-trashed has " in str(error.value)
+    assert env.files() == []
+
+
+def test_an_archived_attachment_without_a_member_fails_the_check():
+    with pytest.raises(BackupError) as error:
+        check_attachments([PERSONAL_ITEM, ARCHIVED_ITEM], {})
+    assert error.value.step == "attachments"
+    assert "is missing from the backup" in str(error.value)
+
+
+def test_an_archived_item_in_an_unlisted_organization_is_refused(env: BackupRun):
+    env.bw.items = [PERSONAL_ITEM]
+    env.bw.archived = [{**ARCHIVED_ITEM, "organizationId": "org1"}]
+    env.bw.organizations = []
+    with pytest.raises(BackupError) as error:
+        env.backup()
+    assert error.value.step == "vault listing"
+    assert env.files() == []
+
+
+def test_an_archived_item_in_the_trash_needs_no_listed_place(env: BackupRun):
+    """Like the trash: a place only an item in the trash names never stops a backup."""
+    env.bw.items = [PERSONAL_ITEM]
+    gone = {"organizationId": "org-gone", "folderId": "f-gone", "collectionIds": ["c-gone"]}
+    env.bw.archived = [{**ARCHIVED_TRASHED_ITEM, **gone}]
+    env.bw.organizations = []
+    info = env.backup()
+    assert env.bw.calls("GET", "/list/object/organizations") == 1
+    assert env.bw.calls("GET", "/list/object/folders") == 1
+    assert env.files() == [info.name]
+
+
 def test_a_second_file_of_the_same_name_gets_the_attachment_id_in_front(env: BackupRun):
     info = env.backup()
     with open_backup(env, info.name) as archive:
@@ -255,6 +422,8 @@ def test_bw_gets_the_key_by_environment_and_never_the_password(env: BackupRun):
         ["--raw", "get", "attachment", "att1"],
         ["--raw", "get", "attachment", "att2"],
         ["--raw", "get", "attachment", "att5"],
+        ["--raw", "get", "attachment", "att6"],
+        ["--raw", "get", "attachment", "att7"],
     ]
     assert env.session_key
     for command in commands:
@@ -460,7 +629,8 @@ def test_no_vault_content_in_the_error_from_a_dead_bw_serve(env: BackupRun):
 def test_an_empty_item_list_after_the_sync_is_waited_out(env: BackupRun):
     env.bw.empty_lists_after_sync = 3
     info = env.backup()
-    assert env.bw.calls("GET", "/list/object/items") == 4
+    ## three empty lists and the full one, then the two of the archived items
+    assert env.bw.calls("GET", "/list/object/items") == 6
     with open_backup(env, info.name) as archive:
         assert json.loads(archive.read("raw/items.json")) == ITEMS
         assert "item-attachments/item-org/recovery.txt" in archive.namelist()
@@ -480,8 +650,8 @@ def test_an_item_list_that_stays_empty_is_refused(env: BackupRun):
 
 def test_a_full_item_list_is_taken_at_once(env: BackupRun):
     env.backup()
-    assert env.bw.calls("GET", "/list/object/items") == 1
-    assert env.bw.calls("GET", "/list/object/organizations") == 1
+    ## once each: the items, the archived items and the archived items in the trash
+    assert env.bw.calls("GET", "/list/object/items") == 3
     assert env.bw.calls("GET", "/list/object/folders") == 1
     assert env.bw.calls("GET", "/list/object/collections") == 1
 
@@ -530,7 +700,8 @@ def test_a_stale_key_in_the_shell_environment_is_replaced(env: BackupRun):
 def test_the_fingerprint_is_stored_under_the_backups_name(env: BackupRun, tmp_path: Path):
     db = Database(tmp_path / "bwtidy.sqlite")
     info = env.backup(store=db)
-    expected = fingerprint(ITEMS, env.bw.folders, [], [ORG])
+    ## the archived item in the trash counts like the trash: not at all
+    expected = fingerprint(ITEMS, env.bw.folders, [], [ORG], archived=[ARCHIVED_ITEM])
     assert info.fingerprint == expected
     assert db.backup_fingerprint(info.name) == expected
     assert db.backup_fingerprint("20200101T000000Z.zip.age") is None
@@ -552,7 +723,13 @@ def test_a_backup_after_bw_serve_respelled_a_revision_matches_the_vault(env: Bac
         await cache.load()
 
     asyncio.run(load())
-    vault = fingerprint(cache.items, cache.folders, cache.collections, cache.organizations)
+    vault = fingerprint(
+        cache.items,
+        cache.folders,
+        cache.collections,
+        cache.organizations,
+        archived=cache.archived,
+    )
     env.bw.items[0] = {**first, "revisionDate": "2026-10-26T10:15:30.336Z"}
     assert env.backup().fingerprint == vault
 

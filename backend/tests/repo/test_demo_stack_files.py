@@ -8,6 +8,8 @@ puts demo code into the normal image fails scripts/ci at once.
 import re
 from pathlib import Path
 
+from bwtidy.gateway.settings import DEFAULT_UID_BASE
+
 ROOT = Path(__file__).resolve().parents[3]
 COMPOSE = (ROOT / "compose.demo.yaml").read_text()
 DEMO_DOCKERFILE = (ROOT / "demo" / "Dockerfile").read_text()
@@ -55,6 +57,18 @@ def test_only_the_public_network_has_a_route_out():
     assert "internal" not in networks["public"]
 
 
+def test_the_public_bridge_has_a_fixed_name_that_scripts_demo_egress_accepts():
+    public = blocks(COMPOSE, "networks")["public"]
+    match = re.search(
+        r"^      com\.docker\.network\.bridge\.name: \$\{DEMO_PUBLIC_BRIDGE:-([^}]+)\}$",
+        public,
+        re.MULTILINE,
+    )
+    assert match, public
+    ## the kernel's limit for an interface name, and what scripts/demo-egress takes
+    assert re.fullmatch(r"[A-Za-z0-9._-]{1,15}", match[1])
+
+
 def test_only_the_edge_is_on_the_public_network():
     services = blocks(COMPOSE, "services")
     assert {name: listed(block, "networks") for name, block in services.items()} == {
@@ -93,8 +107,33 @@ def test_every_container_is_read_only_without_capabilities_it_does_not_need():
         assert "privileged" not in block, name
     bwtidy = blocks((ROOT / "compose.yaml").read_text(), "services")["bwtidy"]
     assert listed(services["demo"], "cap_add") == listed(bwtidy, "cap_add")
-    for name in ("init", "vaultwarden", "controller"):
+    ## init gives the secrets and the ledger their owners, and needs nothing else
+    assert listed(services["init"], "cap_add") == ["CHOWN"]
+    for name in ("vaultwarden", "controller"):
         assert listed(services[name], "cap_add") == [], name
+
+
+def test_the_controller_runs_as_its_own_user_of_the_demo_image():
+    services = blocks(COMPOSE, "services")
+    user = re.search(r'^    user: "(\d+):(\d+)"$', services["controller"], re.MULTILINE)
+    assert user and user.groups() == ("10100", "10100")
+    ## below bwtidy's accounts, so no worker ever runs as the controller
+    assert int(user[1]) < DEFAULT_UID_BASE
+    ## the others keep root: init sets owners, the gateway starts the workers as their uids
+    for name in ("init", "vaultwarden", "demo"):
+        assert "    user:" not in services[name], name
+    assert "groupadd --system --gid 10100 controller" in DEMO_DOCKERFILE
+    assert "useradd --system --uid 10100 --gid 10100" in DEMO_DOCKERFILE
+    assert "chown 10100:10100 /ledger" in DEMO_DOCKERFILE
+    init = (ROOT / "demo" / "src" / "bwtidy_demo" / "init.py").read_text()
+    assert "\nCONTROLLER_UID = 10100\n" in init
+    assert "\nCONTROLLER_GID = 10100\n" in init
+
+
+def test_init_fixes_the_ledger_volume_the_controller_writes():
+    services = blocks(COMPOSE, "services")
+    assert "- ledger:/ledger\n" in services["init"]
+    assert "- ledger:/ledger\n" in services["controller"]
 
 
 def test_the_edge_mounts_no_secret_and_only_init_writes_them():
@@ -113,7 +152,8 @@ def test_vaultwarden_is_the_version_of_the_dev_stack():
 
 
 def test_the_demo_image_is_built_on_the_normal_image_with_uv_alone():
-    assert "\nARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:main\n" in DEMO_DOCKERFILE
+    assert "\nARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:latest\n" in DEMO_DOCKERFILE
+    assert "BWTIDY_IMAGE: ${BWTIDY_IMAGE:-docker.io/tnek213/bwtidy:latest}\n" in COMPOSE
     assert "\nFROM ${BWTIDY_IMAGE}\n" in DEMO_DOCKERFILE
     code = [line for line in DEMO_DOCKERFILE.splitlines() if not line.startswith("#")]
     ## the normal image has no pip
@@ -136,3 +176,18 @@ def test_the_normal_image_holds_no_demo_code():
     assert "demo" not in DOCKERFILE.lower()
     sources = (ROOT / "backend" / "src").rglob("*.py")
     assert [str(path) for path in sources if "bwtidy_demo" in path.read_text()] == []
+
+
+def test_every_service_has_a_memory_and_a_process_limit_from_a_documented_setting():
+    docs = (ROOT / "dev" / "demo.md").read_text()
+    for name, block in blocks(COMPOSE, "services").items():
+        upper = name.upper()
+        memory = re.search(r"^    mem_limit: \$\{(DEMO_MEM_\w+):-([^}]+)\}$", block, re.MULTILINE)
+        swap = re.search(r"^    memswap_limit: \$\{(DEMO_MEM_\w+):-([^}]+)\}$", block, re.MULTILINE)
+        pids = re.search(r"^    pids_limit: \$\{(DEMO_PIDS_\w+):-(\d+)\}$", block, re.MULTILINE)
+        assert memory and swap and pids, name
+        assert memory[1] == f"DEMO_MEM_{upper}", name
+        assert pids[1] == f"DEMO_PIDS_{upper}", name
+        assert swap.groups() == memory.groups(), name
+        for variable in (memory[1], pids[1]):
+            assert f"`{variable}`" in docs, variable

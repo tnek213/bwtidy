@@ -72,10 +72,34 @@ class Elsewhere:
         self.tmp_path = tmp_path
         self.key = app.session.session_key
         self.made: list[str] = []
+        self.folders: list[str] = []
+        ## (organizationId, collection id) of each collection made
+        self.collections: list[tuple[str, str]] = []
         assert self.key
 
     def beat(self) -> None:
         assert self.app.client.post("/api/session/heartbeat").status_code == 204
+
+    def create(self, kind: str, body: dict[str, Any], *options: str) -> dict[str, Any]:
+        encoded = base64.b64encode(json.dumps(body).encode()).decode()
+        return self.bw_cli.json("create", kind, encoded, *options, session=self.key)
+
+    def item(self, **item: Any) -> str:
+        """An item as given, its id."""
+        item_id = self.create("item", item)["id"]
+        self.made.append(item_id)
+        return item_id
+
+    def folder(self, name: str) -> str:
+        folder_id = self.create("folder", {"name": name})["id"]
+        self.folders.append(folder_id)
+        return folder_id
+
+    def collection(self, organization_id: str, name: str) -> str:
+        body = {"organizationId": organization_id, "name": name, "groups": [], "users": []}
+        made = self.create("org-collection", body, "--organizationid", organization_id)
+        self.collections.append((organization_id, made["id"]))
+        return made["id"]
 
     def note_with_attachment(
         self,
@@ -86,10 +110,7 @@ class Elsewhere:
         **place: Any,
     ) -> str:
         """A secure note with one attachment, place (organizationId, collectionIds) as given."""
-        item = {"type": 2, "name": name, "notes": notes, "secureNote": {"type": 0}, **place}
-        encoded = base64.b64encode(json.dumps(item).encode()).decode()
-        item_id = self.bw_cli.json("create", "item", encoded, session=self.key)["id"]
-        self.made.append(item_id)
+        item_id = self.item(type=2, name=name, notes=notes, secureNote={"type": 0}, **place)
         path = self.tmp_path / item_id / file_name
         path.parent.mkdir(parents=True)
         path.write_bytes(content)
@@ -101,6 +122,10 @@ class Elsewhere:
     def trash(self, item_id: str) -> None:
         self.bw_cli.run("delete", "item", item_id, session=self.key)
 
+    def archive(self, item_id: str) -> None:
+        """Archive the item: every listing but `bw list items --archived` leaves it out."""
+        self.bw_cli.run("archive", "item", item_id, session=self.key)
+
     def backup(self) -> str:
         """A backup by hand, its file name."""
         self.beat()
@@ -109,11 +134,25 @@ class Elsewhere:
         return response.json()["name"]
 
     def clean_up(self) -> None:
-        """Delete the made items for good and let the app see the vault as it was."""
+        """Delete the made items, folders and collections for good and let the app see the
+        vault as it was."""
         self.beat()
         for item_id in self.made:
             self.bw_cli.run("delete", "item", item_id, "--permanent", session=self.key)
         self.made.clear()
+        for org_id, collection_id in self.collections:
+            self.bw_cli.run(
+                "delete",
+                "org-collection",
+                collection_id,
+                "--organizationid",
+                org_id,
+                session=self.key,
+            )
+        self.collections.clear()
+        for folder_id in self.folders:
+            self.bw_cli.run("delete", "folder", folder_id, session=self.key)
+        self.folders.clear()
         assert self.app.client.portal is not None
         self.app.client.portal.call(self.app.session.client.sync)
         self.app.client.portal.call(self.app.session.cache.load)

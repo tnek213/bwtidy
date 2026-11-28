@@ -10,13 +10,14 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from bwtidy.gateway.accounts import AccountKey
+from bwtidy.gateway.accounts import MAX_HOST, AccountKey, normalize_email, normalize_server
 from bwtidy.gateway.app import create_gateway_app
 from bwtidy.gateway.settings import GatewaySettings
 from bwtidy.mcp.auth import McpToken
 from bwtidy.mcp_token import UNAUTHORIZED, utc_now
 from bwtidy.protocol import ACCOUNT_COOKIE as COOKIE
 from bwtidy.protocol import SUBDIRS
+from tests.support.sockets import run_root
 
 ALLOWED = "https://vaultwarden"
 EXITING = "exiting"
@@ -205,6 +206,7 @@ def settings(tmp_path: Path, **extra: Any) -> GatewaySettings:
         "switch_uid": False,
         "worker_bin": worker,
         "start_timeout": 15.0,
+        "run_dir": run_root(tmp_path),
         **extra,
     }
     return GatewaySettings(**options)
@@ -217,6 +219,27 @@ def make_env(tmp_path: Path, **extra: Any) -> Iterator[GatewayEnv]:
 
 
 PUBLIC = "https://vault.example.test"
+
+
+def long_host(length: int) -> str:
+    """A host name of this length, labels of at most 63 characters."""
+    labels = ["h" * 63] * 3 + ["h" * (MAX_HOST - 3 * 64 - len(".test"))]
+    host = (".".join(labels) + ".test")[-length:].lstrip(".")
+    assert len(host) == length
+    return host
+
+
+def long_email(length: int) -> str:
+    email = "e" * (length - len("@example.test")) + "@example.test"
+    assert len(email) == length
+    return email
+
+
+def long_account(host_length: int, email_length: int, port: str = "") -> AccountKey:
+    """An account whose host and email have these lengths, as the gateway accepts them."""
+    server, host_dir = normalize_server(f"https://{long_host(host_length)}{port}")
+    email = normalize_email(long_email(email_length))
+    return AccountKey(server=server, email=email, host_dir=host_dir)
 
 
 UNLOCK = "/api/session"

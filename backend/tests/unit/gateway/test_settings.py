@@ -1,12 +1,21 @@
 """The gateway's settings (docs/spec.md, Gateway): what it reads from the environment and passes on
 to the workers."""
 
+import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from bwtidy.config import SettingsError
-from bwtidy.gateway.settings import GatewaySettings, passed_on_from_env
+from bwtidy.gateway.app import stats_outside_accounts
+from bwtidy.gateway.settings import (
+    DEFAULT_MAX_PENDING,
+    DEFAULT_MAX_WORKERS,
+    DEFAULT_UID_BASE,
+    GatewaySettings,
+    passed_on_from_env,
+)
 from tests.support.gateway_env import make_env
 
 
@@ -19,6 +28,23 @@ def test_the_mcp_hosts_are_passed_on_to_the_workers(
     for env in make_env(tmp_path, passed_on=passed_on):
         environment = env.session(env.started()).json()["env"]
         assert environment["BWTIDY_MCP_HOSTS"] == "bwtidy.example.test"
+
+
+def test_an_own_bitwarden_cli_is_passed_on_to_the_workers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("BWTIDY_BW_BIN", "/opt/bw/bw")
+    passed_on = passed_on_from_env()
+    assert passed_on["BWTIDY_BW_BIN"] == "/opt/bw/bw"
+    for env in make_env(tmp_path, passed_on=passed_on):
+        environment = env.session(env.started()).json()["env"]
+        assert environment["BWTIDY_BW_BIN"] == "/opt/bw/bw"
+    monkeypatch.delenv("BWTIDY_BW_BIN")
+    passed_on = passed_on_from_env()
+    assert "BWTIDY_BW_BIN" not in passed_on
+    for env in make_env(tmp_path, passed_on=passed_on):
+        environment = env.session(env.started()).json()["env"]
+        assert "BWTIDY_BW_BIN" not in environment
 
 
 POLICY = {
@@ -51,19 +77,66 @@ def test_a_bad_timeout_or_retention_stops_the_gateway_at_the_start(
         GatewaySettings.from_env()
 
 
-@pytest.mark.parametrize("base", ["0", "-1"])
-def test_a_uid_base_below_one_stops_the_gateway_at_the_start(
-    monkeypatch: pytest.MonkeyPatch, base: str
+## each number setting with the words of its error and a value it reads. A uid base below 1
+## could hand root to a worker, a limit of 0 could never create the first account or start a worker
+NUMBERS = {
+    "BWTIDY_UID_BASE": ("a whole number of at least 1", "1"),
+    "BWTIDY_MAX_PENDING": ("a whole number of at least 1", "1"),
+    "BWTIDY_MAX_WORKERS": ("a whole number of at least 1", "1"),
+    "BWTIDY_PORT": ("a whole number from 1 to 65535", "65535"),
+    "BWTIDY_IDLE_EXIT": ("a positive number of seconds", "0.5"),
+}
+
+
+BAD_NUMBERS = [
+    (name, value)
+    for name in NUMBERS
+    for value in ("ten", "0", "-1", "2.5")
+    if not (name == "BWTIDY_IDLE_EXIT" and value == "2.5")
+]
+
+
+@pytest.mark.parametrize(("name", "value"), BAD_NUMBERS)
+def test_a_bad_number_setting_stops_the_gateway_at_the_start_naming_it(
+    monkeypatch: pytest.MonkeyPatch, name: str, value: str
 ):
-    monkeypatch.setenv("BWTIDY_UID_BASE", base)
-    with pytest.raises(SettingsError, match="BWTIDY_UID_BASE"):
+    monkeypatch.setenv(name, value)
+    expected = NUMBERS[name][0]
+    with pytest.raises(SettingsError, match=f"^{name} must be {expected}$"):
         GatewaySettings.from_env()
 
 
-@pytest.mark.parametrize("base", ["1", "70000"])
-def test_a_uid_base_of_one_or_more_is_read(monkeypatch: pytest.MonkeyPatch, base: str):
-    monkeypatch.setenv("BWTIDY_UID_BASE", base)
-    assert GatewaySettings.from_env().uid_base == int(base)
+def test_a_port_above_65535_stops_the_gateway_at_the_start(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("BWTIDY_PORT", "65536")
+    with pytest.raises(SettingsError, match="BWTIDY_PORT"):
+        GatewaySettings.from_env()
+
+
+def test_a_good_number_setting_is_read(monkeypatch: pytest.MonkeyPatch):
+    for name, (_, value) in NUMBERS.items():
+        monkeypatch.setenv(name, value)
+    settings = GatewaySettings.from_env()
+    assert settings.uid_base == 1
+    assert settings.max_pending == 1
+    assert settings.max_workers == 1
+    assert settings.port == 65535
+    assert settings.passed_on["BWTIDY_IDLE_EXIT"] == "0.5"
+
+
+@pytest.mark.parametrize("value", [None, "", " "])
+def test_an_unset_or_blank_number_setting_has_its_default(
+    monkeypatch: pytest.MonkeyPatch, value: str | None
+):
+    for name in NUMBERS:
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+    settings = GatewaySettings.from_env()
+    assert settings.uid_base == DEFAULT_UID_BASE == 70000
+    assert settings.max_pending == DEFAULT_MAX_PENDING == 2
+    assert settings.max_workers == DEFAULT_MAX_WORKERS == 8
+    assert settings.port == 8000
 
 
 def test_the_backups_root_is_read_from_the_environment(monkeypatch: pytest.MonkeyPatch):
@@ -90,3 +163,23 @@ def test_the_usage_stats_are_off_unless_asked_and_their_file_follows_the_account
     monkeypatch.delenv("BWTIDY_ACCOUNTS_DIR")
     monkeypatch.delenv("BWTIDY_STATS_DB")
     assert GatewaySettings.from_env().stats_path == Path("/data/stats.db")
+
+
+def test_compose_keeps_the_stats_file_on_a_volume_of_its_own(monkeypatch: pytest.MonkeyPatch):
+    ## the root file system of compose.yaml is read-only, so BWTIDY_STATS=1 alone works only
+    ## when the default path lies on a mount that takes writes
+    compose = Path(__file__).resolve().parents[4] / "compose.yaml"
+    service = yaml.safe_load(compose.read_text())["services"]["bwtidy"]
+    assert service["read_only"] is True
+    environment = service["environment"]
+    default = re.fullmatch(r"\$\{BWTIDY_STATS_DB:-(.+)\}", environment["BWTIDY_STATS_DB"])
+    assert default is not None
+    mounts = {Path(volume.rsplit(":", 1)[1]) for volume in service["volumes"]}
+    monkeypatch.setenv("BWTIDY_STATS", "1")
+    monkeypatch.setenv("BWTIDY_STATS_DB", default[1])
+    monkeypatch.setenv("BWTIDY_ACCOUNTS_DIR", "/data/accounts")
+    monkeypatch.setenv("BWTIDY_BACKUPS_ROOT", environment["BWTIDY_BACKUPS_ROOT"])
+    settings = GatewaySettings.from_env()
+    assert settings.stats_path.parent in mounts
+    assert {settings.accounts_dir, settings.backups_root} <= mounts
+    stats_outside_accounts(settings)

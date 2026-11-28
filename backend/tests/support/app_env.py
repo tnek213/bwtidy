@@ -163,7 +163,11 @@ class AppEnv:
         (directory / name).write_bytes(data)
         self.backups.append(name)
         print_ = fingerprint(
-            self.bw.items, self.bw.folders, self.bw.collections, self.bw.organizations
+            self.bw.items,
+            self.bw.folders,
+            self.bw.collections,
+            self.bw.organizations,
+            archived=[i for i in self.bw.archived if not i.get("deletedDate")],
         )
         store.set_backup_fingerprint(name, print_)
         return BackupInfo(name, len(data), when, print_)
@@ -290,11 +294,12 @@ def zip_backup(bw: FakeBwServe) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("personal-export.zip", personal.getvalue())
-        for item in items + bw.trashed:
+        for item in items + bw.trashed + bw.archived:
             for attachment, member in attachment_members(item):
                 archive.writestr(member, bw.attachments[(item["id"], attachment["id"])])
         archive.writestr("raw/items.json", json.dumps(items))
         archive.writestr("raw/trash.json", json.dumps(bw.trashed))
+        archive.writestr("raw/archived.json", json.dumps(bw.archived))
         archive.writestr("raw/folders.json", json.dumps(bw.folders))
         archive.writestr("raw/collections.json", json.dumps(bw.collections))
         archive.writestr("raw/organizations.json", json.dumps(bw.organizations))

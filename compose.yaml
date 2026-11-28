@@ -19,6 +19,7 @@ services:
     ## empty values leave the gateway's own defaults (docs/spec.md, Gateway)
     environment:
       BWTIDY_MCP_HOSTS: ${BWTIDY_MCP_HOSTS:-}
+      BWTIDY_BW_BIN: ${BWTIDY_BW_BIN:-}
       BWTIDY_SECURE_COOKIES: ${BWTIDY_SECURE_COOKIES:-}
       BWTIDY_MAX_PENDING: ${BWTIDY_MAX_PENDING:-}
       BWTIDY_MAX_WORKERS: ${BWTIDY_MAX_WORKERS:-}
@@ -30,10 +31,10 @@ services:
       BWTIDY_BACKUP_KEEP_DAYS: ${BWTIDY_BACKUP_KEEP_DAYS:-}
       BWTIDY_BACKUP_KEEP_ALWAYS: ${BWTIDY_BACKUP_KEEP_ALWAYS:-}
       BWTIDY_FAILED_KEEP_HOURS: ${BWTIDY_FAILED_KEEP_HOURS:-}
-      ## the usage stats, off unless BWTIDY_STATS=1. The file needs a volume of its own
+      ## the usage stats, off unless BWTIDY_STATS=1, their file on the volume bwtidy-stats
       ## (docs/reference/configuration.md, Usage stats)
       BWTIDY_STATS: ${BWTIDY_STATS:-}
-      BWTIDY_STATS_DB: ${BWTIDY_STATS_DB:-}
+      BWTIDY_STATS_DB: ${BWTIDY_STATS_DB:-/stats/stats.db}
       ## each account's backups go to /backups/HOST/EMAIL instead of its directory in the accounts
       BWTIDY_BACKUPS_ROOT: /backups
     volumes:
@@ -44,6 +45,9 @@ services:
       ## tool reads). The gateway makes a directory per account in it, owned by the account's
       ## uid, so the file system must let root chown.
       - ${BWTIDY_BACKUPS:-bwtidy-backups}:/backups
+      ## the usage stats file, which stays empty unless BWTIDY_STATS=1. It lies outside the
+      ## accounts and the backups, whose directories belong to the account uids.
+      - bwtidy-stats:/stats
     ## the image has no curl or wget, and the endpoint needs no login
     healthcheck:
       test:
@@ -85,3 +89,4 @@ services:
 volumes:
   bwtidy-accounts:
   bwtidy-backups:
+  bwtidy-stats:

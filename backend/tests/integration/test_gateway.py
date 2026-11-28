@@ -33,7 +33,9 @@ from mcp.types import TextContent
 from support.app import purge_tool_notes
 from support.cli import EMAIL, PASSWORD, SERVER, BwCli
 
+from bwtidy.gateway.accounts import AccountKey
 from bwtidy.gateway.app import LOCKED
+from bwtidy.gateway.settings import RUN_DIR
 from bwtidy.gateway.workers import STOP_TIMEOUT
 from bwtidy.login_state import LOGGED_IN, LOGGED_OUT
 from bwtidy.mcp_token import UNAUTHORIZED
@@ -129,6 +131,11 @@ class GatewayProcess:
     def directory(self, email: str) -> Path:
         return self.accounts_dir / "vaultwarden" / email
 
+    def run(self, email: str) -> Path:
+        """The account's socket directory (docs/spec.md, Socket directories)."""
+        key = AccountKey(server=SERVER, email=email, host_dir="vaultwarden")
+        return self.accounts_dir / RUN_DIR / key.run_name
+
     def backups(self, email: str) -> Path:
         return self.backups_root / "vaultwarden" / email
 
@@ -192,9 +199,7 @@ def running_gateway(base: Path, stats: bool = False) -> Generator[GatewayProcess
 
 
 def short_base() -> Path:
-    """Short paths (a unix socket path has a limit of about 100 bytes), and the workers' uids
-    must be able to enter the parents of their directories, which pytest's tmp dirs forbid.
-    """
+    """A base whose parents the workers' uids can enter, which pytest's tmp dirs forbid."""
     base = Path(tempfile.mkdtemp(prefix="gw.", dir="/tmp"))
     base.chmod(0o711)
     return base
@@ -235,7 +240,7 @@ def worker_pids(gateway: GatewayProcess, email: str) -> list[int]:
     Root in the container has no CAP_SYS_PTRACE, so another uid's environ and cwd in /proc
     cannot be read, the command line and the status can.
     """
-    wanted = f"unix://{gateway.directory(email) / 'run' / 'bw.sock'}".encode()
+    wanted = f"unix://{gateway.run(email) / 'bw.sock'}".encode()
     pids = set()
     for proc in Path("/proc").iterdir():
         if not proc.name.isdigit():
@@ -328,8 +333,14 @@ def test_each_account_has_its_own_uid_directory_and_processes(gateway: GatewayPr
             sub = path / name
             assert sub.stat().st_uid == uid
             assert sub.stat().st_mode & 0o777 == 0o700
-        assert (path / "run" / "app.sock").is_socket()
-        assert (path / "run" / "bw.sock").is_socket()
+        run = gateway.run(email)
+        assert run.stat().st_uid == uid
+        assert run.stat().st_gid == uid
+        assert run.stat().st_mode & 0o777 == 0o700
+        assert run.parent.stat().st_mode & 0o777 == 0o711
+        assert run.parent.stat().st_uid == 0
+        assert (run / "app.sock").is_socket()
+        assert (run / "bw.sock").is_socket()
         assert (path / "app" / "bwtidy.sqlite").stat().st_uid == uid
         ## the worker's note for the gateway, as its own uid
         state_file = path / "app" / LOGIN_STATE_FILE
@@ -356,7 +367,7 @@ def test_each_account_has_its_own_uid_directory_and_processes(gateway: GatewayPr
 ## run as one account's uid against the other's directory: every access must be denied
 PEEK = """
 import json, os, socket, sys
-other, own, other_backups = sys.argv[1], sys.argv[2], sys.argv[3]
+other, other_backups, other_run, own_run = sys.argv[1:5]
 results = {}
 
 def attempt(name, action):
@@ -374,10 +385,12 @@ attempt("listdir", lambda: os.listdir(other))
 attempt("sqlite", lambda: open(os.path.join(other, "app", "bwtidy.sqlite"), "rb"))
 attempt("bw state", lambda: os.listdir(os.path.join(other, "bw")))
 attempt("worker log", lambda: open(os.path.join(other, "worker.log"), "rb"))
-attempt("bw.sock", lambda: connect(os.path.join(other, "run", "bw.sock")))
-attempt("app.sock", lambda: connect(os.path.join(other, "run", "app.sock")))
+attempt("bw.sock", lambda: connect(os.path.join(other_run, "bw.sock")))
+attempt("app.sock", lambda: connect(os.path.join(other_run, "app.sock")))
+attempt("socket directory", lambda: os.listdir(other_run))
+attempt("socket root", lambda: os.listdir(os.path.dirname(other_run)))
 attempt("backups", lambda: os.listdir(other_backups))
-attempt("own bw.sock", lambda: connect(os.path.join(own, "run", "bw.sock")))
+attempt("own bw.sock", lambda: connect(os.path.join(own_run, "bw.sock")))
 print(json.dumps(results))
 """
 
@@ -386,7 +399,16 @@ def test_one_account_cannot_reach_the_other(gateway: GatewayProcess):
     a, b = gateway.directory(EMAIL), gateway.directory(RESTORE_EMAIL)
     uid_a = a.stat().st_uid
     result = subprocess.run(
-        [sys.executable, "-I", "-c", PEEK, str(b), str(a), str(gateway.backups(RESTORE_EMAIL))],
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            PEEK,
+            str(b),
+            str(gateway.backups(RESTORE_EMAIL)),
+            str(gateway.run(RESTORE_EMAIL)),
+            str(gateway.run(EMAIL)),
+        ],
         user=uid_a,
         group=uid_a,
         extra_groups=[],

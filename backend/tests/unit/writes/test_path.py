@@ -90,10 +90,10 @@ def test_an_empty_item_list_right_after_the_sync_is_asked_again(env: AppEnv):
     response = env.post(op)
     assert response.status_code == 200, response.text
     assert env.item("login-1")["login"]["username"] == "patient@example.test"
-    ## two empty answers, the real one and the trash listing (the same path) before the
-    ## check, the same four after the sync that follows the backup and for the reload after
-    ## the write
-    assert env.bw.calls("GET", "/list/object/items") == lists + 4 + 4 + 4
+    ## two empty answers, the real one, the trash listing and the archived items outside and
+    ## inside the trash (the same path) before the check, the same six after the sync that
+    ## follows the backup and for the reload after the write
+    assert env.bw.calls("GET", "/list/object/items") == lists + 6 + 6 + 6
     assert len(env.app.state.bw.session.cache.items) == len(env.bw.items)
 
 
@@ -935,6 +935,24 @@ def test_a_write_after_a_folder_move_elsewhere_does_not_reuse_the_old_backup(env
     response = env.post(env.set_leaf("login-1", "login.username", "x@example.test"))
     assert response.status_code == 200, response.text
     assert response.json()["backup"] != env.login_backup, "the login backup holds the old folder"
+
+
+def test_a_change_of_an_archived_item_elsewhere_makes_a_fresh_backup(env: AppEnv):
+    """Only archived=true lists an archived item, and the backup holds it, so a change of it
+    must keep a write from reusing the backup taken before."""
+    [note] = [i for i in env.bw.items if i["id"] == "note-1"]
+    env.bw.items.remove(note)
+    archived = {**note, "archivedDate": "2026-10-26T13:00:00.000Z"}
+    env.bw.archived.append(archived)
+    first = env.post(env.set_leaf("login-1", "login.username", "first@example.test"))
+    assert first.status_code == 200
+    after_first = env.backups[-1]
+    assert env.writes.db.backup_fingerprint(after_first) == env.keeper.vault_fingerprint()
+    ## another device edits the archived item, which stays archived
+    archived["revisionDate"] = "2026-10-26T16:00:00.000Z"
+    second = env.post(env.set_leaf("card-1", "card.brand", "Mastercard"))
+    assert second.status_code == 200
+    assert second.json()["backup"] != after_first, "the backup holds the old archived item"
 
 
 def test_every_kind_of_operation_has_a_function_that_applies_it():
