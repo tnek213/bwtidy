@@ -14,8 +14,8 @@ x-demo-image: &demo-image
     context: ${DEMO_BUILD_CONTEXT:-.}
     dockerfile: demo/Dockerfile
     args:
-      ## a deploy pins a short-commit tag or a version instead of main
-      BWTIDY_IMAGE: ${BWTIDY_IMAGE:-docker.io/tnek213/bwtidy:main}
+      ## a deploy pins the version of the git tag it builds from instead of latest
+      BWTIDY_IMAGE: ${BWTIDY_IMAGE:-docker.io/tnek213/bwtidy:latest}
 
 ## the same as compose.yaml: the logs of a long running container never fill the disk
 x-logging: &logging

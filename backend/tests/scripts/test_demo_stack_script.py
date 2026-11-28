@@ -52,6 +52,30 @@ def test_test_runs_the_stack_tests_of_the_demo_project_against_the_stack(script)
     assert env["DEMO_STACK_PROJECT"] == script.demo.project_name(script.ROOT)
 
 
+def test_test_builds_the_demo_on_the_normal_image_built_from_the_worktree(load_script, monkeypatch):
+    module = load_script("demo-stack")
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs.get("env")))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(module.subprocess, "run", run)
+    monkeypatch.setattr(module.demo, "pick_port", lambda root: 82)
+    monkeypatch.setattr(module.demo.git, "commit", lambda name, root: "261128 abc1234")
+    assert module.main(["test"]) == 0
+    base = module.demo.base_image(module.ROOT)
+    build_base, build_demo, start, tests = (command for command, _ in calls)
+    assert build_base[:4] == ["docker", "build", "--target", "app"]
+    assert build_base[-3:] == ["--tag", base, str(module.ROOT)]
+    assert f"BWTIDY_IMAGE={base}" in build_demo
+    assert build_demo[-1] == str(module.ROOT)
+    assert "docker.io/tnek213/bwtidy" not in " ".join(build_base + build_demo)
+    assert start == module.demo.compose(module.ROOT, "up", "--detach", "--wait", "--no-build")
+    assert calls[2][1]["BWTIDY_IMAGE"] == base
+    assert tests[4:6] == ["pytest", "tests/stack"]
+
+
 def test_url_needs_a_running_stack(script, capsys, monkeypatch):
     assert script.main(["url"]) == 0
     assert capsys.readouterr().out == "http://127.0.0.1:81\n"

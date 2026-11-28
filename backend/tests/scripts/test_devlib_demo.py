@@ -39,7 +39,7 @@ def test_the_environment_sets_the_stacks_own_values_and_passes_the_settings_on()
         "DOCKER_CONFIG": "/tmp/config",
         "DEMO_MAX": "1",
         "DEMO_START_RATE": "1r/s",
-        "BWTIDY_IMAGE": "docker.io/someone/else:main",
+        "BWTIDY_IMAGE": "docker.io/someone/else:1.0.0",
         "DEMO_IMAGE": "other:tag",
         "DEMO_BIND": "0.0.0.0",
         "DEMO_PORT": "80",

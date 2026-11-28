@@ -805,7 +805,9 @@ The admin API's user deletion is tested against the mock only.
 ### The stack test
 
 `scripts/demo-stack test` proves the two guarantees on running containers.
-It builds the normal image from the worktree, the demo image on top of it,
+It builds the normal image from the worktree, the demo image on top of it
+(never on a published image, so a change to the demo is tested with the code
+beside it and not with the last release),
 starts the stack on a free port of 127.0.0.1 (in a compose project, with
 images and a public bridge named after the worktree, so several worktrees
 never share one) and
@@ -872,22 +874,22 @@ docker compose -f compose.demo.yaml up -d --build
 The demo then answers on `http://127.0.0.1:8770`. Every setting has a
 default. A `.env` beside the compose file or the environment changes it:
 
-| Setting                                                                  | Default                         | What                                                                               |
-| ------------------------------------------------------------------------ | ------------------------------- | ---------------------------------------------------------------------------------- |
-| `BWTIDY_IMAGE`                                                           | `docker.io/tnek213/bwtidy:main` | the normal image the demo image is built on                                        |
-| `DEMO_IMAGE`                                                             | `bwtidy-demo:local`             | the name the built demo image gets                                                 |
-| `DEMO_BUILD_CONTEXT`                                                     | `.`                             | the build context: the checkout, or a git URL                                      |
-| `DEMO_BIND`, `DEMO_PORT`                                                 | `127.0.0.1`, `8770`             | where the edge is published                                                        |
-| `DEMO_EDGE_PORT`                                                         | `80`                            | the port nginx listens on inside the edge, the published port maps to it           |
-| `DEMO_TRUSTED_PROXIES`                                                   | empty                           | reverse proxies whose `X-Forwarded-For` is believed (Behind a reverse proxy)       |
-| `DEMO_PUBLIC_BRIDGE`                                                     | `br-bwtidy-demo`                | the bridge name of the network `public`, at most 15 characters (Limit the way out) |
-| `DEMO_HOST`                                                              | empty                           | the public host name, for MCP's host check (`BWTIDY_MCP_HOSTS`)                    |
-| `DEMO_SECURE_COOKIES`                                                    | empty                           | `1` behind HTTPS (`BWTIDY_SECURE_COOKIES`)                                         |
-| `DEMO_POOL_READY`, `DEMO_MAX`                                            | 2, 6                            | the pool and the visitors at once                                                  |
-| `DEMO_MAX_PENDING`                                                       | 2                               | starts in flight (`BWTIDY_MAX_PENDING`)                                            |
-| `DEMO_SESSION_IDLE`, `DEMO_SESSION_MAX`                                  | 900, 2700                       | seconds, the idle end and the hard maximum                                         |
-| `DEMO_START_RATE`, `DEMO_START_BURST`, `DEMO_MCP_RATE`, `DEMO_MCP_BURST` | `6r/m`, 5, `10r/s`, 40          | the edge's limits per address                                                      |
-| `DEMO_VAULTWARDEN_DATA_SIZE`, `DEMO_ACCOUNTS_SIZE`                       | `256m`, `512m`                  | the two tmpfs the visitors fill                                                    |
+| Setting                                                                  | Default                           | What                                                                               |
+| ------------------------------------------------------------------------ | --------------------------------- | ---------------------------------------------------------------------------------- |
+| `BWTIDY_IMAGE`                                                           | `docker.io/tnek213/bwtidy:latest` | the normal image the demo image is built on                                        |
+| `DEMO_IMAGE`                                                             | `bwtidy-demo:local`               | the name the built demo image gets                                                 |
+| `DEMO_BUILD_CONTEXT`                                                     | `.`                               | the build context: the checkout, or a git URL                                      |
+| `DEMO_BIND`, `DEMO_PORT`                                                 | `127.0.0.1`, `8770`               | where the edge is published                                                        |
+| `DEMO_EDGE_PORT`                                                         | `80`                              | the port nginx listens on inside the edge, the published port maps to it           |
+| `DEMO_TRUSTED_PROXIES`                                                   | empty                             | reverse proxies whose `X-Forwarded-For` is believed (Behind a reverse proxy)       |
+| `DEMO_PUBLIC_BRIDGE`                                                     | `br-bwtidy-demo`                  | the bridge name of the network `public`, at most 15 characters (Limit the way out) |
+| `DEMO_HOST`                                                              | empty                             | the public host name, for MCP's host check (`BWTIDY_MCP_HOSTS`)                    |
+| `DEMO_SECURE_COOKIES`                                                    | empty                             | `1` behind HTTPS (`BWTIDY_SECURE_COOKIES`)                                         |
+| `DEMO_POOL_READY`, `DEMO_MAX`                                            | 2, 6                              | the pool and the visitors at once                                                  |
+| `DEMO_MAX_PENDING`                                                       | 2                                 | starts in flight (`BWTIDY_MAX_PENDING`)                                            |
+| `DEMO_SESSION_IDLE`, `DEMO_SESSION_MAX`                                  | 900, 2700                         | seconds, the idle end and the hard maximum                                         |
+| `DEMO_START_RATE`, `DEMO_START_BURST`, `DEMO_MCP_RATE`, `DEMO_MCP_BURST` | `6r/m`, 5, `10r/s`, 40            | the edge's limits per address                                                      |
+| `DEMO_VAULTWARDEN_DATA_SIZE`, `DEMO_ACCOUNTS_SIZE`                       | `256m`, `512m`                    | the two tmpfs the visitors fill                                                    |
 
 The server (`https://vaultwarden`) is no setting: the compose file names it,
 and the wrapper refuses to start with any other.
@@ -898,35 +900,40 @@ each worker with the `bwtidy` script beside its own Python, so a second venv
 would not do): first the packages of `demo/uv.lock` at their locked
 versions and hashes, which the base already holds unless the two lock files
 drifted, then the project alone, both without resolving anything. The
-bwtidy in the demo image is the base's, never the checkout's sources. The
-default base follows `main`. A deployment pins a short-commit tag or a
-version, so it runs a bwtidy somebody chose:
+bwtidy in the demo image is the base's, never the checkout's sources.
+
+The demo runs only a release. The default base is `latest`, the newest
+release. A deployment builds the demo layer from a release's git tag on the
+image of that same version, never from main or another commit, so the demo's
+code always matches the bwtidy it wraps:
 
 ```sh
-BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234 docker compose -f compose.demo.yaml up -d --build
+git checkout v1.0.0-beta.3
+BWTIDY_IMAGE=docker.io/tnek213/bwtidy:1.0.0-beta.3 docker compose -f compose.demo.yaml up -d --build
 ```
 
 Without a checkout, the host needs `compose.demo.yaml` and
 `demo/edge/default.conf.template` and `demo/edge/15-trusted-proxies.sh` (the
 edge mounts them) at their paths, and
-`DEMO_BUILD_CONTEXT` names the repo for the build, a branch or commit after
+`DEMO_BUILD_CONTEXT` names the repo for the build, the release's tag after
 `#`:
 
 ```sh
-DEMO_BUILD_CONTEXT=https://github.com/tnek213/bwtidy.git#main docker compose -f compose.demo.yaml up -d --build
+DEMO_BUILD_CONTEXT=https://github.com/tnek213/bwtidy.git#v1.0.0-beta.3 BWTIDY_IMAGE=docker.io/tnek213/bwtidy:1.0.0-beta.3 docker compose -f compose.demo.yaml up -d --build
 ```
 
 `docker compose build` needs buildx 0.17 or later. With an older one, build
 with plain docker and start without a build, as `scripts/demo-stack` does:
 
 ```sh
-docker build -f demo/Dockerfile --build-arg BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234 -t bwtidy-demo:local .
+docker build -f demo/Dockerfile --build-arg BWTIDY_IMAGE=docker.io/tnek213/bwtidy:1.0.0-beta.3 -t bwtidy-demo:local .
 docker compose -f compose.demo.yaml up -d --no-build
 ```
 
-To build on the checkout's own bwtidy instead of a published image, build
-the normal image first (`docker build --target app -t bwtidy:demo-base .`)
-and set `BWTIDY_IMAGE=bwtidy:demo-base`.
+For local work the demo builds on the checkout's own bwtidy instead of a
+published image, as `scripts/demo-stack` does (The stack test). Build the
+normal image first (`docker build --target app -t bwtidy:demo-base .`) and
+set `BWTIDY_IMAGE=bwtidy:demo-base`.
 
 After a changed setting, `up -d` again makes the containers it concerns
 anew. `docker compose -f compose.demo.yaml down` stops the stack and keeps
@@ -1072,9 +1079,9 @@ public there). Keep the default `DEMO_BIND=127.0.0.1`, so the edge listens
 on loopback of the host and nothing else can connect:
 
 ```sh
-git clone https://github.com/tnek213/bwtidy.git
+git clone --branch v1.0.0-beta.3 https://github.com/tnek213/bwtidy.git
 cd bwtidy
-BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234 docker compose -f compose.demo.yaml up -d --build
+BWTIDY_IMAGE=docker.io/tnek213/bwtidy:1.0.0-beta.3 docker compose -f compose.demo.yaml up -d --build
 ```
 
 From a laptop, an SSH tunnel brings the port over, and the demo is at
@@ -1104,22 +1111,22 @@ front of it holds the certificate for the public name.
 1. Put these in a `.env` beside `compose.demo.yaml`, with the public name:
 
    ```sh
-   BWTIDY_IMAGE=docker.io/tnek213/bwtidy:abc1234
+   BWTIDY_IMAGE=docker.io/tnek213/bwtidy:1.0.0-beta.3
    DEMO_HOST=demo.example.org
    DEMO_SECURE_COOKIES=1
    ```
 
    `DEMO_SECURE_COOKIES=1` sets the Secure flag on the cookies, which only
    works behind HTTPS. `DEMO_HOST` lets MCP's host check accept the name.
-   `BWTIDY_IMAGE` pins the normal image to a short-commit tag, so the demo
+   `BWTIDY_IMAGE` pins the normal image to a release, so the demo
    runs a bwtidy somebody chose.
 
-2. Build from a pinned commit with a remote git context, so the VPS needs no
-   checkout of the sources (only `compose.demo.yaml` and
-   the two files of `demo/edge` at their paths):
+2. Build from the tag of that release with a remote git context, so the VPS
+   needs no checkout of the sources (only `compose.demo.yaml` and the two
+   files of `demo/edge` at their paths, taken from the same tag):
 
    ```sh
-   DEMO_BUILD_CONTEXT=https://github.com/tnek213/bwtidy.git#COMMIT docker compose -f compose.demo.yaml up -d --build
+   DEMO_BUILD_CONTEXT=https://github.com/tnek213/bwtidy.git#v1.0.0-beta.3 docker compose -f compose.demo.yaml up -d --build
    ```
 
    With a buildx older than 0.17, build with plain docker as in Run it.
@@ -1154,10 +1161,10 @@ front of it holds the certificate for the public name.
    the proxy for every visitor, unless the edge trusts the proxy's
    `X-Forwarded-For` (Behind a reverse proxy).
 
-Updating: pull the new commit or set a new `COMMIT` and `BWTIDY_IMAGE`, and
-run the `up -d --build` again. Every container that changed is made anew,
-and every demo running ends with it (Vaultwarden starts empty). The ledger
-volume stays, so no id is used twice.
+Updating: check out the new release's tag or set it in `DEMO_BUILD_CONTEXT`,
+set its version in `BWTIDY_IMAGE` and run the `up -d --build` again. Every
+container that changed is made anew, and every demo running ends with it
+(Vaultwarden starts empty). The ledger volume stays, so no id is used twice.
 
 Logs: `docker compose -f compose.demo.yaml logs -f demo controller edge`
 (each log is capped at 3 files of 10 MB). The controller's counts are in the

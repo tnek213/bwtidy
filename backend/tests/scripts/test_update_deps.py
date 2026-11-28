@@ -22,7 +22,7 @@ FROM --platform=linux/amd64 python:3.13-slim-trixie@{OLD} AS python
 
 DEMO_DOCKERFILE = f"""# syntax=docker/dockerfile:1@{OLD}
 
-ARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:main
+ARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:latest
 
 FROM ghcr.io/astral-sh/uv:0.11@{OLD} AS uv
 

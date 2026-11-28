@@ -152,7 +152,8 @@ def test_vaultwarden_is_the_version_of_the_dev_stack():
 
 
 def test_the_demo_image_is_built_on_the_normal_image_with_uv_alone():
-    assert "\nARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:main\n" in DEMO_DOCKERFILE
+    assert "\nARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:latest\n" in DEMO_DOCKERFILE
+    assert "BWTIDY_IMAGE: ${BWTIDY_IMAGE:-docker.io/tnek213/bwtidy:latest}\n" in COMPOSE
     assert "\nFROM ${BWTIDY_IMAGE}\n" in DEMO_DOCKERFILE
     code = [line for line in DEMO_DOCKERFILE.splitlines() if not line.startswith("#")]
     ## the normal image has no pip
