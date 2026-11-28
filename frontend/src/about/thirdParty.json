@@ -505,7 +505,7 @@
   },
   {
     "name": "fastapi",
-    "version": "0.162.7",
+    "version": "0.165.0",
     "ecosystem": "PyPI",
     "license": "MIT",
     "direct": true
@@ -526,7 +526,7 @@
   },
   {
     "name": "fontawesome",
-    "version": "0.0.42",
+    "version": "0.0.43",
     "ecosystem": "zensical-ui",
     "license": "CC-BY-4.0",
     "direct": false
@@ -652,14 +652,14 @@
   },
   {
     "name": "lucide",
-    "version": "0.0.42",
+    "version": "0.0.43",
     "ecosystem": "zensical-ui",
     "license": "ISC AND MIT",
     "direct": false
   },
   {
     "name": "material",
-    "version": "0.0.42",
+    "version": "0.0.43",
     "ecosystem": "zensical-ui",
     "license": "Apache-2.0",
     "direct": false
@@ -694,7 +694,7 @@
   },
   {
     "name": "octicons",
-    "version": "0.0.42",
+    "version": "0.0.43",
     "ecosystem": "zensical-ui",
     "license": "MIT",
     "direct": false
@@ -953,7 +953,7 @@
   },
   {
     "name": "zensical-ui",
-    "version": "0.0.42",
+    "version": "0.0.43",
     "ecosystem": "PyPI",
     "license": "MIT",
     "direct": false
