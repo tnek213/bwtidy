@@ -11,7 +11,7 @@
 ARG BWTIDY_IMAGE=docker.io/tnek213/bwtidy:latest
 
 ## the same uv as the normal Dockerfile, pinned the same way
-FROM ghcr.io/astral-sh/uv:0.11@sha256:77280f2f771df71f90786c314fe1bbc1e023feac652969bbf139c280babf2eb7 AS uv
+FROM ghcr.io/astral-sh/uv:0.13@sha256:a3ea1357342c1a4bf9a0c53a3deb1b55379aefa037338d8113d5771efa01774f AS uv
 
 FROM ${BWTIDY_IMAGE}
 
